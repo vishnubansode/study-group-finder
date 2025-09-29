@@ -1,7 +1,7 @@
 /* eslint-disable react-refresh/only-export-components */
 // src/context/AuthContext.jsx
 import { createContext, useState, useEffect } from "react";
-import { loginUser, registerUser } from "../services/api"; // named imports
+import { loginUser, registerUser, getMe } from "../services/api"; // named imports
 
 // 1. Export the Context object
 export const AuthContext = createContext();
@@ -12,47 +12,48 @@ export function AuthProvider({ children }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const token = localStorage.getItem("token");
+    const token = localStorage.getItem("token") || sessionStorage.getItem("token");
     if (token) {
-      fetchUserProfile(token);
+      fetchUserProfile();
     } else {
       setLoading(false);
     }
   }, []);
 
-  const fetchUserProfile = async (token) => {
+  const fetchUserProfile = async () => {
     try {
-      // NOTE: For a real app, move this URL to an environment variable (.env)
-      const res = await fetch("http://localhost:5000/api/auth/me", {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (!res.ok) throw new Error("Failed to fetch user");
-      const data = await res.json();
-      setUser(data);
+      const res = await getMe();
+      setUser(res.data);
     } catch {
       localStorage.removeItem("token");
+      sessionStorage.removeItem("token");
       setUser(null);
     } finally {
       setLoading(false);
     }
   };
 
-  const login = async (credentials) => {
-    // Assuming loginUser returns a response object with a data property
-    const res = await loginUser(credentials); 
-    const { token, user } = res.data;
-    localStorage.setItem("token", token);
-    setUser(user);
+  const login = async (credentials, { remember = true } = {}) => {
+    const res = await loginUser(credentials);
+    const { token, user: userFromResponse } = res.data;
+    if (remember) localStorage.setItem("token", token); else sessionStorage.setItem("token", token);
+    if (userFromResponse) setUser(userFromResponse); else await fetchUserProfile();
     return res;
   };
 
   const register = async (payload) => {
     const res = await registerUser(payload);
+    const { token, user: userFromResponse } = res.data || {};
+    if (token) {
+      localStorage.setItem("token", token);
+      if (userFromResponse) setUser(userFromResponse); else await fetchUserProfile();
+    }
     return res;
   };
 
   const logout = () => {
     localStorage.removeItem("token");
+    sessionStorage.removeItem("token");
     setUser(null);
   };
 

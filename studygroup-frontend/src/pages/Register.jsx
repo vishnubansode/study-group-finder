@@ -3,19 +3,67 @@ import { useNavigate } from "react-router-dom";
 import { registerUser } from "../services/api";
 
 export default function Register() {
+  const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [academicDetails, setAcademicDetails] = useState("");
+  const [avatar, setAvatar] = useState(null);
   const [error, setError] = useState("");
+  const [fieldErrors, setFieldErrors] = useState({});
+  const [submitting, setSubmitting] = useState(false);
   const navigate = useNavigate();
+
+  const validate = () => {
+    const errs = {};
+    if (!name.trim()) errs.name = "Name is required";
+    if (!email.trim()) errs.email = "Email is required";
+    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) errs.email = "Enter a valid email";
+    if (!password) errs.password = "Password is required";
+    else if (password.length < 6) errs.password = "Password must be at least 6 characters";
+    if (confirmPassword !== password) errs.confirmPassword = "Passwords do not match";
+    if (!academicDetails.trim()) errs.academicDetails = "Academic details are required";
+    setFieldErrors(errs);
+    return Object.keys(errs).length === 0;
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    setError("");
+    if (!validate()) return;
+    setSubmitting(true);
     try {
-      await registerUser({ email, password });
-      alert("Registration successful! Please login.");
-      navigate("/login");
+      const payload = { name, email, password, academic_details: academicDetails };
+      // Some Spring Boot backends return token on register, some don't. Handle both.
+      const res = await registerUser(payload);
+      const { token } = res.data || {};
+      if (token) {
+        localStorage.setItem("token", token);
+        // Optional immediate avatar upload if provided
+        if (avatar) {
+          try {
+            const formData = new FormData();
+            formData.append("avatar", avatar);
+            await fetch((import.meta.env.VITE_API_URL || "http://localhost:5000/api") + "/users/me/avatar", {
+              method: "POST",
+              headers: { Authorization: `Bearer ${token}` },
+              body: formData,
+            });
+          } catch {}
+        }
+        navigate("/dashboard");
+      } else {
+        alert("Registration successful! Please login.");
+        navigate("/login");
+      }
     } catch (err) {
-      setError(err.response?.data?.message || "Registration failed");
+      const message = err.response?.data?.message || err.response?.data?.error || "Registration failed";
+      if (String(message).toLowerCase().includes("email") && String(message).toLowerCase().includes("exist")) {
+        setFieldErrors((p) => ({ ...p, email: "Email already exists" }));
+      }
+      setError(message);
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -131,6 +179,18 @@ export default function Register() {
         <form onSubmit={handleSubmit} className="auth-form" autoComplete="off">
           <input
             className="auth-input"
+            type="text"
+            placeholder="Full name"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            name="name"
+            autoComplete="off"
+            spellCheck={false}
+          />
+          {fieldErrors.name && <span style={{ color: '#b91c1c', fontSize: 12 }}>{fieldErrors.name}</span>}
+
+          <input
+            className="auth-input"
             type="email"
             placeholder="Email"
             value={email}
@@ -139,20 +199,54 @@ export default function Register() {
             autoComplete="off"
             inputMode="email"
             spellCheck={false}
-            required
           />
+          {fieldErrors.email && <span style={{ color: '#b91c1c', fontSize: 12 }}>{fieldErrors.email}</span>}
+
           <input
             className="auth-input"
             type="password"
-            placeholder="Password"
+            placeholder="Password (min 6 chars)"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             name="password"
             autoComplete="off"
             spellCheck={false}
-            required
           />
-          <button className="auth-button" type="submit">Register</button>
+          {fieldErrors.password && <span style={{ color: '#b91c1c', fontSize: 12 }}>{fieldErrors.password}</span>}
+
+          <input
+            className="auth-input"
+            type="password"
+            placeholder="Confirm password"
+            value={confirmPassword}
+            onChange={(e) => setConfirmPassword(e.target.value)}
+            name="confirmPassword"
+            autoComplete="off"
+            spellCheck={false}
+          />
+          {fieldErrors.confirmPassword && <span style={{ color: '#b91c1c', fontSize: 12 }}>{fieldErrors.confirmPassword}</span>}
+
+          <input
+            className="auth-input"
+            type="text"
+            placeholder="Academic details (e.g., CS, Year 2)"
+            value={academicDetails}
+            onChange={(e) => setAcademicDetails(e.target.value)}
+            name="academic_details"
+            autoComplete="off"
+            spellCheck={false}
+          />
+          {fieldErrors.academicDetails && <span style={{ color: '#b91c1c', fontSize: 12 }}>{fieldErrors.academicDetails}</span>}
+
+          <input
+            className="auth-input"
+            type="file"
+            accept="image/*"
+            onChange={(e) => setAvatar(e.target.files?.[0] ?? null)}
+            name="avatar"
+          />
+
+          <button className="auth-button" type="submit" disabled={submitting}>{submitting ? "Registering..." : "Register"}</button>
         </form>
       </div>
     </div>

@@ -5,18 +5,39 @@ import { loginUser } from "../services/api";
 export default function Login() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [remember, setRemember] = useState(false);
   const [error, setError] = useState("");
+  const [submitting, setSubmitting] = useState(false);
   const navigate = useNavigate();
+
+  const validate = () => {
+    if (!email.trim() || !password) return false;
+    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    setError("");
+    if (!validate()) {
+      setError("Enter a valid email and password");
+      return;
+    }
+    setSubmitting(true);
     try {
       const res = await loginUser({ email, password });
-      localStorage.setItem("token", res.data.token); // save JWT
+      const token = res.data?.token;
+      if (!token) throw new Error("No token returned");
+      if (remember) {
+        localStorage.setItem("token", token);
+      } else {
+        sessionStorage.setItem("token", token);
+      }
       alert("Login successful!");
-      navigate("/dashboard"); // redirect after login
+      navigate("/dashboard");
     } catch (err) {
-      setError(err.response?.data?.message || "Invalid credentials");
+      setError(err.response?.data?.message || err.message || "Invalid credentials");
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -140,7 +161,6 @@ export default function Login() {
             autoComplete="off"
             inputMode="email"
             spellCheck={false}
-            required
           />
           <input
             className="auth-input"
@@ -151,9 +171,12 @@ export default function Login() {
             name="password"
             autoComplete="off"
             spellCheck={false}
-            required
           />
-          <button className="auth-button" type="submit">Login</button>
+          <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: '#374151' }}>
+            <input type="checkbox" checked={remember} onChange={(e) => setRemember(e.target.checked)} />
+            Remember me
+          </label>
+          <button className="auth-button" type="submit" disabled={submitting}>{submitting ? "Logging in..." : "Login"}</button>
         </form>
       </div>
     </div>

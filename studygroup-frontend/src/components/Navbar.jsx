@@ -66,6 +66,7 @@ export default function Navbar() {
           {user ? (
             <>
               <span className="sg-user">Hi, {user.name || user.email}</span>
+              <Link className="sg-link" to="/profile">Profile</Link>
               <button className="sg-btn" onClick={logout}>Logout</button>
             </>
           ) : (
