@@ -1,0 +1,255 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Definition of the design system. All colors, gradients, fonts, etc should be defined here. 
+All colors MUST be HSL.
+*/
+
+@layer base {
+  :root {
+    /* Academic Theme - Professional Blue & Purple Palette */
+    --background: 0 0% 100%;
+    --foreground: 223 47% 11%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 223 47% 11%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 223 47% 11%;
+
+    /* GroupGenius Indigo Primary */
+    --primary: 231 98% 67%;
+    --primary-foreground: 0 0% 100%;
+    --primary-hover: 231 98% 57%;
+
+    /* Soft Academic Purple Secondary */
+    --secondary: 262 83% 78%;
+    --secondary-foreground: 223 47% 11%;
+    --secondary-hover: 262 83% 68%;
+
+    --muted: 220 13% 96%;
+    --muted-foreground: 220 9% 46%;
+
+    /* Success Green Accent */
+    --accent: 142 71% 45%;
+    --accent-foreground: 0 0% 100%;
+    --accent-hover: 142 71% 35%;
+
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 220 13% 91%;
+    --input: 220 13% 91%;
+    --ring: 213 94% 68%;
+
+    /* GroupGenius Gradients */
+    --gradient-primary: linear-gradient(135deg, hsl(231 98% 67%), hsl(262 83% 78%));
+    --gradient-secondary: linear-gradient(135deg, hsl(220 13% 96%), hsl(0 0% 100%));
+    --gradient-accent: linear-gradient(135deg, hsl(142 71% 45%), hsl(231 98% 67%));
+    
+    /* Shadows for GroupGenius Cards */
+    --shadow-card: 0 2px 8px -2px hsl(231 98% 67% / 0.1);
+    --shadow-card-hover: 0 8px 25px -8px hsl(231 98% 67% / 0.25);
+    --shadow-elegant: 0 10px 40px -10px hsl(231 98% 67% / 0.2);
+
+    /* Animation Variables */
+    --transition-smooth: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    --transition-bounce: all 0.4s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+
+    --radius: 0.5rem;
+
+    --sidebar-background: 0 0% 98%;
+
+    --sidebar-foreground: 240 5.3% 26.1%;
+
+    --sidebar-primary: 240 5.9% 10%;
+
+    --sidebar-primary-foreground: 0 0% 98%;
+
+    --sidebar-accent: 240 4.8% 95.9%;
+
+    --sidebar-accent-foreground: 240 5.9% 10%;
+
+    --sidebar-border: 220 13% 91%;
+
+    --sidebar-ring: 217.2 91.2% 59.8%;
+  }
+
+  .dark {
+    /* Dark Academic Theme */
+    --background: 223 47% 7%;
+    --foreground: 213 31% 91%;
+
+    --card: 223 47% 9%;
+    --card-foreground: 213 31% 91%;
+
+    --popover: 223 47% 9%;
+    --popover-foreground: 213 31% 91%;
+
+    /* Dark GroupGenius Colors */
+    --primary: 231 98% 67%;
+    --primary-foreground: 0 0% 100%;
+    --primary-hover: 231 98% 77%;
+
+    --secondary: 262 83% 68%;
+    --secondary-foreground: 0 0% 100%;
+    --secondary-hover: 262 83% 78%;
+
+    --muted: 223 47% 13%;
+    --muted-foreground: 213 31% 71%;
+
+    --accent: 142 71% 55%;
+    --accent-foreground: 0 0% 100%;
+    --accent-hover: 142 71% 65%;
+
+    --destructive: 0 62% 50%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 223 47% 15%;
+    --input: 223 47% 15%;
+    --ring: 213 94% 68%;
+
+    /* Dark GroupGenius Gradients */
+    --gradient-primary: linear-gradient(135deg, hsl(231 98% 67%), hsl(262 83% 68%));
+    --gradient-secondary: linear-gradient(135deg, hsl(223 47% 13%), hsl(223 47% 9%));
+    --gradient-accent: linear-gradient(135deg, hsl(142 71% 55%), hsl(231 98% 67%));
+    
+    /* Dark Shadows */
+    --shadow-card: 0 2px 8px -2px hsl(0 0% 0% / 0.3);
+    --shadow-card-hover: 0 8px 25px -8px hsl(0 0% 0% / 0.4);
+    --shadow-elegant: 0 10px 40px -10px hsl(0 0% 0% / 0.5);
+    --sidebar-background: 240 5.9% 10%;
+    --sidebar-foreground: 240 4.8% 95.9%;
+    --sidebar-primary: 224.3 76.3% 48%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 240 3.7% 15.9%;
+    --sidebar-accent-foreground: 240 4.8% 95.9%;
+    --sidebar-border: 240 3.7% 15.9%;
+    --sidebar-ring: 217.2 91.2% 59.8%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+  }
+}
+
+@layer components {
+  /* Academic Card Component */
+  .academic-card {
+    @apply bg-card border border-border rounded-lg p-6 shadow-[var(--shadow-card)] transition-[var(--transition-smooth)] hover:shadow-[var(--shadow-card-hover)];
+  }
+
+  /* Academic Button Variants */
+  .btn-academic {
+    @apply bg-gradient-to-r from-primary to-secondary text-primary-foreground px-6 py-3 rounded-lg font-medium transition-[var(--transition-smooth)] hover:scale-105 shadow-[var(--shadow-card)];
+  }
+
+  .btn-hero {
+    @apply bg-gradient-to-r from-primary to-secondary text-primary-foreground px-8 py-4 rounded-xl font-semibold transition-[var(--transition-bounce)] hover:scale-105 shadow-[var(--shadow-elegant)];
+  }
+
+  .btn-accent {
+    @apply bg-accent text-accent-foreground px-6 py-3 rounded-lg font-medium transition-[var(--transition-smooth)] hover:bg-accent/90 shadow-[var(--shadow-card)];
+  }
+
+  /* Academic Layout Components */
+  .hero-section {
+    @apply bg-gradient-to-br from-primary/10 via-secondary/10 to-accent/10 min-h-[60vh] flex items-center justify-center;
+  }
+
+  .sidebar-academic {
+    @apply bg-card border-r border-border w-64 h-screen fixed left-0 top-0 z-40 transition-transform duration-300;
+  }
+
+  /* Academic Typography */
+  .heading-hero {
+    @apply text-4xl md:text-6xl font-bold bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent;
+  }
+
+  .heading-section {
+    @apply text-2xl md:text-3xl font-semibold text-foreground mb-6;
+  }
+
+  /* Academic Animations */
+  .hover-lift {
+    @apply transition-[var(--transition-smooth)] hover:-translate-y-1 hover:shadow-[var(--shadow-card-hover)];
+  }
+
+  .fade-in {
+    @apply animate-[fadeIn_0.6s_ease-out];
+  }
+
+  .slide-in-right {
+    @apply animate-[slideInRight_0.5s_ease-out];
+  }
+}
+
+@layer utilities {
+  /* Academic Gradient Backgrounds */
+  .bg-gradient-academic {
+    background: var(--gradient-primary);
+  }
+
+  .bg-gradient-secondary {
+    background: var(--gradient-secondary);
+  }
+
+  .bg-gradient-accent {
+    background: var(--gradient-accent);
+  }
+
+  /* Academic Shadow Utilities */
+  .shadow-academic {
+    box-shadow: var(--shadow-card);
+  }
+
+  .shadow-academic-hover {
+    box-shadow: var(--shadow-card-hover);
+  }
+
+  .shadow-elegant {
+    box-shadow: var(--shadow-elegant);
+  }
+
+  /* Custom scrollbar */
+  .custom-scrollbar::-webkit-scrollbar {
+    width: 6px;
+  }
+
+  .custom-scrollbar::-webkit-scrollbar-track {
+    background: hsl(var(--muted) / 0.3);
+    border-radius: 3px;
+  }
+
+  .custom-scrollbar::-webkit-scrollbar-thumb {
+    background: hsl(var(--primary) / 0.4);
+    border-radius: 3px;
+  }
+
+  .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+    background: hsl(var(--primary) / 0.6);
+  }
+
+  /* Scale animation */
+  @keyframes scale-in {
+    0% {
+      transform: scale(0.8);
+      opacity: 0;
+    }
+    100% {
+      transform: scale(1);
+      opacity: 1;
+    }
+  }
+
+  .animate-scale-in {
+    animation: scale-in 0.2s ease-out;
+  }
+}
