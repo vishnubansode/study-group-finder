@@ -2,23 +2,29 @@ package com.groupgenius.groupgenius_backend.controller;
 
 import com.groupgenius.groupgenius_backend.entity.User;
 import com.groupgenius.groupgenius_backend.repository.UserRepository;
+import com.groupgenius.groupgenius_backend.security.JwtUtil;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
-
-import java.util.List;
+import org.springframework.web.bind.annotation.*;
 
 @RestController
-@RequestMapping("/users")
+@RequestMapping("/api/user")
 @RequiredArgsConstructor
 public class UserController {
 
-    private final UserRepository userRepository;  // make it final
+    private final UserRepository userRepository;
+    private final JwtUtil jwtUtil;
 
-    @GetMapping("/all")
-    public ResponseEntity<List<User>> getAllUsers() {
-        return ResponseEntity.ok(userRepository.findAll());
+    // ✅ Protected endpoint
+    @GetMapping("/me")
+    public ResponseEntity<?> getMyProfile(@RequestHeader("Authorization") String token) {
+        // Extract JWT token without "Bearer "
+        String jwt = token.replace("Bearer ", "");
+
+        String email = jwtUtil.extractUsername(jwt);
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+
+        return ResponseEntity.ok(user);
     }
 }

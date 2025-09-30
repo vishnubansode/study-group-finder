@@ -13,9 +13,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
 
 @Service
 @RequiredArgsConstructor
@@ -25,10 +22,9 @@ public class AuthService {
     private final PasswordEncoder passwordEncoder;
     private final JwtUtil jwtUtil;
     private final ModelMapper modelMapper;
+    private final FileStorageService fileStorageService;
 
-    // ================= Registration =================
-    public String register(UserDto userDto, MultipartFile profileImage) throws IOException {
-
+    public User register(UserDto userDto, MultipartFile profileImage) throws IOException {
         // Check if email already exists
         if (userRepository.existsByEmail(userDto.getEmail())) {
             throw new IllegalArgumentException("Email is already taken");
@@ -37,31 +33,22 @@ public class AuthService {
         // Handle profile image upload (optional)
         String profileImageUrl = null;
         if (profileImage != null && !profileImage.isEmpty()) {
-            String fileName = System.currentTimeMillis() + "_" + profileImage.getOriginalFilename();
-            Path uploadPath = Paths.get("uploads").toAbsolutePath().normalize();
-            Files.createDirectories(uploadPath); // Ensure folder exists
-            Path filePath = uploadPath.resolve(fileName);
-            Files.copy(profileImage.getInputStream(), filePath);
-            profileImageUrl = "/uploads/" + fileName; // Relative path to return
+            profileImageUrl = fileStorageService.storeFile(profileImage);
         }
 
         // Map DTO to Entity
         User user = modelMapper.map(userDto, User.class);
         user.setPassword(passwordEncoder.encode(userDto.getPassword()));
-        user.setProfileImageUrl(profileImageUrl); // This will be null if no file uploaded
+        user.setProfileImageUrl(profileImageUrl);
 
-        // Set selected courses if provided
         if (userDto.getSelectedCourses() != null) {
             user.setSelectedCourses(userDto.getSelectedCourses());
         }
 
-        // Save user
-        userRepository.save(user);
-
-        return "User registered successfully";
+        // Save user and return the saved entity
+        return userRepository.save(user);
     }
 
-    // ================= Login =================
     public LoginResponse login(LoginRequest request) {
         User user = userRepository.findByEmail(request.getEmail())
                 .orElseThrow(() -> new IllegalArgumentException("Invalid email or password"));
@@ -76,7 +63,5 @@ public class AuthService {
                 .token(token)
                 .tokenType("Bearer")
                 .build();
-
     }
 }
-
