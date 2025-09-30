@@ -27,6 +27,12 @@ public class User {
     @Column(name = "last_name")
     private String lastName;
     
+    @Column(name = "academic_details")
+    private String academicDetails;
+    
+    @Column(name = "avatar_url")
+    private String avatarUrl;
+    
     @Column(name = "created_at")
     private LocalDateTime createdAt;
     
@@ -73,6 +79,12 @@ public class User {
 
     public String getLastName() { return lastName; }
     public void setLastName(String lastName) { this.lastName = lastName; }
+
+    public String getAcademicDetails() { return academicDetails; }
+    public void setAcademicDetails(String academicDetails) { this.academicDetails = academicDetails; }
+
+    public String getAvatarUrl() { return avatarUrl; }
+    public void setAvatarUrl(String avatarUrl) { this.avatarUrl = avatarUrl; }
 
     public LocalDateTime getCreatedAt() { return createdAt; }
     public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }

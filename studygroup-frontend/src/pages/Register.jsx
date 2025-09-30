@@ -20,7 +20,8 @@ export default function Register() {
     if (!email.trim()) errs.email = "Email is required";
     else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) errs.email = "Enter a valid email";
     if (!password) errs.password = "Password is required";
-    else if (password.length < 6) errs.password = "Password must be at least 6 characters";
+    else if (password.length < 8) errs.password = "Password must be at least 8 characters";
+    else if (!/[a-zA-Z]/.test(password) || !/\d/.test(password)) errs.password = "Password must contain at least one letter and one number";
     if (confirmPassword !== password) errs.confirmPassword = "Passwords do not match";
     if (!academicDetails.trim()) errs.academicDetails = "Academic details are required";
     setFieldErrors(errs);
@@ -205,7 +206,7 @@ export default function Register() {
           <input
             className="auth-input"
             type="password"
-            placeholder="Password (min 6 chars)"
+            placeholder="Password (min 8 chars, letters & numbers)"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             name="password"

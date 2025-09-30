@@ -18,9 +18,8 @@ public class EnvironmentConfig implements ApplicationContextInitializer<Configur
     @Override
     public void initialize(ConfigurableApplicationContext applicationContext) {
         try {
-            // Try to load .env file from the project root (parent directory)
+            // Try to load .env file from the current directory (backend directory)
             Dotenv dotenv = Dotenv.configure()
-                    .directory("../") // Look in parent directory where .env file is located
                     .ignoreIfMissing() // Don't fail if .env file doesn't exist
                     .load();
 
