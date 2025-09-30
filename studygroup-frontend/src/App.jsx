@@ -1,5 +1,5 @@
 import './App.css'
-import { BrowserRouter, Routes, Route, Link } from 'react-router-dom'
+import { BrowserRouter, Routes, Route } from 'react-router-dom'
 import { AuthProvider } from './context/AuthContext'
 import { GroupProvider } from './context/GroupContext'
 import Login from './pages/Login'
@@ -10,6 +10,7 @@ import Chat from './pages/Chat'
 import CalendarPage from './pages/Calendar'
 import Navbar from './components/Navbar'
 import ProtectedRoute from './components/ProtectedRoute'
+import Profile from './pages/Profile'
 
 function App() {
   return (
@@ -17,12 +18,14 @@ function App() {
       <GroupProvider>
         <BrowserRouter>
           <Navbar />
-          <main style={{ padding: 20 }}>
+          <main style={{ padding: 0 }}>
             <Routes>
+              {/* Public Routes */}
               <Route path="/" element={<Login />} />
               <Route path="/login" element={<Login />} />
               <Route path="/register" element={<Register />} />
 
+              {/* Protected Routes */}
               <Route
                 path="/dashboard"
                 element={
@@ -52,6 +55,14 @@ function App() {
                 element={
                   <ProtectedRoute>
                     <CalendarPage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/profile"
+                element={
+                  <ProtectedRoute>
+                    <Profile />
                   </ProtectedRoute>
                 }
               />

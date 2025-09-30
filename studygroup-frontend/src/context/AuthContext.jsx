@@ -1,53 +1,66 @@
 /* eslint-disable react-refresh/only-export-components */
-import { createContext, useState, useContext, useEffect } from 'react'
-import api from '../services/api'
+// src/context/AuthContext.jsx
+import { createContext, useState, useEffect } from "react";
+import { loginUser, registerUser, getMe } from "../services/api"; // named imports
 
-const AuthContext = createContext()
+// 1. Export the Context object
+export const AuthContext = createContext();
 
+// 2. Export the Provider component
 export function AuthProvider({ children }) {
-  const [user, setUser] = useState(null)
-  const [loading, setLoading] = useState(true)
+  const [user, setUser] = useState(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const token = localStorage.getItem('token')
+    const token = localStorage.getItem("token") || sessionStorage.getItem("token");
     if (token) {
-      // try to fetch user profile
-      api
-        .get('/auth/me')
-        .then((res) => setUser(res.data))
-        .catch(() => {
-          localStorage.removeItem('token')
-          setUser(null)
-        })
-        .finally(() => setLoading(false))
+      fetchUserProfile();
     } else {
-      setLoading(false)
+      setLoading(false);
     }
-  }, [])
+  }, []);
 
-  const login = async (credentials) => {
-    const res = await api.post('/auth/login', credentials)
-    const { token, user } = res.data
-    localStorage.setItem('token', token)
-    setUser(user)
-    return res
-  }
+  const fetchUserProfile = async () => {
+    try {
+      const res = await getMe();
+      setUser(res.data);
+    } catch {
+      localStorage.removeItem("token");
+      sessionStorage.removeItem("token");
+      setUser(null);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const login = async (credentials, { remember = true } = {}) => {
+    const res = await loginUser(credentials);
+    const { token, user: userFromResponse } = res.data;
+    if (remember) localStorage.setItem("token", token); else sessionStorage.setItem("token", token);
+    if (userFromResponse) setUser(userFromResponse); else await fetchUserProfile();
+    return res;
+  };
 
   const register = async (payload) => {
-    const res = await api.post('/auth/register', payload)
-    return res
-  }
+    const res = await registerUser(payload);
+    const { token, user: userFromResponse } = res.data || {};
+    if (token) {
+      localStorage.setItem("token", token);
+      if (userFromResponse) setUser(userFromResponse); else await fetchUserProfile();
+    }
+    return res;
+  };
 
   const logout = () => {
-    localStorage.removeItem('token')
-    setUser(null)
-  }
+    localStorage.removeItem("token");
+    sessionStorage.removeItem("token");
+    setUser(null);
+  };
 
+  // 3. Provide the state and functions to consumers
   return (
     <AuthContext.Provider value={{ user, loading, login, register, logout }}>
       {children}
     </AuthContext.Provider>
-  )
+  );
 }
-
-export const useAuth = () => useContext(AuthContext)
