@@ -7,12 +7,12 @@ interface User {
   lastName: string;
   email: string;
   profileImageUrl: string | null;
-  secondarySchool: string;
-  graduationYear: string;
-  university: string;
-  major: string;
-  currentYear: string;
-  selectedCourses: string[];
+  secondarySchool?: string;
+  graduationYear?: string;
+  university?: string;
+  major?: string;
+  currentYear?: string;
+  selectedCourses?: string[];
 }
 
 interface AuthContextType {

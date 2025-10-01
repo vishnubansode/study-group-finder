@@ -1,22 +1,22 @@
 package com.groupgenius.groupgenius_backend.dto;
 
 import lombok.Builder;
-import lombok.Data;
+import lombok.Value;
 
 import java.util.List;
 
-@Data
+@Value
 @Builder
 public class UserResponse {
-    private Long id;
-    private String firstName;
-    private String lastName;
-    private String email;
-    private String profileImageUrl;
-    private String secondarySchool;
-    private String graduationYear;
-    private String university;
-    private String major;
-    private String currentYear;
-    private List<String> courses;
+    Long id;
+    String firstName;
+    String lastName;
+    String email;
+    String profileImageUrl;
+    String secondarySchool;
+    String graduationYear;
+    String university;
+    String major;
+    String currentYear;
+    List<CourseResponse> courses;
 }

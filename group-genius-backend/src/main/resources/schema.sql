@@ -1,10 +1,15 @@
 CREATE TABLE IF NOT EXISTS users (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
-    name VARCHAR(150) NOT NULL,
+    first_name VARCHAR(100) NOT NULL,
+    last_name VARCHAR(100) NOT NULL,
     email VARCHAR(150) UNIQUE NOT NULL,
     password VARCHAR(255) NOT NULL,
-    academic_details TEXT,
-    avatar VARCHAR(255)
+    profile_image_url VARCHAR(255),
+    secondary_school VARCHAR(255),
+    graduation_year VARCHAR(20),
+    university VARCHAR(255),
+    major VARCHAR(255),
+    current_year VARCHAR(50)
 );
 
 CREATE TABLE IF NOT EXISTS courses (

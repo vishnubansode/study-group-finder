@@ -3,8 +3,8 @@ package com.groupgenius.groupgenius_backend.service;
 import com.groupgenius.groupgenius_backend.dto.LoginRequest;
 import com.groupgenius.groupgenius_backend.dto.LoginResponse;
 import com.groupgenius.groupgenius_backend.dto.UserDto;
-import com.groupgenius.groupgenius_backend.entity.Course;
 import com.groupgenius.groupgenius_backend.entity.User;
+import com.groupgenius.groupgenius_backend.mapper.UserMapper;
 import com.groupgenius.groupgenius_backend.repository.CourseRepository;
 import com.groupgenius.groupgenius_backend.repository.UserRepository;
 import com.groupgenius.groupgenius_backend.security.JwtUtil;
@@ -41,8 +41,8 @@ public class AuthService {
         }
 
         // Map DTO to Entity
-    User user = modelMapper.map(userDto, User.class);
-    user.setCourses(new HashSet<>());
+        User user = modelMapper.map(userDto, User.class);
+        user.setCourses(new HashSet<>());
         user.setPassword(passwordEncoder.encode(userDto.getPassword()));
         user.setProfileImageUrl(profileImageUrl);
 
@@ -53,13 +53,14 @@ public class AuthService {
             }
         }
 
-        userRepository.save(user);
+    userRepository.save(user);
 
-        String token = jwtUtil.generateToken(user.getEmail());
-        return LoginResponse.builder()
-                .token(token)
-                .tokenType("Bearer")
-                .build();
+    String token = jwtUtil.generateToken(user.getEmail());
+    return LoginResponse.builder()
+        .token(token)
+        .tokenType("Bearer")
+        .user(UserMapper.toResponse(user))
+        .build();
     }
 
     public LoginResponse login(LoginRequest request) {
@@ -75,6 +76,7 @@ public class AuthService {
         return LoginResponse.builder()
                 .token(token)
                 .tokenType("Bearer")
+                .user(UserMapper.toResponse(user))
                 .build();
     }
 }

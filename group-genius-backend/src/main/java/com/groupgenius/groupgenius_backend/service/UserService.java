@@ -3,8 +3,10 @@ package com.groupgenius.groupgenius_backend.service;
 import com.groupgenius.groupgenius_backend.dto.LoginRequest;
 import com.groupgenius.groupgenius_backend.dto.LoginResponse;
 import com.groupgenius.groupgenius_backend.dto.UserDto;
+import com.groupgenius.groupgenius_backend.dto.UserResponse;
 import com.groupgenius.groupgenius_backend.entity.Course;
 import com.groupgenius.groupgenius_backend.entity.User;
+import com.groupgenius.groupgenius_backend.mapper.UserMapper;
 import com.groupgenius.groupgenius_backend.repository.CourseRepository;
 import com.groupgenius.groupgenius_backend.repository.UserRepository;
 import com.groupgenius.groupgenius_backend.security.JwtUtil;
@@ -92,7 +94,7 @@ public class UserService {
     }
 
     @Transactional
-    public User addCourse(Long userId, Long courseId) {
+    public UserResponse addCourse(Long userId, Long courseId) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new IllegalArgumentException("User not found"));
         Course course = courseRepository.findById(courseId)
@@ -100,11 +102,11 @@ public class UserService {
 
         user.getCourses().add(course);
         course.getEnrolledUsers().add(user);
-        return user;
+        return UserMapper.toResponse(user);
     }
 
     @Transactional
-    public User removeCourse(Long userId, Long courseId) {
+    public UserResponse removeCourse(Long userId, Long courseId) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new IllegalArgumentException("User not found"));
         Course course = courseRepository.findById(courseId)
@@ -112,11 +114,11 @@ public class UserService {
 
         user.getCourses().remove(course);
         course.getEnrolledUsers().remove(user);
-        return user;
+        return UserMapper.toResponse(user);
     }
 
     @Transactional
-    public User updateCourseStatus(Long userId, Long courseId, boolean active) {
+    public UserResponse updateCourseStatus(Long userId, Long courseId, boolean active) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new IllegalArgumentException("User not found"));
         Course course = courseRepository.findById(courseId)
@@ -130,6 +132,6 @@ public class UserService {
             courses.remove(course);
             course.getEnrolledUsers().remove(user);
         }
-        return user;
+        return UserMapper.toResponse(user);
     }
 }

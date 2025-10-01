@@ -1,7 +1,9 @@
 package com.groupgenius.groupgenius_backend.service;
 
 import com.groupgenius.groupgenius_backend.dto.UserDto;
+import com.groupgenius.groupgenius_backend.dto.UserResponse;
 import com.groupgenius.groupgenius_backend.entity.User;
+import com.groupgenius.groupgenius_backend.mapper.UserMapper;
 import com.groupgenius.groupgenius_backend.repository.UserRepository;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
@@ -19,13 +21,20 @@ public class ProfileService {
     private final FileStorageService fileStorageService;
     private final PasswordEncoder passwordEncoder;
 
-    public User getProfile(Long id) {
-        return userRepository.findById(id)
+    public UserResponse getProfile(Long id) {
+        User user = userRepository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("User not found"));
+        return UserMapper.toResponse(user);
+    }
+
+    public UserResponse getProfileByEmail(String email) {
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new IllegalArgumentException("User not found"));
+        return UserMapper.toResponse(user);
     }
 
     @Transactional
-    public User updateProfile(Long id, UserDto updateRequest) {
+    public UserResponse updateProfile(Long id, UserDto updateRequest) {
         User user = userRepository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("User not found"));
 
@@ -39,7 +48,7 @@ public class ProfileService {
         if (updateRequest.getPassword() != null && !updateRequest.getPassword().isBlank()) {
             user.setPassword(passwordEncoder.encode(updateRequest.getPassword()));
         }
-        return user;
+        return UserMapper.toResponse(user);
     }
 
     @Transactional
@@ -51,12 +60,12 @@ public class ProfileService {
     }
 
     @Transactional
-    public User uploadAvatar(Long id, MultipartFile avatar) throws IOException {
+    public UserResponse uploadAvatar(Long id, MultipartFile avatar) throws IOException {
         User user = userRepository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("User not found"));
 
         String imageUrl = fileStorageService.storeFile(avatar);
         user.setProfileImageUrl(imageUrl);
-        return user;
+        return UserMapper.toResponse(user);
     }
 }
