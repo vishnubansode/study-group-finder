@@ -101,6 +101,59 @@ export const userAPI = {
   },
 };
 
+export const groupAPI = {
+  getAllGroups: async (token: string) => {
+    const response = await fetch(`${API_BASE_URL}/groups`, {
+      method: 'GET',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+    });
+
+    if (!response.ok) {
+      const message = await response.text();
+      throw new Error(message || 'Failed to fetch groups');
+    }
+
+    return response.json();
+  },
+
+  joinGroup: async (token: string, groupId: number) => {
+    const response = await fetch(`${API_BASE_URL}/groups/${groupId}/join`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+    });
+
+    if (!response.ok) {
+      const message = await response.text();
+      throw new Error(message || 'Failed to join group');
+    }
+
+    return response.json();
+  },
+
+  leaveGroup: async (token: string, groupId: number) => {
+    const response = await fetch(`${API_BASE_URL}/groups/${groupId}/leave`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+    });
+
+    if (!response.ok) {
+      const message = await response.text();
+      throw new Error(message || 'Failed to leave group');
+    }
+
+    return response.json();
+  },
+};
+
 export const tokenService = {
   getToken: (): string | null => localStorage.getItem('token'),
   setToken: (token: string): void => localStorage.setItem('token', token),

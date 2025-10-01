@@ -12,6 +12,7 @@ import {
   X,
   Bell
 } from 'lucide-react';
+import { useAuth } from '@/contexts/AuthContext';
 
 const navigationItems = [
   { name: 'Home', href: '/', icon: Home },
@@ -25,10 +26,34 @@ const navigationItems = [
 export function Navigation() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const location = useLocation();
+  const { user, logout } = useAuth();
+
+  const menuItems = user ? navigationItems : navigationItems.slice(0, 1);
 
   const isActive = (href: string) => {
     return location.pathname === href;
   };
+
+  if (!user) {
+    return (
+      <nav className="flex items-center justify-between px-6 py-4 bg-card border-b border-border">
+        <Link to="/" className="flex items-center space-x-2">
+          <div className="w-8 h-8 bg-gradient-academic rounded-lg flex items-center justify-center">
+            <BookOpen className="w-5 h-5 text-white" />
+          </div>
+          <span className="text-xl font-bold text-foreground">GroupGenius</span>
+        </Link>
+        <div className="flex items-center gap-3">
+          <Button variant="ghost" asChild>
+            <Link to="/login">Sign In</Link>
+          </Button>
+          <Button asChild>
+            <Link to="/register">Create Account</Link>
+          </Button>
+        </div>
+      </nav>
+    );
+  }
 
   return (
     <>
@@ -43,7 +68,7 @@ export function Navigation() {
           </Link>
           
           <div className="flex items-center space-x-1">
-            {navigationItems.map((item) => {
+            {menuItems.map((item) => {
               const Icon = item.icon;
               return (
                 <Link
@@ -68,7 +93,7 @@ export function Navigation() {
             <Bell className="w-5 h-5" />
             <div className="absolute -top-1 -right-1 w-3 h-3 bg-accent rounded-full" />
           </Button>
-          <Button variant="outline">Sign Out</Button>
+          <Button variant="outline" onClick={logout}>Sign Out</Button>
         </div>
       </nav>
 
@@ -100,7 +125,7 @@ export function Navigation() {
         {/* Mobile Menu */}
         {isMobileMenuOpen && (
           <div className="px-4 py-2 border-t border-border bg-muted/50">
-            {navigationItems.map((item) => {
+            {menuItems.map((item) => {
               const Icon = item.icon;
               return (
                 <Link
@@ -119,7 +144,12 @@ export function Navigation() {
               );
             })}
             <div className="mt-4 pt-4 border-t border-border">
-              <Button variant="outline" className="w-full">Sign Out</Button>
+              <Button variant="outline" className="w-full" onClick={() => {
+                setIsMobileMenuOpen(false);
+                logout();
+              }}>
+                Sign Out
+              </Button>
             </div>
           </div>
         )}
@@ -128,7 +158,7 @@ export function Navigation() {
       {/* Bottom Navigation for Mobile */}
       <div className="lg:hidden fixed bottom-0 left-0 right-0 bg-card border-t border-border z-50">
         <div className="flex items-center justify-around py-2">
-          {navigationItems.slice(0, 5).map((item) => {
+          {menuItems.slice(0, 5).map((item) => {
             const Icon = item.icon;
             return (
               <Link
