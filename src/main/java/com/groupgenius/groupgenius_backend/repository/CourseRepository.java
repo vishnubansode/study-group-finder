@@ -1,9 +1,8 @@
-//package com.groupgenius.groupgenius_backend.repository;
-//
-//import org.springframework.data.jpa.repository.JpaRepository;
-//
-//import java.util.List;
-//
-//public interface CourseRepository extends JpaRepository<Course, Long> {
-//    List<Course> findByCourseNameContainingIgnoreCase(String name);
-//}
+package com.groupgenius.groupgenius_backend.repository;
+
+import com.groupgenius.groupgenius_backend.entity.Course;
+import org.springframework.data.jpa.repository.JpaRepository;
+
+public interface CourseRepository extends JpaRepository<Course, Long> {
+}
+

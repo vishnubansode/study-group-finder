@@ -39,11 +39,7 @@ public class AuthService {
         // Map DTO to Entity
         User user = modelMapper.map(userDto, User.class);
         user.setPassword(passwordEncoder.encode(userDto.getPassword()));
-        user.setProfileImageUrl(profileImageUrl);
-
-        if (userDto.getSelectedCourses() != null) {
-            user.setSelectedCourses(userDto.getSelectedCourses());
-        }
+        user.setAvatar(profileImageUrl);
 
         // Save user and return the saved entity
         return userRepository.save(user);

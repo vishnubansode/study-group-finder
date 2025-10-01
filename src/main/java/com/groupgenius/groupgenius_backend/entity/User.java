@@ -2,7 +2,8 @@ package com.groupgenius.groupgenius_backend.entity;
 
 import jakarta.persistence.*;
 import lombok.*;
-import java.util.List;
+import java.util.Set;
+import com.groupgenius.groupgenius_backend.entity.Course;
 
 @Entity
 @Data
@@ -10,32 +11,31 @@ import java.util.List;
 @AllArgsConstructor
 @Builder
 @Table(name = "users")
+@Getter
+@Setter
 public class User {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    private String firstName;
-    private String lastName;
+    private String name;
 
     @Column(unique = true)
     private String email;
 
     private String password;
 
-    private String profileImageUrl;
+    private String academicDetails;
 
-    private String secondarySchool;
-    private String graduationYear;
-    private String university;
-    private String major;
-    private String currentYear;
+    private String avatar;
 
-    // Persist selected courses as a separate table
-    @ElementCollection
-    @CollectionTable(name = "user_courses", joinColumns = @JoinColumn(name = "user_id"))
-    @Column(name = "course_name")
-    private List<String> selectedCourses;
+    @ManyToMany
+    @JoinTable(
+        name = "user_course",
+        joinColumns = @JoinColumn(name = "user_id"),
+        inverseJoinColumns = @JoinColumn(name = "course_id")
+    )
+    private Set<Course> courses;
 
 }
