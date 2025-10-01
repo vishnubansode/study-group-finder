@@ -35,7 +35,7 @@ export default function Login() {
     setIsLoading(true);
 
     try {
-      await login(email, password);
+      const user = await login(email, password);
       
       toast({
         title: "Welcome back! 🎉",
@@ -51,7 +51,8 @@ export default function Login() {
         localStorage.removeItem('rememberedEmail');
       }
       
-      navigate('/dashboard');
+      // Navigate to dashboard with user ID
+      navigate(`/dashboard/${user.id}`);
     } catch (error: any) {
       console.error('Login error:', error);
       

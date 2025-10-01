@@ -2,17 +2,39 @@ import type { ReactNode } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Users, Calendar, BookOpen, Award, Plus } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { Link, useParams, Navigate } from 'react-router-dom';
+import { useAuth } from '@/contexts/AuthContext';
 
 export default function Dashboard() {
+  const { id } = useParams<{ id: string }>();
+  const { user } = useAuth();
+  
+  // Security check: Verify that the URL parameter matches the authenticated user
+  if (id && user && user.id.toString() !== id) {
+    // Redirect to the correct dashboard URL for the authenticated user
+    return <Navigate to={`/dashboard/${user.id}`} replace />;
+  }
+  
+  // If no ID in URL but user is authenticated, redirect to dashboard with ID
+  if (!id && user) {
+    return <Navigate to={`/dashboard/${user.id}`} replace />;
+  }
+  
   return (
     <div className="min-h-screen bg-background">
       <div className="hero-section px-6 py-12">
         <div className="max-w-4xl mx-auto text-center">
-          <h1 className="heading-hero mb-6">Welcome back to GroupGenius</h1>
-          <p className="text-xl text-muted-foreground mb-8 max-w-2xl mx-auto">
+          <h1 className="heading-hero mb-6">
+            Welcome back to GroupGenius{user ? `, ${user.firstName}` : ''}
+          </h1>
+          <p className="text-xl text-muted-foreground mb-4 max-w-2xl mx-auto">
             Your personalised dashboard will light up as soon as the platform is connected to live study data.
           </p>
+          {user && (
+            <p className="text-sm text-muted-foreground mb-8">
+              User ID: {user.id} | Email: {user.email}
+            </p>
+          )}
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <Button className="btn-hero" disabled>
               <Plus className="w-5 h-5 mr-2" />

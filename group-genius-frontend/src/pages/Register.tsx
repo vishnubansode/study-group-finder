@@ -71,7 +71,7 @@ export default function Register() {
       
       console.log('🔵 Auto-logging in user');
       // Auto-login after successful registration
-      await login(formData.email, formData.password);
+      const user = await login(formData.email, formData.password);
       console.log('✅ Login completed successfully');
       
       toast({
@@ -79,8 +79,8 @@ export default function Register() {
         description: "Welcome to GroupGenius! Your account has been created.",
       });
       
-      // Navigate to dashboard
-      navigate('/dashboard');
+      // Navigate to dashboard with user ID
+      navigate(`/dashboard/${user.id}`);
       
     } catch (error: any) {
       console.error('❌ Registration error:', error);

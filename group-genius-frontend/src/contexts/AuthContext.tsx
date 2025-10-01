@@ -17,7 +17,7 @@ interface User {
 
 interface AuthContextType {
   user: User | null;
-  login: (email: string, password: string) => Promise<void>;
+  login: (email: string, password: string) => Promise<User>;
   register: (userData: any, profileImage?: File) => Promise<void>;
   logout: () => void;
   isLoading: boolean;
@@ -64,7 +64,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  const login = async (email: string, password: string) => {
+  const login = async (email: string, password: string): Promise<User> => {
     setIsLoading(true);
     try {
       console.log('🔵 AuthContext: Calling authAPI.login with:', email);
@@ -81,6 +81,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       console.log('🔵 AuthContext: Setting user state');
       setUser(userData);
       console.log('✅ AuthContext: User state updated');
+      
+      return userData;
     } catch (error) {
       console.error('❌ AuthContext: Login failed:', error);
       throw error;

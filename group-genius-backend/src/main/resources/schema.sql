@@ -5,11 +5,8 @@ CREATE TABLE IF NOT EXISTS users (
     email VARCHAR(150) UNIQUE NOT NULL,
     password VARCHAR(255) NOT NULL,
     profile_image_url VARCHAR(255),
-    secondary_school VARCHAR(255),
-    graduation_year VARCHAR(20),
-    university VARCHAR(255),
-    major VARCHAR(255),
-    current_year VARCHAR(50)
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 );
 
 CREATE TABLE IF NOT EXISTS courses (
