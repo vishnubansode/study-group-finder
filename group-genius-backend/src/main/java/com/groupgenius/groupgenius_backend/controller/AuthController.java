@@ -50,14 +50,23 @@ public class AuthController {
                         .body(Map.of("error", "Email is required"));
             }
 
-            passwordResetService.initiatePasswordReset(email);
+            passwordResetService.initiatePasswordReset(email.trim());
             
             Map<String, String> response = new HashMap<>();
             response.put("message", "Password reset link sent to your email");
+            response.put("email", email.trim());
             return ResponseEntity.ok(response);
-        } catch (Exception e) {
+        } catch (RuntimeException e) {
+            // Handle user not found specifically
+            if (e.getMessage().contains("User not found")) {
+                return ResponseEntity.status(404)
+                        .body(Map.of("error", "No account found with this email address"));
+            }
             return ResponseEntity.badRequest()
                     .body(Map.of("error", e.getMessage()));
+        } catch (Exception e) {
+            return ResponseEntity.status(500)
+                    .body(Map.of("error", "Internal server error. Please try again later."));
         }
     }
 

@@ -149,7 +149,7 @@ export default function Login() {
                     </Label>
                   </div>
                   <Link 
-                    to="#" 
+                    to="/forgot-password" 
                     className={`text-sm text-primary hover:underline ${isLoading ? 'opacity-50 pointer-events-none' : ''}`}
                   >
                     Forgot password?
