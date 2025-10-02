@@ -27,6 +27,7 @@ public class AuthService {
     private final ModelMapper modelMapper;
     private final FileStorageService fileStorageService;
     private final CourseRepository courseRepository;
+    private final EmailService emailService;
 
     public LoginResponse register(UserDto userDto, MultipartFile profileImage) throws IOException {
         // Check if email already exists
@@ -54,6 +55,9 @@ public class AuthService {
         }
 
     userRepository.save(user);
+
+    // Send welcome email asynchronously
+    emailService.sendWelcomeEmail(user.getEmail(), user.getFirstName());
 
     String token = jwtUtil.generateToken(user.getEmail());
     return LoginResponse.builder()
