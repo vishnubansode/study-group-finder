@@ -10,7 +10,8 @@ import {
   User, 
   Menu, 
   X,
-  Bell
+  Bell,
+  Mail
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 
@@ -21,6 +22,7 @@ const navigationItems = [
   { name: 'Chat', href: '/chat', icon: MessageCircle },
   { name: 'Calendar', href: '/calendar', icon: Calendar },
   { name: 'Profile', href: '/profile', icon: User },
+  { name: 'Contact', href: '/contact', icon: Mail },
 ];
 
 export function Navigation() {
@@ -28,7 +30,7 @@ export function Navigation() {
   const location = useLocation();
   const { user, logout } = useAuth();
 
-  const menuItems = user ? navigationItems : navigationItems.slice(0, 1);
+  const menuItems = user ? navigationItems : [navigationItems[0], navigationItems[navigationItems.length - 1]]; // Home and Contact for guests
 
   const isActive = (href: string) => {
     return location.pathname === href;
