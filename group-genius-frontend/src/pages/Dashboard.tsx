@@ -1,7 +1,31 @@
-import type { ReactNode } from 'react';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Users, Calendar, BookOpen, Award, Plus } from 'lucide-react';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { 
+  Users, 
+  Calendar, 
+  BookOpen, 
+  Award, 
+  Plus, 
+  Clock, 
+  TrendingUp, 
+  MessageCircle,
+  Target,
+  UserPlus,
+  ArrowRight,
+  GraduationCap,
+  Sparkles,
+  Edit,
+  Bell,
+  CheckCircle2,
+  X,
+  Zap,
+  Lightbulb,
+  Star,
+  Video,
+  FileText
+} from 'lucide-react';
 import { Link, useParams, Navigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 
@@ -11,7 +35,6 @@ export default function Dashboard() {
   
   // Security check: Verify that the URL parameter matches the authenticated user
   if (id && user && user.id.toString() !== id) {
-    // Redirect to the correct dashboard URL for the authenticated user
     return <Navigate to={`/dashboard/${user.id}`} replace />;
   }
   
@@ -19,84 +42,481 @@ export default function Dashboard() {
   if (!id && user) {
     return <Navigate to={`/dashboard/${user.id}`} replace />;
   }
+
+  // Mock data for demo purposes
+  const upcomingSessions = [
+    { id: 1, course: 'Data Structures', topic: 'Binary Trees', time: 'Today, 3:00 PM', date: 'Oct 2', group: 'CS Study Group', attendees: 5, type: 'video' },
+    { id: 2, course: 'Calculus II', topic: 'Integration Techniques', time: 'Tomorrow, 10:00 AM', date: 'Oct 3', group: 'Math Masters', attendees: 8, type: 'in-person' },
+    { id: 3, course: 'Web Development', topic: 'React Hooks', time: 'Friday, 2:00 PM', date: 'Oct 4', group: 'Web Dev Warriors', attendees: 6, type: 'video' },
+  ];
+
+  const myCourses = [
+    { id: 1, code: 'CS 301', name: 'Data Structures & Algorithms', professor: 'Dr. Smith', progress: 75, color: 'bg-blue-500' },
+    { id: 2, code: 'MATH 202', name: 'Calculus II', professor: 'Prof. Johnson', progress: 60, color: 'bg-green-500' },
+    { id: 3, code: 'CS 410', name: 'Web Development', professor: 'Dr. Williams', progress: 85, color: 'bg-purple-500' },
+    { id: 4, code: 'PHYS 101', name: 'Physics I', professor: 'Prof. Davis', progress: 45, color: 'bg-orange-500' },
+  ];
+
+  const myGroups = [
+    { id: 1, name: 'CS Study Group', members: 12, active: true, lastActivity: '2 min ago', avatar: '💻' },
+    { id: 2, name: 'Math Masters', members: 8, active: true, lastActivity: '1 hour ago', avatar: '📐' },
+    { id: 3, name: 'Web Dev Warriors', members: 15, active: false, lastActivity: '2 days ago', avatar: '🌐' },
+    { id: 4, name: 'Physics Club', members: 10, active: true, lastActivity: '30 min ago', avatar: '⚡' },
+  ];
+
+  const notifications = [
+    { id: 1, type: 'invite', message: 'Sarah invited you to join "Advanced Algorithms"', time: '5 min ago', unread: true },
+    { id: 2, type: 'reminder', message: 'Study session "Binary Trees" starts in 2 hours', time: '10 min ago', unread: true },
+    { id: 3, type: 'message', message: 'New message from John in CS Study Group', time: '1 hour ago', unread: false },
+  ];
+
+  const suggestedPeers = [
+    { id: 1, name: 'Alex Johnson', courses: 3, avatar: null, commonCourses: 'CS 301, MATH 202, CS 410' },
+    { id: 2, name: 'Maria Garcia', courses: 2, avatar: null, commonCourses: 'CS 301, Web Dev' },
+    { id: 3, name: 'James Wilson', courses: 2, avatar: null, commonCourses: 'MATH 202, PHYS 101' },
+  ];
+
+  const motivationalTips = [
+    { icon: <Sparkles className="w-5 h-5" />, text: "Great job! You've maintained a 7-day study streak 🔥", color: "from-yellow-500/20 to-orange-500/20" },
+    { icon: <Target className="w-5 h-5" />, text: "Set small goals and celebrate each achievement along the way!", color: "from-blue-500/20 to-purple-500/20" },
+    { icon: <Users className="w-5 h-5" />, text: "Teaching others is one of the best ways to learn. Share your knowledge!", color: "from-green-500/20 to-teal-500/20" },
+    { icon: <Lightbulb className="w-5 h-5" />, text: "Take regular breaks using the Pomodoro technique: 25 min study, 5 min break", color: "from-pink-500/20 to-rose-500/20" },
+  ];
+
+  const currentTip = motivationalTips[Math.floor(Date.now() / (24 * 60 * 60 * 1000)) % motivationalTips.length];
   
   return (
     <div className="min-h-screen bg-background">
-      <div className="hero-section px-6 py-12">
-        <div className="max-w-4xl mx-auto text-center">
-          <h1 className="heading-hero mb-6">
-            Welcome back to GroupGenius{user ? `, ${user.firstName}` : ''}
-          </h1>
-          <p className="text-xl text-muted-foreground mb-4 max-w-2xl mx-auto">
-            Your personalised dashboard will light up as soon as the platform is connected to live study data.
-          </p>
-          {user && (
-            <p className="text-sm text-muted-foreground mb-8">
-              User ID: {user.id} | Email: {user.email}
-            </p>
-          )}
-          <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <Button className="btn-hero" disabled>
-              <Plus className="w-5 h-5 mr-2" />
-              Create Study Group
-            </Button>
-            <Button variant="outline" size="lg" className="px-8 py-4" asChild>
-              <Link to="/groups">
-                <Users className="w-5 h-5 mr-2" />
-                Browse Groups
-              </Link>
-            </Button>
+      {/* Hero Section */}
+      <div className="bg-gradient-to-br from-primary/10 via-background to-secondary/10 border-b">
+        <div className="max-w-7xl mx-auto px-6 py-8">
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+            <div>
+              <h1 className="text-3xl md:text-4xl font-bold mb-2">
+                Welcome back, {user?.firstName}! 👋
+              </h1>
+              <p className="text-muted-foreground">
+                Here's what's happening with your study groups today
+              </p>
+            </div>
+            <div className="flex gap-3">
+              <Button className="gap-2" asChild>
+                <Link to="/groups">
+                  <Plus className="w-4 h-4" />
+                  Create Group
+                </Link>
+              </Button>
+              <Button variant="outline" className="gap-2" asChild>
+                <Link to="/courses">
+                  <BookOpen className="w-4 h-4" />
+                  Browse Courses
+                </Link>
+              </Button>
+            </div>
           </div>
         </div>
       </div>
 
       <div className="max-w-7xl mx-auto px-6 py-8 pb-24 lg:pb-8">
+        {/* Stats Overview */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-          <DashboardStatCard icon={<Users className="w-4 h-4 text-primary" />} title="Active Groups" description="Connect to the backend to see your live group count." />
-          <DashboardStatCard icon={<BookOpen className="w-4 h-4 text-secondary" />} title="Courses" description="Courses you follow will appear here automatically." />
-          <DashboardStatCard icon={<Calendar className="w-4 h-4 text-accent" />} title="Upcoming Sessions" description="Events sync in once calendar integration is ready." />
-          <DashboardStatCard icon={<Award className="w-4 h-4 text-primary" />} title="Achievements" description="Track your progress when analytics go live." />
+          <StatCard 
+            icon={<Users className="w-5 h-5" />} 
+            title="My Groups" 
+            value="5"
+            change="+2 this week"
+            trend="up"
+          />
+          <StatCard 
+            icon={<Calendar className="w-5 h-5" />} 
+            title="Sessions This Week" 
+            value="8"
+            change="3 completed"
+            trend="neutral"
+          />
+          <StatCard 
+            icon={<Clock className="w-5 h-5" />} 
+            title="Study Hours" 
+            value="24.5"
+            change="+5.2 from last week"
+            trend="up"
+          />
+          <StatCard 
+            icon={<Award className="w-5 h-5" />} 
+            title="Achievements" 
+            value="12"
+            change="2 new badges"
+            trend="up"
+          />
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          <Card className="academic-card lg:col-span-2">
-            <CardHeader className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-              <CardTitle className="heading-section">Recent group activity</CardTitle>
-              <Button variant="ghost" size="sm" disabled>
-                Coming soon
-              </Button>
-            </CardHeader>
-            <CardContent className="text-muted-foreground text-sm">
-              As soon as the app is wired to the Spring Boot services, your joined groups, messages and study sessions will appear here in real time.
-            </CardContent>
-          </Card>
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* Main Content - Left & Center Columns */}
+          <div className="lg:col-span-2 space-y-6">
+            {/* Profile Card */}
+            <Card className="bg-gradient-to-br from-primary/5 via-background to-secondary/5">
+              <CardContent className="pt-6">
+                <div className="flex flex-col sm:flex-row items-center sm:items-start gap-4">
+                  <Avatar className="w-24 h-24 border-4 border-background shadow-lg">
+                    <AvatarImage src={(user?.avatar || user?.profileImageUrl) ? `http://localhost:8080${user.avatar || user.profileImageUrl}` : undefined} />
+                    <AvatarFallback className="text-2xl font-bold bg-gradient-to-br from-primary to-secondary text-white">
+                      {user?.firstName?.[0]}{user?.lastName?.[0]}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div className="flex-1 text-center sm:text-left">
+                    <div className="flex flex-col sm:flex-row sm:items-center gap-2 mb-2">
+                      <h2 className="text-2xl font-bold">{user?.firstName} {user?.lastName}</h2>
+                      <Badge variant="secondary" className="w-fit mx-auto sm:mx-0">
+                        <GraduationCap className="w-3 h-3 mr-1" />
+                        Student
+                      </Badge>
+                    </div>
+                    <p className="text-sm text-muted-foreground mb-3">{user?.email}</p>
+                    <div className="flex flex-wrap gap-2 justify-center sm:justify-start">
+                      <Badge variant="outline" className="gap-1">
+                        <BookOpen className="w-3 h-3" />
+                        4 Courses
+                      </Badge>
+                      <Badge variant="outline" className="gap-1">
+                        <Users className="w-3 h-3" />
+                        5 Groups
+                      </Badge>
+                      <Badge variant="outline" className="gap-1">
+                        <Star className="w-3 h-3" />
+                        12 Achievements
+                      </Badge>
+                    </div>
+                  </div>
+                  <Button variant="outline" size="sm" className="gap-2" asChild>
+                    <Link to="/profile">
+                      <Edit className="w-4 h-4" />
+                      Edit Profile
+                    </Link>
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
 
-          <Card className="academic-card">
-            <CardHeader>
-              <CardTitle className="text-lg font-semibold">What to expect next</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3 text-sm text-muted-foreground">
-              <p>• Calendar events and deadlines will sync from the backend schedule service.</p>
-              <p>• Suggested study partners will surface once matching logic is available.</p>
-              <p>• Notifications and reminders will show once real-time updates are configured.</p>
-            </CardContent>
-          </Card>
+            {/* Upcoming Sessions Card */}
+            <Card>
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle className="flex items-center gap-2">
+                      <Calendar className="w-5 h-5 text-primary" />
+                      Upcoming Study Sessions
+                    </CardTitle>
+                    <CardDescription className="mt-1">Your scheduled sessions</CardDescription>
+                  </div>
+                  <Button variant="ghost" size="sm" asChild>
+                    <Link to="/calendar" className="gap-1">
+                      View All
+                      <ArrowRight className="w-4 h-4" />
+                    </Link>
+                  </Button>
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                {upcomingSessions.map((session) => (
+                  <div key={session.id} className="flex items-center gap-3 p-4 rounded-lg border bg-card hover:bg-accent/5 transition-all hover:shadow-sm">
+                    <div className="flex flex-col items-center justify-center w-16 h-16 rounded-lg bg-primary/10 flex-shrink-0">
+                      <span className="text-xs font-semibold text-primary">{session.date}</span>
+                      <span className="text-xs text-muted-foreground">{session.time.split(',')[1]}</span>
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-1">
+                        <h4 className="font-semibold text-sm truncate">{session.topic}</h4>
+                        {session.type === 'video' ? (
+                          <Badge variant="secondary" className="text-xs"><Video className="w-3 h-3 mr-1" />Online</Badge>
+                        ) : (
+                          <Badge variant="outline" className="text-xs">In-Person</Badge>
+                        )}
+                      </div>
+                      <p className="text-xs text-muted-foreground mb-2">{session.course} • {session.group}</p>
+                      <div className="flex items-center gap-2">
+                        <div className="flex -space-x-2">
+                          {[...Array(Math.min(session.attendees, 3))].map((_, i) => (
+                            <div key={i} className="w-6 h-6 rounded-full bg-gradient-to-br from-primary/80 to-secondary/80 border-2 border-background flex items-center justify-center text-xs text-white font-semibold">
+                              {String.fromCharCode(65 + i)}
+                            </div>
+                          ))}
+                        </div>
+                        <span className="text-xs text-muted-foreground">{session.attendees} attending</span>
+                      </div>
+                    </div>
+                    <Button size="sm" className="flex-shrink-0">Join</Button>
+                  </div>
+                ))}
+              </CardContent>
+            </Card>
+
+            {/* My Courses Card */}
+            <Card>
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle className="flex items-center gap-2">
+                      <BookOpen className="w-5 h-5 text-primary" />
+                      My Courses
+                    </CardTitle>
+                    <CardDescription>Track your enrolled courses</CardDescription>
+                  </div>
+                  <Button variant="ghost" size="sm" asChild>
+                    <Link to="/courses" className="gap-1">
+                      <Plus className="w-4 h-4" />
+                      Add Course
+                    </Link>
+                  </Button>
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                {myCourses.map((course) => (
+                  <div key={course.id} className="p-3 rounded-lg border hover:bg-accent/5 transition-colors">
+                    <div className="flex items-start justify-between mb-2">
+                      <div>
+                        <div className="flex items-center gap-2 mb-1">
+                          <Badge variant="outline" className="text-xs font-mono">{course.code}</Badge>
+                          <h4 className="font-semibold text-sm">{course.name}</h4>
+                        </div>
+                        <p className="text-xs text-muted-foreground">{course.professor}</p>
+                      </div>
+                      <Button variant="ghost" size="sm" className="h-6 w-6 p-0 text-muted-foreground hover:text-destructive">
+                        <X className="w-4 h-4" />
+                      </Button>
+                    </div>
+                    <div className="space-y-1">
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="text-muted-foreground">Progress</span>
+                        <span className="font-semibold">{course.progress}%</span>
+                      </div>
+                      <div className="w-full h-2 bg-secondary/20 rounded-full overflow-hidden">
+                        <div 
+                          className={`h-full ${course.color} transition-all duration-500`}
+                          style={{ width: `${course.progress}%` }}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </CardContent>
+            </Card>
+
+            {/* My Groups Card */}
+            <Card>
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle className="flex items-center gap-2">
+                      <Users className="w-5 h-5 text-primary" />
+                      My Study Groups
+                    </CardTitle>
+                    <CardDescription>Groups you've joined</CardDescription>
+                  </div>
+                  <Button variant="ghost" size="sm" asChild>
+                    <Link to="/groups" className="gap-1">
+                      <Plus className="w-4 h-4" />
+                      Create Group
+                    </Link>
+                  </Button>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {myGroups.map((group) => (
+                    <div key={group.id} className="p-3 rounded-lg border hover:border-primary/50 transition-all hover:shadow-sm cursor-pointer">
+                      <div className="flex items-start gap-3">
+                        <div className="w-12 h-12 rounded-lg bg-gradient-to-br from-primary/20 to-secondary/20 flex items-center justify-center text-2xl flex-shrink-0">
+                          {group.avatar}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 mb-1">
+                            <h4 className="font-semibold text-sm truncate">{group.name}</h4>
+                            {group.active && (
+                              <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
+                            )}
+                          </div>
+                          <p className="text-xs text-muted-foreground mb-2">{group.members} members</p>
+                          <p className="text-xs text-muted-foreground">Last active: {group.lastActivity}</p>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Sidebar - Right Column */}
+          <div className="space-y-6">
+            {/* Quick Actions Card */}
+            <Card className="bg-gradient-to-br from-primary/5 to-secondary/5">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-lg">
+                  <Zap className="w-5 h-5 text-primary" />
+                  Quick Actions
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-2">
+                <Button className="w-full justify-start gap-2 shadow-sm" asChild>
+                  <Link to="/groups">
+                    <Plus className="w-4 h-4" />
+                    Create Study Group
+                  </Link>
+                </Button>
+                <Button variant="outline" className="w-full justify-start gap-2" asChild>
+                  <Link to="/calendar">
+                    <Calendar className="w-4 h-4" />
+                    Schedule Session
+                  </Link>
+                </Button>
+                <Button variant="outline" className="w-full justify-start gap-2" asChild>
+                  <Link to="/chat">
+                    <MessageCircle className="w-4 h-4" />
+                    Start Chat
+                  </Link>
+                </Button>
+              </CardContent>
+            </Card>
+
+            {/* Notifications Card */}
+            <Card>
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <CardTitle className="flex items-center gap-2 text-lg">
+                    <Bell className="w-5 h-5 text-primary" />
+                    Notifications
+                  </CardTitle>
+                  <Badge variant="secondary">{notifications.filter(n => n.unread).length}</Badge>
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-2">
+                {notifications.map((notification) => (
+                  <div key={notification.id} className={`p-3 rounded-lg border transition-colors ${notification.unread ? 'bg-primary/5 border-primary/20' : 'hover:bg-accent/5'}`}>
+                    <p className="text-sm mb-1">{notification.message}</p>
+                    <p className="text-xs text-muted-foreground">{notification.time}</p>
+                    {notification.type === 'invite' && (
+                      <div className="flex gap-2 mt-2">
+                        <Button size="sm" variant="default" className="h-7 text-xs">Accept</Button>
+                        <Button size="sm" variant="outline" className="h-7 text-xs">Decline</Button>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </CardContent>
+            </Card>
+
+            {/* Progress/Engagement Card */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-lg">
+                  <TrendingUp className="w-5 h-5 text-primary" />
+                  This Week's Progress
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-muted-foreground">Groups Joined</span>
+                    <span className="font-bold text-lg">5</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-muted-foreground">Sessions Attended</span>
+                    <span className="font-bold text-lg">8</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-muted-foreground">Study Hours</span>
+                    <span className="font-bold text-lg">24.5</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-muted-foreground">Messages Sent</span>
+                    <span className="font-bold text-lg">43</span>
+                  </div>
+                </div>
+                <div className="pt-3 border-t">
+                  <div className="flex items-center justify-center gap-2 text-sm text-green-600">
+                    <CheckCircle2 className="w-4 h-4" />
+                    <span className="font-semibold">Great week! Keep it up! 🎉</span>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Suggested Peers Card */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-lg">
+                  <UserPlus className="w-5 h-5 text-primary" />
+                  Suggested Peers
+                </CardTitle>
+                <CardDescription>Students with common courses</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                {suggestedPeers.map((peer) => (
+                  <div key={peer.id} className="flex items-center gap-3 p-2 rounded-lg hover:bg-accent/5 transition-colors">
+                    <Avatar className="w-10 h-10">
+                      <AvatarImage src={peer.avatar || undefined} />
+                      <AvatarFallback className="text-xs bg-gradient-to-br from-primary/80 to-secondary/80 text-white">
+                        {peer.name.split(' ').map(n => n[0]).join('')}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div className="flex-1 min-w-0">
+                      <h4 className="font-semibold text-sm">{peer.name}</h4>
+                      <p className="text-xs text-muted-foreground truncate">{peer.commonCourses}</p>
+                    </div>
+                    <Button size="sm" variant="outline" className="h-7 text-xs">Connect</Button>
+                  </div>
+                ))}
+              </CardContent>
+            </Card>
+
+            {/* Motivational/Tip Card */}
+            <Card className={`bg-gradient-to-br ${currentTip.color} border-primary/20`}>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-lg">
+                  {currentTip.icon}
+                  Daily Tip
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-sm leading-relaxed">{currentTip.text}</p>
+              </CardContent>
+            </Card>
+          </div>
         </div>
       </div>
     </div>
   );
 }
 
-function DashboardStatCard({ title, description, icon }: { title: string; description: string; icon: React.ReactNode }) {
+function StatCard({ 
+  icon, 
+  title, 
+  value, 
+  change, 
+  trend 
+}: { 
+  icon: React.ReactNode; 
+  title: string; 
+  value: string; 
+  change: string; 
+  trend: 'up' | 'down' | 'neutral';
+}) {
   return (
-    <Card className="academic-card hover-lift">
+    <Card className="hover:shadow-md transition-shadow">
       <CardHeader className="flex flex-row items-center justify-between pb-2">
         <CardTitle className="text-sm font-medium text-muted-foreground">{title}</CardTitle>
-        {icon}
+        <div className="text-primary">{icon}</div>
       </CardHeader>
       <CardContent>
-        <p className="text-2xl font-semibold text-foreground">--</p>
-        <p className="text-xs text-muted-foreground mt-2">{description}</p>
+        <div className="text-2xl font-bold">{value}</div>
+        <p className={`text-xs mt-1 flex items-center gap-1 ${
+          trend === 'up' ? 'text-green-600' : 
+          trend === 'down' ? 'text-red-600' : 
+          'text-muted-foreground'
+        }`}>
+          {trend === 'up' && <TrendingUp className="w-3 h-3" />}
+          {change}
+        </p>
       </CardContent>
     </Card>
   );

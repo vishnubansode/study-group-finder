@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { 
-  Home, 
+  LayoutDashboard, 
   Users, 
   BookOpen, 
   MessageCircle, 
@@ -15,7 +15,7 @@ import {
 import { useAuth } from '@/contexts/AuthContext';
 
 const navigationItems = [
-  { name: 'Home', href: '/', icon: Home },
+  { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
   { name: 'Groups', href: '/groups', icon: Users },
   { name: 'Courses', href: '/courses', icon: BookOpen },
   { name: 'Chat', href: '/chat', icon: MessageCircle },
@@ -28,9 +28,23 @@ export function Navigation() {
   const location = useLocation();
   const { user, logout } = useAuth();
 
-  const menuItems = user ? navigationItems : navigationItems.slice(0, 1);
+  // Create dynamic menu items with user-specific dashboard URL
+  const getDynamicMenuItems = () => {
+    if (!user) return navigationItems.slice(0, 1);
+    return navigationItems.map(item => {
+      if (item.name === 'Dashboard') {
+        return { ...item, href: `/dashboard/${user.id}` };
+      }
+      return item;
+    });
+  };
+
+  const menuItems = getDynamicMenuItems();
 
   const isActive = (href: string) => {
+    if (href.startsWith('/dashboard')) {
+      return location.pathname.startsWith('/dashboard');
+    }
     return location.pathname === href;
   };
 

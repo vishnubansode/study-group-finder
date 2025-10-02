@@ -54,7 +54,7 @@ const AppShell = () => {
         <Sidebar />
         <main className={`flex-1 ${user ? 'lg:ml-64' : ''}`}>
           <Routes>
-            <Route path="/" element={<Index />} />
+            <Route path="/" element={user ? <Navigate to={`/dashboard/${user.id}`} replace /> : <Index />} />
             <Route path="/login" element={<GuestRoute><Login /></GuestRoute>} />
             <Route path="/register" element={<GuestRoute><Register /></GuestRoute>} />
             <Route path="/forgot-password" element={<GuestRoute><ForgotPassword /></GuestRoute>} />

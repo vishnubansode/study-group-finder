@@ -7,6 +7,7 @@ interface User {
   lastName: string;
   email: string;
   profileImageUrl: string | null;
+  avatar?: string | null;  // Backend avatar path
   secondarySchool?: string;
   graduationYear?: string;
   university?: string;
