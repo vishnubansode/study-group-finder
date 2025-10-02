@@ -36,8 +36,8 @@ export default function ResetPassword() {
   const validatePassword = (password: string) => {
     const errors = [];
     
-    if (password.length < 6) {
-      errors.push("At least 6 characters long");
+    if (password.length < 8) {
+      errors.push("At least 8 characters long");
     }
     if (!/[A-Za-z]/.test(password)) {
       errors.push("At least one letter");
@@ -47,6 +47,25 @@ export default function ResetPassword() {
     }
     
     return errors;
+  };
+
+  const passwordStrength = (password: string) => {
+    if (!password) return { strength: 0, label: '', color: '', isValid: false };
+    
+    const hasMinLength = password.length >= 8;
+    const hasLetter = /[a-zA-Z]/.test(password);
+    const hasNumber = /\d/.test(password);
+    
+    const isValid = hasMinLength && hasLetter && hasNumber;
+    
+    if (!hasMinLength) {
+      return { strength: 1, label: 'Too short', color: 'bg-red-500', isValid: false };
+    }
+    if (!hasLetter || !hasNumber) {
+      return { strength: 2, label: 'Weak', color: 'bg-yellow-500', isValid: false };
+    }
+    
+    return { strength: 3, label: 'Strong', color: 'bg-green-500', isValid: true };
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -307,6 +326,27 @@ export default function ResetPassword() {
                     {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                   </button>
                 </div>
+                
+                {/* Password Strength Indicator */}
+                {password && (
+                  <div className="space-y-1">
+                    <div className="flex gap-1">
+                      {[...Array(3)].map((_, i) => (
+                        <div
+                          key={i}
+                          className={`h-1.5 flex-1 rounded-full transition-colors ${
+                            i < passwordStrength(password).strength
+                              ? passwordStrength(password).color
+                              : 'bg-muted'
+                          }`}
+                        />
+                      ))}
+                    </div>
+                    <p className={`text-xs font-medium ${passwordStrength(password).isValid ? 'text-green-600' : 'text-muted-foreground'}`}>
+                      {passwordStrength(password).label}
+                    </p>
+                  </div>
+                )}
               </div>
 
               <div className="space-y-2">
@@ -335,17 +375,17 @@ export default function ResetPassword() {
                 </div>
               </div>
 
-              <div className="text-xs text-muted-foreground space-y-1">
-                <p className="font-medium">Password requirements:</p>
-                <ul className="list-disc list-inside space-y-1 ml-2">
-                  <li className={password.length >= 6 ? 'text-green-600' : ''}>
-                    At least 6 characters long
+              <div className="bg-muted/50 rounded-lg p-3 space-y-1">
+                <p className="text-xs font-medium text-muted-foreground">Password must:</p>
+                <ul className="text-xs text-muted-foreground space-y-1 ml-4">
+                  <li className={password.length >= 8 ? 'text-green-600 font-medium' : ''}>
+                    ✓ At least 8 characters long
                   </li>
-                  <li className={/[A-Za-z]/.test(password) ? 'text-green-600' : ''}>
-                    At least one letter
+                  <li className={/[A-Za-z]/.test(password) ? 'text-green-600 font-medium' : ''}>
+                    ✓ Contains at least one letter
                   </li>
-                  <li className={/[0-9]/.test(password) ? 'text-green-600' : ''}>
-                    At least one number
+                  <li className={/[0-9]/.test(password) ? 'text-green-600 font-medium' : ''}>
+                    ✓ Contains at least one number
                   </li>
                 </ul>
               </div>

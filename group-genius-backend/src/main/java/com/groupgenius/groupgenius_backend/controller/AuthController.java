@@ -110,4 +110,43 @@ public class AuthController {
         
         return ResponseEntity.ok(debug);
     }
+
+    @PostMapping("/change-password")
+    public ResponseEntity<Map<String, String>> changePassword(
+            @RequestHeader("Authorization") String authHeader,
+            @RequestBody Map<String, String> request
+    ) {
+        try {
+            String currentPassword = request.get("currentPassword");
+            String newPassword = request.get("newPassword");
+
+            if (currentPassword == null || newPassword == null) {
+                return ResponseEntity.badRequest()
+                        .body(Map.of("error", "Current password and new password are required"));
+            }
+
+            // Extract email from JWT token
+            String token = authHeader.replace("Bearer ", "");
+            String email = authService.changePassword(token, currentPassword, newPassword);
+            
+            Map<String, String> response = new HashMap<>();
+            response.put("message", "Password changed successfully");
+            response.put("email", email);
+            return ResponseEntity.ok(response);
+            
+        } catch (RuntimeException e) {
+            if (e.getMessage().contains("Current password is incorrect")) {
+                return ResponseEntity.status(401)
+                        .body(Map.of("error", "Current password is incorrect"));
+            } else if (e.getMessage().contains("Invalid token") || e.getMessage().contains("User not found")) {
+                return ResponseEntity.status(401)
+                        .body(Map.of("error", "Invalid authentication token"));
+            }
+            return ResponseEntity.badRequest()
+                    .body(Map.of("error", e.getMessage()));
+        } catch (Exception e) {
+            return ResponseEntity.status(500)
+                    .body(Map.of("error", "Internal server error. Please try again later."));
+        }
+    }
 }

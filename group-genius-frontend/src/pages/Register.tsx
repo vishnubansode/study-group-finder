@@ -24,6 +24,16 @@ export default function Register() {
   const { register, login } = useAuth();
   const { toast } = useToast();
 
+  const passwordStrength = (password: string) => {
+    if (password.length < 8) return { strength: 1, label: 'Too short' };
+    
+    const hasLetter = /[a-zA-Z]/.test(password);
+    const hasNumber = /\d/.test(password);
+    
+    if (hasLetter && hasNumber) return { strength: 3, label: 'Strong' };
+    return { strength: 2, label: 'Weak' };
+  };
+
   const handleInputChange = (field: string, value: any) => {
     setFormData(prev => ({
       ...prev,
@@ -48,6 +58,33 @@ export default function Register() {
       toast({
         title: "Passwords Don't Match",
         description: "Please make sure your passwords match",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (formData.password.length < 8) {
+      toast({
+        title: "Password Too Short",
+        description: "Password must be at least 8 characters long",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!/[a-zA-Z]/.test(formData.password)) {
+      toast({
+        title: "Password Invalid",
+        description: "Password must contain at least one letter",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!/\d/.test(formData.password)) {
+      toast({
+        title: "Password Invalid",
+        description: "Password must contain at least one number",
         variant: "destructive",
       });
       return;
@@ -195,34 +232,88 @@ export default function Register() {
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="password" className="text-sm font-medium text-foreground">Password *</Label>
-                  <Input
-                    id="password"
-                    type="password"
-                    placeholder="••••••••"
-                    value={formData.password}
-                    onChange={(e) => handleInputChange('password', e.target.value)}
-                    className="h-11 transition-all duration-200 focus:ring-2 focus:ring-primary/20"
-                    required
-                    disabled={isLoading}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="confirmPassword" className="text-sm font-medium text-foreground">Confirm Password *</Label>
-                  <Input
-                    id="confirmPassword"
-                    type="password"
-                    placeholder="••••••••"
-                    value={formData.confirmPassword}
-                    onChange={(e) => handleInputChange('confirmPassword', e.target.value)}
-                    className="h-11 transition-all duration-200 focus:ring-2 focus:ring-primary/20"
-                    required
-                    disabled={isLoading}
-                  />
-                </div>
+              <div className="space-y-2">
+                <Label htmlFor="password" className="text-sm font-medium text-foreground">Password *</Label>
+                <Input
+                  id="password"
+                  type="password"
+                  placeholder="••••••••"
+                  value={formData.password}
+                  onChange={(e) => handleInputChange('password', e.target.value)}
+                  className="h-11 transition-all duration-200 focus:ring-2 focus:ring-primary/20"
+                  required
+                  disabled={isLoading}
+                />
+                
+                {formData.password && (
+                  <div className="mt-3 space-y-2">
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-xs text-muted-foreground">Password Strength:</span>
+                      <span className={`text-xs font-medium ${
+                        passwordStrength(formData.password).strength === 3 ? 'text-green-600' :
+                        passwordStrength(formData.password).strength === 2 ? 'text-yellow-600' :
+                        'text-red-600'
+                      }`}>
+                        {passwordStrength(formData.password).label}
+                      </span>
+                    </div>
+                    <div className="flex gap-1.5">
+                      {[1, 2, 3].map((level) => (
+                        <div
+                          key={level}
+                          className={`h-1.5 flex-1 rounded-full transition-all duration-300 ${
+                            level <= passwordStrength(formData.password).strength
+                              ? passwordStrength(formData.password).strength === 3
+                                ? 'bg-green-500'
+                                : passwordStrength(formData.password).strength === 2
+                                ? 'bg-yellow-500'
+                                : 'bg-red-500'
+                              : 'bg-gray-200'
+                          }`}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="confirmPassword" className="text-sm font-medium text-foreground">Confirm Password *</Label>
+                <Input
+                  id="confirmPassword"
+                  type="password"
+                  placeholder="••••••••"
+                  value={formData.confirmPassword}
+                  onChange={(e) => handleInputChange('confirmPassword', e.target.value)}
+                  className="h-11 transition-all duration-200 focus:ring-2 focus:ring-primary/20"
+                  required
+                  disabled={isLoading}
+                />
+              </div>
+
+              {formData.password && (
+                <div className="bg-muted/50 rounded-lg p-3 space-y-1.5">
+                  <p className="text-xs font-medium text-foreground mb-2">Password Requirements:</p>
+                  <div className={`flex items-center gap-2 text-xs transition-colors ${
+                    formData.password.length >= 8 ? 'text-green-600' : 'text-muted-foreground'
+                  }`}>
+                    <span className="font-medium">{formData.password.length >= 8 ? '✓' : '○'}</span>
+                    <span>At least 8 characters</span>
+                  </div>
+                  <div className={`flex items-center gap-2 text-xs transition-colors ${
+                    /[a-zA-Z]/.test(formData.password) ? 'text-green-600' : 'text-muted-foreground'
+                  }`}>
+                    <span className="font-medium">{/[a-zA-Z]/.test(formData.password) ? '✓' : '○'}</span>
+                    <span>Contains at least one letter</span>
+                  </div>
+                  <div className={`flex items-center gap-2 text-xs transition-colors ${
+                    /\d/.test(formData.password) ? 'text-green-600' : 'text-muted-foreground'
+                  }`}>
+                    <span className="font-medium">{/\d/.test(formData.password) ? '✓' : '○'}</span>
+                    <span>Contains at least one number</span>
+                  </div>
+                </div>
+              )}
 
               <div className="pt-6">
                 <Button 

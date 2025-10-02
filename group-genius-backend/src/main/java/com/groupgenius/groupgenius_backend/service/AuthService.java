@@ -83,4 +83,44 @@ public class AuthService {
                 .user(UserMapper.toResponse(user))
                 .build();
     }
+
+    public String changePassword(String token, String currentPassword, String newPassword) {
+        // Extract email from JWT token
+        String email = jwtUtil.extractUsername(token);
+        if (email == null) {
+            throw new IllegalArgumentException("Invalid token");
+        }
+
+        // Find user
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new IllegalArgumentException("User not found"));
+
+        // Verify current password
+        if (!passwordEncoder.matches(currentPassword, user.getPassword())) {
+            throw new IllegalArgumentException("Current password is incorrect");
+        }
+
+        // Validate new password
+        if (newPassword == null || newPassword.trim().length() < 6) {
+            throw new IllegalArgumentException("New password must be at least 6 characters long");
+        }
+
+        // Check if new password is different from current
+        if (passwordEncoder.matches(newPassword, user.getPassword())) {
+            throw new IllegalArgumentException("New password must be different from current password");
+        }
+
+        // Update password
+        user.setPassword(passwordEncoder.encode(newPassword));
+        userRepository.save(user);
+
+        // Send notification email
+        emailService.sendNotificationEmail(
+                user.getEmail(),
+                "Password Changed Successfully",
+                String.format("Hi %s,\n\nYour password has been successfully changed. If you didn't make this change, please contact support immediately.\n\nBest regards,\nGroupGenius Team", user.getFirstName())
+        );
+
+        return email;
+    }
 }

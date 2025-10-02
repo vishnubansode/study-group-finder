@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -20,7 +21,8 @@ import {
   MessageCircle,
   Star,
   TrendingUp,
-  Loader2
+  Loader2,
+  KeyRound
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/components/ui/use-toast';
@@ -40,6 +42,7 @@ export default function Profile() {
   const [isLoading, setIsLoading] = useState(false);
   const { user, isLoading: authLoading } = useAuth();
   const { toast } = useToast();
+  const navigate = useNavigate();
 
   // Form data state - initialized with user data from backend
   const [formData, setFormData] = useState({
@@ -210,13 +213,22 @@ export default function Profile() {
                   </Button>
                 </div>
               ) : (
-                <Button 
-                  className="btn-academic" 
-                  onClick={() => setIsEditing(true)}
-                >
-                  <Edit3 className="w-4 h-4 mr-2" />
-                  Edit Profile
-                </Button>
+                <div className="flex gap-3">
+                  <Button 
+                    className="btn-academic" 
+                    onClick={() => setIsEditing(true)}
+                  >
+                    <Edit3 className="w-4 h-4 mr-2" />
+                    Edit Profile
+                  </Button>
+                  <Button 
+                    variant="outline"
+                    onClick={() => navigate('/change-password')}
+                  >
+                    <KeyRound className="w-4 h-4 mr-2" />
+                    Change Password
+                  </Button>
+                </div>
               )}
             </div>
           </div>
