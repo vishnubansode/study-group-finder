@@ -31,6 +31,7 @@ public class UserDto {
     private String university;
     private String major;
     private String currentYear;
+    private String bio;
 
     private List<String> selectedCourses;
 }

@@ -38,17 +38,19 @@ public class ProfileService {
         User user = userRepository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("User not found"));
 
+        // Update ALL profile fields
         user.setFirstName(updateRequest.getFirstName());
         user.setLastName(updateRequest.getLastName());
-        user.setSecondarySchool(updateRequest.getSecondarySchool());
-        user.setGraduationYear(updateRequest.getGraduationYear());
+        user.setEmail(updateRequest.getEmail());
         user.setUniversity(updateRequest.getUniversity());
         user.setMajor(updateRequest.getMajor());
         user.setCurrentYear(updateRequest.getCurrentYear());
-        if (updateRequest.getPassword() != null && !updateRequest.getPassword().isBlank()) {
-            user.setPassword(passwordEncoder.encode(updateRequest.getPassword()));
-        }
-        return UserMapper.toResponse(user);
+        user.setSecondarySchool(updateRequest.getSecondarySchool());
+        user.setGraduationYear(updateRequest.getGraduationYear());
+        user.setBio(updateRequest.getBio()); // Add this line
+
+        User savedUser = userRepository.save(user);
+        return UserMapper.toResponse(savedUser);
     }
 
     @Transactional

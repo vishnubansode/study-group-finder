@@ -37,7 +37,7 @@ public class SecurityConfig {
             .requestMatchers("/api/auth/register", "/api/auth/login", "/api/auth/forgot-password", "/api/auth/reset-password").permitAll()  // public auth endpoints
             .requestMatchers("/api/auth/change-password").authenticated()  // requires authentication
             .requestMatchers(HttpMethod.GET, "/api/courses/**").permitAll()
-            .requestMatchers("/uploads/**").permitAll()   // allow profile images access
+            .requestMatchers("/api/files/**").permitAll()   // allow profile images access
             .anyRequest().authenticated()                 // secure everything else
                 )
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);

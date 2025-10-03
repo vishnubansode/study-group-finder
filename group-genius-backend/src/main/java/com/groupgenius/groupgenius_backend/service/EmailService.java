@@ -26,7 +26,7 @@ public class EmailService {
     @Value("${app.frontend.url:http://localhost:3000}")
     private String frontendUrl;
 
-    @Value("${spring.mail.username:noreply@groupgenius.com}")
+    @Value("${spring.mail.username:groupgeniusweb@gmail.com}")
     private String fromEmail;
 
     @Value("${app.email.enabled:false}")

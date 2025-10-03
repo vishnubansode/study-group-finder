@@ -1,12 +1,13 @@
 package com.groupgenius.groupgenius_backend.dto;
 
-import lombok.Builder;
-import lombok.Value;
+import lombok.*;
 
 import java.util.List;
 
 @Value
 @Builder
+@Data
+@AllArgsConstructor
 public class UserResponse {
     Long id;
     String firstName;
@@ -18,5 +19,6 @@ public class UserResponse {
     String university;
     String major;
     String currentYear;
+    String bio;
     List<CourseResponse> courses;
 }

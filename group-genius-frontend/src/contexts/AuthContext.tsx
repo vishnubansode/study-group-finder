@@ -13,6 +13,7 @@ interface User {
   university?: string;
   major?: string;
   currentYear?: string;
+  bio?: string; // ADD THIS FIELD
   selectedCourses?: string[];
 }
 
@@ -22,6 +23,7 @@ interface AuthContextType {
   register: (userData: any, profileImage?: File) => Promise<void>;
   logout: () => void;
   isLoading: boolean;
+  updateUser: (userData: User) => void; // ADD THIS FUNCTION
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -45,6 +47,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
     }
     setIsLoading(false);
+  };
+
+  // ADD THIS FUNCTION - Update user in context
+  const updateUser = (userData: User) => {
+    setUser(userData);
   };
 
   const register = async (userData: any, profileImage?: File) => {
@@ -98,7 +105,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   return (
-    <AuthContext.Provider value={{ user, login, register, logout, isLoading }}>
+    <AuthContext.Provider value={{ 
+      user, 
+      login, 
+      register, 
+      logout, 
+      isLoading,
+      updateUser // ADD THIS TO THE PROVIDER
+    }}>
       {children}
     </AuthContext.Provider>
   );

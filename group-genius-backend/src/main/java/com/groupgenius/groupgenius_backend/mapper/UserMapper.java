@@ -15,10 +15,6 @@ public final class UserMapper {
     }
 
     public static UserResponse toResponse(User user) {
-        if (user == null) {
-            return null;
-        }
-
         return UserResponse.builder()
                 .id(user.getId())
                 .firstName(user.getFirstName())
@@ -30,7 +26,7 @@ public final class UserMapper {
                 .university(user.getUniversity())
                 .major(user.getMajor())
                 .currentYear(user.getCurrentYear())
-                .courses(mapCourses(user.getCourses()))
+                .bio(user.getBio()) // ADD THIS LINE
                 .build();
     }
 
