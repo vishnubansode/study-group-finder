@@ -33,6 +33,7 @@ public class User {
     private String university;
     private String major;
     private String currentYear;
+    private String bio;
 
     @ManyToMany(fetch = FetchType.LAZY)
     @JoinTable(
