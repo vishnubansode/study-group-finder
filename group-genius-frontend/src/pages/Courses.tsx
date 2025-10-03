@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -18,8 +18,52 @@ import {
   Target
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import { 
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter
+} from '@/components/ui/dialog';
 
-const enrolledCourses = [
+type DifficultyLevel = 'Easy' | 'Medium' | 'Hard';
+
+type Status = 'Enrolled' | 'Available';
+
+interface BaseCourse {
+  id: number;
+  code: string;
+  name: string;
+  instructor: string;
+  credits: number;
+  schedule: string;
+  description: string;
+  status: Status;
+}
+
+interface EnrolledCourse extends BaseCourse {
+  status: 'Enrolled';
+  progress: number;
+  grade: string;
+  studyGroups: number;
+  nextAssignment: string;
+  dueDate: string;
+  color: 'primary' | 'secondary' | 'accent';
+}
+
+interface AvailableCourse extends BaseCourse {
+  status: 'Available';
+  prerequisites: string[];
+  enrolled: boolean;
+  rating: number;
+  difficulty: DifficultyLevel;
+}
+
+type SeedEnrolledCourse = Omit<EnrolledCourse, 'description' | 'status'>;
+type SeedAvailableCourse = Omit<AvailableCourse, 'description' | 'status'>;
+
+const initialEnrolledCourses: SeedEnrolledCourse[] = [
   {
     id: 1,
     code: 'CS 101',
@@ -78,7 +122,7 @@ const enrolledCourses = [
   }
 ];
 
-const availableCourses = [
+const initialAvailableCourses: SeedAvailableCourse[] = [
   {
     id: 5,
     code: 'CS 201',
@@ -108,6 +152,112 @@ const availableCourses = [
 export default function Courses() {
   const [searchQuery, setSearchQuery] = useState('');
   const [activeTab, setActiveTab] = useState<'enrolled' | 'available'>('enrolled');
+  const [enrolled, setEnrolled] = useState<EnrolledCourse[]>(
+    initialEnrolledCourses.map((c) => ({
+      description:
+        'Engage with course materials, assignments, and collaborative activities to progress effectively.',
+      ...c,
+      status: 'Enrolled',
+    }))
+  );
+  const [detailsOpen, setDetailsOpen] = useState(false);
+  const [selectedCourse, setSelectedCourse] = useState<EnrolledCourse | AvailableCourse | null>(null);
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [pendingRemoveId, setPendingRemoveId] = useState<number | null>(null);
+
+  const isEnrolledCourse = (c: EnrolledCourse | AvailableCourse): c is EnrolledCourse => c.status === 'Enrolled';
+
+  const openDetails = (course: EnrolledCourse | AvailableCourse) => {
+    setSelectedCourse(course);
+    setDetailsOpen(true);
+  };
+  const requestRemove = (courseId: number) => {
+    setPendingRemoveId(courseId);
+    setConfirmOpen(true);
+  };
+  const confirmRemove = () => {
+    if (pendingRemoveId !== null) {
+      handleUnenroll(pendingRemoveId);
+    }
+    setConfirmOpen(false);
+    setPendingRemoveId(null);
+    if (detailsOpen) setDetailsOpen(false);
+  };
+  const [available, setAvailable] = useState<AvailableCourse[]>(
+    initialAvailableCourses.map((c) => ({
+      description:
+        'Explore this course to learn core concepts and develop practical skills.',
+      ...c,
+      status: 'Available',
+    }))
+  );
+
+  const filteredEnrolled = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    if (!q) return enrolled;
+    return enrolled.filter(
+      (c) => c.code.toLowerCase().includes(q) || c.name.toLowerCase().includes(q)
+    );
+  }, [searchQuery, enrolled]);
+
+  const filteredAvailable = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    if (!q) return available;
+    return available.filter(
+      (c) => c.code.toLowerCase().includes(q) || c.name.toLowerCase().includes(q)
+    );
+  }, [searchQuery, available]);
+
+  const handleEnroll = (courseId: number) => {
+    setAvailable((prevAvailable) => {
+      const course = prevAvailable.find((c) => c.id === courseId);
+      if (!course) return prevAvailable;
+      // remove from available
+      const remaining = prevAvailable.filter((c) => c.id !== courseId);
+      // add to enrolled with defaults if needed
+      setEnrolled((prevEnrolled) => [
+        ...prevEnrolled,
+        {
+          ...course,
+          status: 'Enrolled',
+          progress: 0,
+          grade: 'N/A',
+          studyGroups: 0,
+          nextAssignment: 'TBD',
+          dueDate: 'TBD',
+          color: 'primary' as const,
+        } as EnrolledCourse,
+      ]);
+      return remaining;
+    });
+  };
+
+  const handleUnenroll = (courseId: number) => {
+    setEnrolled((prevEnrolled) => {
+      const course = prevEnrolled.find((c) => c.id === courseId);
+      if (!course) return prevEnrolled;
+      const remaining = prevEnrolled.filter((c) => c.id !== courseId);
+      setAvailable((prevAvailable) => [
+        ...prevAvailable,
+        {
+          id: course.id,
+          code: course.code,
+          name: course.name,
+          instructor: course.instructor,
+          credits: course.credits,
+          schedule: course.schedule,
+          prerequisites: [],
+          enrolled: false,
+          rating: 4.5,
+          difficulty: 'Medium' as const,
+          description:
+            'Explore this course to learn core concepts and develop practical skills.',
+          status: 'Available',
+        } as AvailableCourse,
+      ]);
+      return remaining;
+    });
+  };
 
   const getProgressColor = (progress: number) => {
     if (progress >= 80) return 'bg-accent';
@@ -134,6 +284,7 @@ export default function Courses() {
   };
 
   return (
+    <>
     <div className="min-h-screen bg-background pb-24 lg:pb-8">
       {/* Header */}
       <div className="bg-gradient-secondary px-6 py-12">
@@ -171,7 +322,7 @@ export default function Courses() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold text-foreground">
-                {enrolledCourses.reduce((sum, course) => sum + course.credits, 0)}
+                {enrolled.reduce((sum, course) => sum + course.credits, 0)}
               </div>
               <p className="text-xs text-muted-foreground mt-1">
                 This semester
@@ -204,7 +355,7 @@ export default function Courses() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold text-foreground">
-                {enrolledCourses.reduce((sum, course) => sum + course.studyGroups, 0)}
+                {enrolled.reduce((sum, course) => sum + course.studyGroups, 0)}
               </div>
               <p className="text-xs text-muted-foreground mt-1">
                 Active groups joined
@@ -237,7 +388,7 @@ export default function Courses() {
                   onClick={() => setActiveTab('enrolled')}
                   className={activeTab === 'enrolled' ? 'btn-academic' : ''}
                 >
-                  Enrolled Courses ({enrolledCourses.length})
+                  Enrolled Courses ({filteredEnrolled.length})
                 </Button>
                 <Button
                   variant={activeTab === 'available' ? 'default' : 'ghost'}
@@ -245,7 +396,7 @@ export default function Courses() {
                   onClick={() => setActiveTab('available')}
                   className={activeTab === 'available' ? 'btn-academic' : ''}
                 >
-                  Available Courses ({availableCourses.length})
+                  Available Courses ({filteredAvailable.length})
                 </Button>
               </div>
               
@@ -271,7 +422,7 @@ export default function Courses() {
         {/* Course Lists */}
         {activeTab === 'enrolled' ? (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {enrolledCourses.map((course) => (
+            {filteredEnrolled.map((course) => (
               <Card key={course.id} className="academic-card hover-lift">
                 <CardHeader className="pb-4">
                   <div className="flex items-start justify-between">
@@ -289,11 +440,15 @@ export default function Courses() {
                         <p>{course.instructor}</p>
                         <p>{course.schedule}</p>
                         <p>{course.credits} credits</p>
+                        <p className="line-clamp-2 text-foreground/80">{course.description}</p>
                       </div>
                     </div>
-                    <Badge variant="outline" className="font-semibold">
-                      {course.grade}
-                    </Badge>
+                    <div className="flex flex-col items-end gap-1">
+                      <Badge variant="outline" className="font-semibold">
+                        {course.grade}
+                      </Badge>
+                      <Badge className="bg-primary/10 text-primary border-primary/20">Enrolled</Badge>
+                    </div>
                   </div>
                 </CardHeader>
                 
@@ -331,9 +486,11 @@ export default function Courses() {
                         Study Groups
                       </Button>
                     </Link>
-                    <Button className="btn-accent flex-1" size="sm">
-                      <BookOpen className="w-4 h-4 mr-2" />
-                      View Course
+                    <Button variant="outline" className="flex-1" size="sm" onClick={() => openDetails(course)}>
+                      View Details
+                    </Button>
+                    <Button variant="destructive" className="flex-1" size="sm" onClick={() => requestRemove(course.id)}>
+                      Remove
                     </Button>
                   </div>
                 </CardContent>
@@ -342,7 +499,7 @@ export default function Courses() {
           </div>
         ) : (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {availableCourses.map((course) => (
+            {filteredAvailable.map((course) => (
               <Card key={course.id} className="academic-card hover-lift">
                 <CardHeader className="pb-4">
                   <div className="flex items-start justify-between">
@@ -360,6 +517,7 @@ export default function Courses() {
                         <p>{course.instructor}</p>
                         <p>{course.schedule}</p>
                         <p>{course.credits} credits</p>
+                        <p className="line-clamp-2 text-foreground/80">{course.description}</p>
                       </div>
                     </div>
                     <div className="flex items-center space-x-2">
@@ -367,6 +525,7 @@ export default function Courses() {
                         <Star className="w-4 h-4 text-yellow-500 fill-current" />
                         <span className="text-sm font-medium">{course.rating}</span>
                       </div>
+                      <Badge className="bg-muted text-foreground border-border">Available</Badge>
                     </div>
                   </div>
                 </CardHeader>
@@ -393,10 +552,10 @@ export default function Courses() {
                   )}
 
                   <div className="flex space-x-2 pt-4 border-t border-border">
-                    <Button variant="outline" className="flex-1" size="sm">
+                    <Button variant="outline" className="flex-1" size="sm" onClick={() => openDetails(course)}>
                       View Details
                     </Button>
-                    <Button className="btn-academic flex-1" size="sm">
+                    <Button className="btn-academic flex-1" size="sm" onClick={() => handleEnroll(course.id)}>
                       <Plus className="w-4 h-4 mr-2" />
                       Enroll
                     </Button>
@@ -408,8 +567,8 @@ export default function Courses() {
         )}
 
         {/* Empty State */}
-        {((activeTab === 'enrolled' && enrolledCourses.length === 0) || 
-          (activeTab === 'available' && availableCourses.length === 0)) && (
+        {((activeTab === 'enrolled' && filteredEnrolled.length === 0) || 
+          (activeTab === 'available' && filteredAvailable.length === 0)) && (
           <div className="text-center py-12">
             <BookOpen className="w-16 h-16 text-muted-foreground mx-auto mb-4" />
             <h3 className="text-lg font-medium text-foreground mb-2">
@@ -430,5 +589,75 @@ export default function Courses() {
         )}
       </div>
     </div>
+    <Dialog open={detailsOpen} onOpenChange={setDetailsOpen}>
+      <DialogContent>
+        {selectedCourse && (
+          <div>
+            <DialogHeader>
+              <DialogTitle>{selectedCourse.code} — {selectedCourse.name}</DialogTitle>
+              <DialogDescription>{selectedCourse.instructor} • {selectedCourse.schedule}</DialogDescription>
+            </DialogHeader>
+            <div className="mt-4 space-y-3">
+              <p className="text-sm text-muted-foreground">Credits: {selectedCourse.credits}</p>
+              <p className="text-sm text-foreground/90">{selectedCourse.description}</p>
+              {isEnrolledCourse(selectedCourse) ? (
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between text-sm">
+                    <span>Progress</span>
+                    <span className="font-medium">{selectedCourse.progress}%</span>
+                  </div>
+                  <Progress value={selectedCourse.progress} className="h-2" />
+                  <div className="grid grid-cols-2 gap-3 text-sm">
+                    <div><span className="text-muted-foreground">Grade:</span> <span className="font-medium">{selectedCourse.grade}</span></div>
+                    <div><span className="text-muted-foreground">Groups:</span> <span className="font-medium">{selectedCourse.studyGroups}</span></div>
+                    <div className="col-span-2"><span className="text-muted-foreground">Next assignment:</span> <span className="font-medium">{selectedCourse.nextAssignment}</span></div>
+                    <div className="col-span-2"><span className="text-muted-foreground">Due:</span> <span className="font-medium">{selectedCourse.dueDate}</span></div>
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  <div className="grid grid-cols-2 gap-3 text-sm">
+                    <div><span className="text-muted-foreground">Rating:</span> <span className="font-medium">{selectedCourse.rating}</span></div>
+                    <div><span className="text-muted-foreground">Difficulty:</span> <span className={`font-medium ${getDifficultyColor(selectedCourse.difficulty)}`}>{selectedCourse.difficulty}</span></div>
+                  </div>
+                  {selectedCourse.prerequisites.length > 0 && (
+                    <div>
+                      <span className="text-sm text-muted-foreground">Prerequisites:</span>
+                      <div className="flex flex-wrap gap-1 mt-1">
+                        {selectedCourse.prerequisites.map((p) => (
+                          <Badge key={p} variant="outline" className="text-xs">{p}</Badge>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+            <DialogFooter className="mt-6">
+              {selectedCourse && isEnrolledCourse(selectedCourse) ? (
+                <Button variant="destructive" onClick={() => requestRemove(selectedCourse.id)}>Remove</Button>
+              ) : selectedCourse ? (
+                <Button onClick={() => { handleEnroll(selectedCourse.id); setDetailsOpen(false); }}>Enroll</Button>
+              ) : null}
+            </DialogFooter>
+          </div>
+        )}
+      </DialogContent>
+    </Dialog>
+    <Dialog open={confirmOpen} onOpenChange={setConfirmOpen}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Remove course?</DialogTitle>
+          <DialogDescription>
+            Are you sure you want to remove this course from your enrolled list?
+          </DialogDescription>
+        </DialogHeader>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => setConfirmOpen(false)}>Cancel</Button>
+          <Button variant="destructive" onClick={confirmRemove}>Remove</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+    </>
   );
 }
