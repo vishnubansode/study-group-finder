@@ -15,7 +15,8 @@ import {
   TrendingUp,
   Plus,
   GraduationCap,
-  Target
+  Target,
+  Loader2
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { 
@@ -152,6 +153,7 @@ const initialAvailableCourses: SeedAvailableCourse[] = [
 export default function Courses() {
   const [searchQuery, setSearchQuery] = useState('');
   const [activeTab, setActiveTab] = useState<'enrolled' | 'available'>('enrolled');
+  const [enrollingId, setEnrollingId] = useState<number | null>(null);
   const [enrolled, setEnrolled] = useState<EnrolledCourse[]>(
     initialEnrolledCourses.map((c) => ({
       description:
@@ -209,27 +211,33 @@ export default function Courses() {
   }, [searchQuery, available]);
 
   const handleEnroll = (courseId: number) => {
-    setAvailable((prevAvailable) => {
-      const course = prevAvailable.find((c) => c.id === courseId);
-      if (!course) return prevAvailable;
-      // remove from available
-      const remaining = prevAvailable.filter((c) => c.id !== courseId);
-      // add to enrolled with defaults if needed
-      setEnrolled((prevEnrolled) => [
-        ...prevEnrolled,
-        {
-          ...course,
-          status: 'Enrolled',
-          progress: 0,
-          grade: 'N/A',
-          studyGroups: 0,
-          nextAssignment: 'TBD',
-          dueDate: 'TBD',
-          color: 'primary' as const,
-        } as EnrolledCourse,
-      ]);
-      return remaining;
-    });
+    setEnrollingId(courseId);
+    // Simulate a short async operation for better UX
+    setTimeout(() => {
+      setAvailable((prevAvailable) => {
+        const course = prevAvailable.find((c) => c.id === courseId);
+        if (!course) {
+          setEnrollingId(null);
+          return prevAvailable;
+        }
+        const remaining = prevAvailable.filter((c) => c.id !== courseId);
+        setEnrolled((prevEnrolled) => [
+          ...prevEnrolled,
+          {
+            ...course,
+            status: 'Enrolled',
+            progress: 0,
+            grade: 'N/A',
+            studyGroups: 0,
+            nextAssignment: 'TBD',
+            dueDate: 'TBD',
+            color: 'primary' as const,
+          } as EnrolledCourse,
+        ]);
+        setEnrollingId(null);
+        return remaining;
+      });
+    }, 400);
   };
 
   const handleUnenroll = (courseId: number) => {
@@ -552,12 +560,26 @@ export default function Courses() {
                   )}
 
                   <div className="flex space-x-2 pt-4 border-t border-border">
-                    <Button variant="outline" className="flex-1" size="sm" onClick={() => openDetails(course)}>
+                    <Button variant="outline" className="flex-1 hover:shadow-sm transition" size="sm" onClick={() => openDetails(course)}>
                       View Details
                     </Button>
-                    <Button className="btn-academic flex-1" size="sm" onClick={() => handleEnroll(course.id)}>
-                      <Plus className="w-4 h-4 mr-2" />
-                      Enroll
+                    <Button 
+                      className="flex-1 bg-primary text-primary-foreground hover:bg-primary/90 shadow-sm transition"
+                      size="sm"
+                      onClick={() => handleEnroll(course.id)}
+                      disabled={enrollingId === course.id}
+                    >
+                      {enrollingId === course.id ? (
+                        <>
+                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                          Enrolling...
+                        </>
+                      ) : (
+                        <>
+                          <Plus className="w-4 h-4 mr-2" />
+                          Enroll
+                        </>
+                      )}
                     </Button>
                   </div>
                 </CardContent>
