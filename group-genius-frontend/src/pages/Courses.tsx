@@ -447,7 +447,7 @@ export default function Courses() {
                 asChild
               >
                 <Link to="/calendar">
-                  <Calendar className="w-5 h-5 mr-2" />
+                  <Calendar className="w-5  mr-2" />
                   View Schedule
                 </Link>
               </Button>

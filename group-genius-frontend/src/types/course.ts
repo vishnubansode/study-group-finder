@@ -65,3 +65,18 @@ export interface EnrollmentResponse {
   message: string;
   enrollment?: UserCourse;
 }
+
+// User courses response
+export interface UserCoursesResponse {
+  courses: UserCourse[];
+  totalCreditHours: number;
+  totalCourses: number;
+  averageEnrollmentPercentage: number;
+}
+
+// Course peers response
+export interface CoursePeersResponse {
+  courseId: number;
+  courseName: string;
+  peers: CoursePeer[];
+}
