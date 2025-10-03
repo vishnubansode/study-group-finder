@@ -259,34 +259,55 @@ export default function Dashboard() {
                       <BookOpen className="w-5 h-5 text-primary" />
                       My Courses
                     </CardTitle>
-                    <CardDescription>Track your enrolled courses</CardDescription>
+                    <CardDescription>Your enrolled courses and progress</CardDescription>
                   </div>
                   <Button variant="ghost" size="sm" asChild>
                     <Link to="/courses" className="gap-1">
-                      <Plus className="w-4 h-4" />
-                      Add Course
+                      View All
+                      <ArrowRight className="w-4 h-4" />
                     </Link>
                   </Button>
                 </div>
               </CardHeader>
               <CardContent className="space-y-3">
                 {myCourses.map((course) => (
-                  <div key={course.id} className="p-3 rounded-lg border hover:bg-accent/5 transition-colors">
-                    <div className="flex items-start justify-between mb-2">
-                      <div>
-                        <div className="flex items-center gap-2 mb-1">
-                          <Badge variant="outline" className="text-xs font-mono">{course.code}</Badge>
-                          <h4 className="font-semibold text-sm">{course.name}</h4>
+                  <div key={course.id} className="p-4 rounded-lg border hover:bg-accent/5 transition-colors group">
+                    <div className="flex items-start justify-between mb-3">
+                      <div className="flex items-center gap-3">
+                        <div className={`w-10 h-10 ${course.color} rounded-lg flex items-center justify-center flex-shrink-0`}>
+                          <BookOpen className="w-5 h-5 text-white" />
                         </div>
-                        <p className="text-xs text-muted-foreground">{course.professor}</p>
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2 mb-1">
+                            <Badge variant="outline" className="text-xs font-mono">{course.code}</Badge>
+                            <h4 className="font-semibold text-sm">{course.name}</h4>
+                          </div>
+                          <p className="text-xs text-muted-foreground">{course.professor}</p>
+                        </div>
                       </div>
-                      <Button variant="ghost" size="sm" className="h-6 w-6 p-0 text-muted-foreground hover:text-destructive">
-                        <X className="w-4 h-4" />
-                      </Button>
+                      <div className="flex items-center gap-2">
+                        <Button 
+                          variant="ghost" 
+                          size="sm" 
+                          className="h-8 px-2 opacity-0 group-hover:opacity-100 transition-opacity"
+                          asChild
+                        >
+                          <Link to={`/courses?course=${course.code}`}>
+                            <Users className="w-4 h-4" />
+                          </Link>
+                        </Button>
+                        <Button 
+                          variant="ghost" 
+                          size="sm" 
+                          className="h-8 w-8 p-0 text-muted-foreground hover:text-destructive opacity-0 group-hover:opacity-100 transition-opacity"
+                        >
+                          <X className="w-4 h-4" />
+                        </Button>
+                      </div>
                     </div>
-                    <div className="space-y-1">
+                    <div className="space-y-2">
                       <div className="flex items-center justify-between text-xs">
-                        <span className="text-muted-foreground">Progress</span>
+                        <span className="text-muted-foreground">Course Progress</span>
                         <span className="font-semibold">{course.progress}%</span>
                       </div>
                       <div className="w-full h-2 bg-secondary/20 rounded-full overflow-hidden">
@@ -295,9 +316,26 @@ export default function Dashboard() {
                           style={{ width: `${course.progress}%` }}
                         />
                       </div>
+                      <div className="flex items-center justify-between text-xs text-muted-foreground">
+                        <span>Next assignment due soon</span>
+                        <Link 
+                          to={`/courses?course=${course.code}`}
+                          className="text-primary hover:underline font-medium"
+                        >
+                          View details
+                        </Link>
+                      </div>
                     </div>
                   </div>
                 ))}
+                <div className="pt-3 border-t">
+                  <Button variant="outline" className="w-full gap-2" asChild>
+                    <Link to="/courses">
+                      <Plus className="w-4 h-4" />
+                      Browse Course Catalog
+                    </Link>
+                  </Button>
+                </div>
               </CardContent>
             </Card>
 
@@ -361,6 +399,12 @@ export default function Dashboard() {
                   <Link to="/groups">
                     <Plus className="w-4 h-4" />
                     Create Study Group
+                  </Link>
+                </Button>
+                <Button variant="outline" className="w-full justify-start gap-2" asChild>
+                  <Link to="/courses">
+                    <BookOpen className="w-4 h-4" />
+                    Browse Courses
                   </Link>
                 </Button>
                 <Button variant="outline" className="w-full justify-start gap-2" asChild>
