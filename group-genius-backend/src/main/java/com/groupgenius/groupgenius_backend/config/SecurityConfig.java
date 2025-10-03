@@ -36,6 +36,7 @@ public class SecurityConfig {
         .authorizeHttpRequests(auth -> auth
             .requestMatchers("/api/auth/register", "/api/auth/login", "/api/auth/forgot-password", "/api/auth/reset-password").permitAll()  // public auth endpoints
             .requestMatchers("/api/auth/change-password").authenticated()  // requires authentication
+            .requestMatchers("/api/contact").permitAll()
             .requestMatchers(HttpMethod.GET, "/api/courses/**").permitAll()
             .requestMatchers("/api/files/**").permitAll()   // allow profile images access
             .anyRequest().authenticated()                 // secure everything else

@@ -10,7 +10,8 @@ import {
   User, 
   Menu, 
   X,
-  Bell
+  Bell,
+  Mail
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 
@@ -21,6 +22,7 @@ const navigationItems = [
   { name: 'Chat', href: '/chat', icon: MessageCircle },
   { name: 'Calendar', href: '/calendar', icon: Calendar },
   { name: 'Profile', href: '/profile', icon: User },
+  { name: 'Contact', href: '/contact', icon: Mail },
 ];
 
 export function Navigation() {
@@ -30,7 +32,7 @@ export function Navigation() {
 
   // Create dynamic menu items with user-specific dashboard URL
   const getDynamicMenuItems = () => {
-    if (!user) return navigationItems.slice(0, 1);
+    if (!user) return [navigationItems[0], navigationItems[navigationItems.length - 1]]; // Home and Contact for guests
     return navigationItems.map(item => {
       if (item.name === 'Dashboard') {
         return { ...item, href: `/dashboard/${user.id}` };
@@ -58,6 +60,7 @@ export function Navigation() {
           <span className="text-xl font-bold text-foreground">GroupGenius</span>
         </Link>
         <div className="flex items-center gap-3">
+          {/* Show Sign In for guests (Contact moved to the lower/menu area) */}
           <Button variant="ghost" asChild>
             <Link to="/login">Sign In</Link>
           </Button>

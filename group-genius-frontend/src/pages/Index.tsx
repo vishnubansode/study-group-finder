@@ -10,7 +10,8 @@ import {
   ArrowRight,
   GraduationCap,
   Target,
-  Zap
+  Zap,
+  Mail
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
@@ -220,10 +221,10 @@ const Index = () => {
                 Start Your Journey
               </Button>
             </Link>
-            <Link to="/login">
-              <Button variant="outline" size="lg" className="border-white text-white hover:bg-white/10 text-lg px-12 py-6">
-                <Users className="w-6 h-6 mr-3" />
-                Sign In
+            <Link to="/contact">
+              <Button size="lg" className="bg-white/10 text-white hover:bg-white/20 text-lg px-12 py-6">
+                <Mail className="w-6 h-6 mr-3" />
+                Contact
               </Button>
             </Link>
           </div>

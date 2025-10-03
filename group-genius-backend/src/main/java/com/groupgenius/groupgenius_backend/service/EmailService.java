@@ -3,6 +3,7 @@ package com.groupgenius.groupgenius_backend.service;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.core.io.InputStreamSource;
 import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.mail.javamail.MimeMessageHelper;
@@ -13,6 +14,8 @@ import org.thymeleaf.context.Context;
 
 import jakarta.mail.MessagingException;
 import jakarta.mail.internet.MimeMessage;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.concurrent.CompletableFuture;
 
 @Service
@@ -31,6 +34,9 @@ public class EmailService {
 
     @Value("${app.email.enabled:false}")
     private boolean emailEnabled;
+
+    @Value("${app.contact.to:}")
+    private String contactTo;
 
     @Async
     public CompletableFuture<Void> sendPasswordResetEmail(String userEmail, String resetToken) {
@@ -113,6 +119,88 @@ public class EmailService {
     }
 
     @Async
+    public CompletableFuture<Void> sendContactEmail(
+            String senderName,
+            String senderEmail,
+            String queryType,
+            String subject,
+            String message,
+            InputStreamSource attachment,
+            String attachmentFilename
+    ) {
+        try {
+            String safeName = senderName == null || senderName.isBlank() ? "Guest" : senderName.trim();
+            String safeEmail = senderEmail == null || senderEmail.isBlank() ? fromEmail : senderEmail.trim();
+            String safeQueryType = queryType == null || queryType.isBlank() ? "General" : queryType.trim();
+            String safeSubject = subject == null || subject.isBlank() ? "No subject provided" : subject.trim();
+            String safeMessage = message == null ? "" : message.trim();
+
+            String fullSubject = "[Contact Form] " + safeSubject + " (" + safeQueryType + ")";
+            String formattedMessage = safeMessage.replaceAll("\\r?\\n", "<br/>");
+            boolean hasAttachment = attachment != null && attachmentFilename != null && !attachmentFilename.isBlank();
+
+            if (!emailEnabled) {
+                // Development mode - log to console
+                log.info("===========================================");
+                log.info("CONTACT EMAIL (Development Mode)");
+                log.info("===========================================");
+                log.info("To: {}", getContactToAddress());
+                log.info("Subject: {}", fullSubject);
+                log.info("");
+                log.info("From: {} <{}>", safeName, safeEmail);
+                log.info("");
+                log.info("Message:\n{}", safeMessage);
+                if (hasAttachment) {
+                    log.info("Attachment: {}", attachmentFilename);
+                }
+                log.info("");
+                log.info("Submitted At: {}", LocalDateTime.now());
+                log.info("");
+                log.info("GroupGenius Team");
+                log.info("===========================================");
+                return CompletableFuture.completedFuture(null);
+            }
+
+            Context context = new Context();
+            context.setVariable("name", safeName);
+            context.setVariable("email", safeEmail);
+            context.setVariable("queryType", safeQueryType);
+            context.setVariable("subject", safeSubject);
+            context.setVariable("message", formattedMessage);
+            context.setVariable("submittedAt", LocalDateTime.now().format(DateTimeFormatter.ofPattern("MMM d, yyyy h:mm a")));
+            context.setVariable("hasAttachment", hasAttachment);
+            context.setVariable("attachmentName", hasAttachment ? attachmentFilename : "");
+
+            String html = templateEngine.process("contact-email", context);
+
+            MimeMessage mimeMessage = mailSender.createMimeMessage();
+            MimeMessageHelper helper = new MimeMessageHelper(mimeMessage, hasAttachment, "UTF-8");
+            helper.setFrom(fromEmail);
+            helper.setTo(getContactToAddress());
+            helper.setReplyTo(safeEmail);
+            helper.setSubject(fullSubject);
+            helper.setText(html, true);
+
+            if (hasAttachment) {
+                helper.addAttachment(attachmentFilename, attachment);
+            }
+
+            mailSender.send(mimeMessage);
+
+            log.info("Contact email sent successfully from: {} <{}> (attachment: {})", safeName, safeEmail, hasAttachment ? attachmentFilename : "none");
+        } catch (Exception e) {
+            log.error("Failed to send contact email from: {} <{}>", senderName, senderEmail, e);
+            throw new RuntimeException("Failed to send contact email", e);
+        }
+
+        return CompletableFuture.completedFuture(null);
+    }
+
+    private String getContactToAddress() {
+        return contactTo != null && !contactTo.isBlank() ? contactTo : fromEmail;
+    }
+
+    @Async
     public CompletableFuture<Void> sendNotificationEmail(String userEmail, String subject, String message) {
         try {
             if (!emailEnabled) {
@@ -154,12 +242,12 @@ public class EmailService {
     private void sendHtmlEmail(String to, String subject, String htmlContent) throws MessagingException {
         MimeMessage message = mailSender.createMimeMessage();
         MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
-        
+
         helper.setFrom(fromEmail);
         helper.setTo(to);
         helper.setSubject(subject);
         helper.setText(htmlContent, true);
-        
+
         mailSender.send(message);
     }
 
