@@ -44,4 +44,8 @@ public class User {
     @Builder.Default
     private Set<Course> courses = new HashSet<>();
 
+    public boolean isEnrolledInCourse(Course course) {
+        return courses.contains(course);
+    }
+
 }

@@ -4,21 +4,22 @@ import lombok.*;
 
 import java.util.List;
 
-@Value
-@Builder
 @Data
+@Builder
+@NoArgsConstructor
 @AllArgsConstructor
 public class UserResponse {
-    Long id;
-    String firstName;
-    String lastName;
-    String email;
-    String profileImageUrl;
-    String secondarySchool;
-    String graduationYear;
-    String university;
-    String major;
-    String currentYear;
-    String bio;
-    List<CourseResponse> courses;
+    private Long id;
+    private String firstName;
+    private String lastName;
+    private String email;
+    private String profileImageUrl;
+    private String secondarySchool;
+    private String graduationYear;
+    private String university;
+    private String major;
+    private String currentYear;
+    private String bio; // Add bio field
+    private List<CourseResponse> courses;
+    private Integer commonCourses;
 }

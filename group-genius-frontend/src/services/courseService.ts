@@ -1,281 +1,197 @@
-import { Course, UserCourse, CoursePeer, CourseSearchParams, PaginatedCourseResponse, EnrollmentResponse, CourseStats } from '@/types/course';
-
+// services/courseService.ts
 const API_BASE_URL = 'http://localhost:8080/api';
 
-// Helper function to get current user ID (replace with actual auth logic)
-const getCurrentUserId = (): number | null => {
-  // This should get the user ID from your authentication system
-  // For now, using a hardcoded value for testing
-  return 1;
-};
-
-// Helper function to get auth headers
-const getAuthHeaders = () => {
-  const token = localStorage.getItem('token');
-  return {
-    'Content-Type': 'application/json',
-    ...(token && { 'Authorization': `Bearer ${token}` }),
-  };
-};
-
-// Course Catalog Management
 export const courseApi = {
-  // Get all available courses (paginated)
-  getAllCourses: async (params: CourseSearchParams = {}): Promise<PaginatedCourseResponse> => {
+  // Get all courses (public endpoint)
+  getAllCourses: async (params: {
+    page?: number;
+    size?: number;
+    sortBy?: string;
+    sortDirection?: string;
+    userId?: number;
+  } = {}) => {
     const queryParams = new URLSearchParams();
-    const userId = getCurrentUserId();
-    
     if (params.page !== undefined) queryParams.append('page', params.page.toString());
     if (params.size !== undefined) queryParams.append('size', params.size.toString());
     if (params.sortBy) queryParams.append('sortBy', params.sortBy);
-    if (params.sortDir) queryParams.append('sortDirection', params.sortDir);
-    if (userId) queryParams.append('userId', userId.toString());
+    if (params.sortDirection) queryParams.append('sortDirection', params.sortDirection);
+    if (params.userId) queryParams.append('userId', params.userId.toString());
 
-    const response = await fetch(`${API_BASE_URL}/courses?${queryParams}`, {
-      headers: getAuthHeaders(),
-    });
+    console.log('🌐 Fetching courses from:', `${API_BASE_URL}/courses?${queryParams}`);
+    
+    const response = await fetch(`${API_BASE_URL}/courses?${queryParams}`);
+    
+    console.log('🌐 Courses response status:', response.status);
     
     if (!response.ok) {
-      throw new Error(`Failed to fetch courses: ${response.statusText}`);
+      const errorText = await response.text();
+      console.error('❌ Courses API error:', errorText);
+      throw new Error(`Failed to fetch courses: ${response.status} ${errorText}`);
     }
-    
+
     const data = await response.json();
-    return {
-      content: data.content,
-      totalElements: data.totalElements,
-      totalPages: data.totalPages,
-      size: data.size,
-      number: data.number,
-      first: data.first,
-      last: data.last
-    };
+    console.log('✅ Courses data received:', data);
+    return data;
   },
 
-  // Search courses by code/name
-  searchCourses: async (query: string, page = 0, size = 10): Promise<PaginatedCourseResponse> => {
+  // Search courses (public endpoint)
+  searchCourses: async (query: string, params: {
+    page?: number;
+    size?: number;
+    userId?: number;
+  } = {}) => {
     const queryParams = new URLSearchParams();
-    const userId = getCurrentUserId();
-    
     queryParams.append('q', query);
-    queryParams.append('page', page.toString());
-    queryParams.append('size', size.toString());
-    if (userId) queryParams.append('userId', userId.toString());
+    if (params.page !== undefined) queryParams.append('page', params.page.toString());
+    if (params.size !== undefined) queryParams.append('size', params.size.toString());
+    if (params.userId) queryParams.append('userId', params.userId.toString());
 
-    const response = await fetch(`${API_BASE_URL}/courses/search?${queryParams}`, {
-      headers: getAuthHeaders(),
-    });
+    console.log('🌐 Searching courses:', `${API_BASE_URL}/courses/search?${queryParams}`);
+    
+    const response = await fetch(`${API_BASE_URL}/courses/search?${queryParams}`);
     
     if (!response.ok) {
-      throw new Error(`Failed to search courses: ${response.statusText}`);
+      const errorText = await response.text();
+      console.error('❌ Search courses API error:', errorText);
+      throw new Error(`Failed to search courses: ${response.status} ${errorText}`);
     }
-    
+
     const data = await response.json();
-    return {
-      content: data.content,
-      totalElements: data.totalElements,
-      totalPages: data.totalPages,
-      size: data.size,
-      number: data.number,
-      first: data.first,
-      last: data.last
-    };
+    console.log('✅ Search results:', data);
+    return data;
   },
 
-  // Get detailed course information
-  getCourseById: async (courseId: number): Promise<Course> => {
-    const userId = getCurrentUserId();
-    const queryParams = new URLSearchParams();
-    if (userId) queryParams.append('userId', userId.toString());
-
-    const response = await fetch(`${API_BASE_URL}/courses/${courseId}?${queryParams}`, {
-      headers: getAuthHeaders(),
-    });
+  // Get course by ID (public endpoint)
+  getCourse: async (id: number, userId?: number) => {
+    const queryParams = userId ? `?userId=${userId}` : '';
+    console.log('🌐 Fetching course:', `${API_BASE_URL}/courses/${id}${queryParams}`);
+    
+    const response = await fetch(`${API_BASE_URL}/courses/${id}${queryParams}`);
     
     if (!response.ok) {
-      throw new Error(`Failed to fetch course details: ${response.statusText}`);
+      const errorText = await response.text();
+      console.error('❌ Get course API error:', errorText);
+      throw new Error(`Failed to fetch course: ${response.status} ${errorText}`);
     }
-    
-    return response.json();
+
+    const data = await response.json();
+    console.log('✅ Course data:', data);
+    return data;
   }
 };
 
-// User Course Management
 export const userCourseApi = {
-  // Get user's enrolled courses
-  getUserCourses: async (): Promise<any> => {
-    const userId = getCurrentUserId();
-    if (!userId) {
-      throw new Error('User not authenticated');
-    }
-
+  // Get user's enrolled courses (protected endpoint)
+  getUserCourses: async (userId: number) => {
+    const token = localStorage.getItem('token');
+    console.log('🌐 Fetching user courses for user:', userId);
+    
     const response = await fetch(`${API_BASE_URL}/user/courses?userId=${userId}`, {
-      headers: getAuthHeaders(),
+      headers: {
+        'Authorization': `Bearer ${token}`
+      }
     });
     
-    if (!response.ok) {
-      throw new Error(`Failed to fetch user courses: ${response.statusText}`);
-    }
+    console.log('🌐 User courses response status:', response.status);
     
-    return response.json();
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('❌ User courses API error:', errorText);
+      throw new Error(`Failed to fetch user courses: ${response.status} ${errorText}`);
+    }
+
+    const data = await response.json();
+    console.log('✅ User courses data:', data);
+    return data;
   },
 
-  // Enroll in a course
-  enrollInCourse: async (courseId: number): Promise<Course> => {
-    const userId = getCurrentUserId();
-    if (!userId) {
-      throw new Error('User not authenticated');
-    }
-
+  // Enroll in course (protected endpoint)
+  enrollInCourse: async (userId: number, courseId: number) => {
+    const token = localStorage.getItem('token');
+    console.log('🌐 Enrolling user', userId, 'in course', courseId);
+    
     const response = await fetch(`${API_BASE_URL}/user/courses/${courseId}/enroll?userId=${userId}`, {
       method: 'POST',
-      headers: getAuthHeaders(),
+      headers: {
+        'Authorization': `Bearer ${token}`
+      }
     });
     
     if (!response.ok) {
       const errorText = await response.text();
-      throw new Error(errorText || `Failed to enroll in course: ${response.statusText}`);
+      console.error('❌ Enroll API error:', errorText);
+      throw new Error(`Failed to enroll in course: ${response.status} ${errorText}`);
     }
-    
-    return response.json();
+
+    const data = await response.text();
+    console.log('✅ Enrollment success:', data);
+    return data;
   },
 
-  // Drop a course
-  dropCourse: async (courseId: number): Promise<void> => {
-    const userId = getCurrentUserId();
-    if (!userId) {
-      throw new Error('User not authenticated');
-    }
-
+  // Drop course (protected endpoint)
+  dropCourse: async (userId: number, courseId: number) => {
+    const token = localStorage.getItem('token');
+    console.log('🌐 Dropping course', courseId, 'for user', userId);
+    
     const response = await fetch(`${API_BASE_URL}/user/courses/${courseId}?userId=${userId}`, {
       method: 'DELETE',
-      headers: getAuthHeaders(),
+      headers: {
+        'Authorization': `Bearer ${token}`
+      }
     });
     
     if (!response.ok) {
       const errorText = await response.text();
-      throw new Error(errorText || `Failed to drop course: ${response.statusText}`);
+      console.error('❌ Drop course API error:', errorText);
+      throw new Error(`Failed to drop course: ${response.status} ${errorText}`);
     }
+
+    const data = await response.text();
+    console.log('✅ Drop course success:', data);
+    return data;
   },
 
-  // Find peers in same course
-  getCoursePeers: async (courseId: number): Promise<any> => {
-    const userId = getCurrentUserId();
-    if (!userId) {
-      throw new Error('User not authenticated');
-    }
-
+  // Get course peers (protected endpoint)
+  getCoursePeers: async (courseId: number, userId: number) => {
+    const token = localStorage.getItem('token');
+    console.log('🌐 Fetching peers for course', courseId, 'user', userId);
+    
     const response = await fetch(`${API_BASE_URL}/user/courses/peers?courseId=${courseId}&userId=${userId}`, {
-      headers: getAuthHeaders(),
+      headers: {
+        'Authorization': `Bearer ${token}`
+      }
     });
     
     if (!response.ok) {
-      throw new Error(`Failed to fetch course peers: ${response.statusText}`);
+      const errorText = await response.text();
+      console.error('❌ Course peers API error:', errorText);
+      throw new Error(`Failed to fetch course peers: ${response.status} ${errorText}`);
     }
+
+    const data = await response.json();
+    console.log('✅ Course peers data:', data);
+    return data;
+  },
+
+  // Get user dashboard (protected endpoint)
+  getUserDashboard: async (userId: number) => {
+    const token = localStorage.getItem('token');
+    console.log('🌐 Fetching dashboard for user:', userId);
     
-    return response.json();
-  },
-
-  // Get course statistics for dashboard
-  getCourseStats: async (): Promise<CourseStats> => {
-    try {
-      const userCourses = await userCourseApi.getUserCourses();
-      
-      // Calculate stats from user courses
-      const totalCreditHours = userCourses?.totalCreditHours || 0;
-      const totalCourses = userCourses?.totalCourses || 0;
-      const averageEnrollmentPercentage = userCourses?.averageEnrollmentPercentage || 0;
-      
-      return {
-        totalEnrolledCredits: totalCreditHours,
-        totalCourses: totalCourses,
-        averageProgress: averageEnrollmentPercentage,
-        studyGroupsCount: 2 // Mock for now
-      };
-    } catch (error) {
-      // Return default stats if error
-      return {
-        totalEnrolledCredits: 0,
-        totalCourses: 0,
-        averageProgress: 0,
-        studyGroupsCount: 0
-      };
+    const response = await fetch(`${API_BASE_URL}/user/courses/dashboard?userId=${userId}`, {
+      headers: {
+        'Authorization': `Bearer ${token}`
+      }
+    });
+    
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('❌ Dashboard API error:', errorText);
+      throw new Error(`Failed to fetch dashboard: ${response.status} ${errorText}`);
     }
-  },
-};
 
-// Mock data fallback for development
-export const mockData = {
-  courses: [
-    {
-      id: 1,
-      courseCode: 'CS101',
-      courseName: 'Introduction to Computer Science',
-      description: 'Fundamentals of programming and computer science concepts',
-      instructorName: 'Dr. Sarah Mitchell',
-      classSchedule: 'MWF 10:00-11:00 AM',
-      creditHours: 4,
-      courseCapacity: 30,
-      currentEnrollment: 25,
-    },
-    {
-      id: 2,
-      courseCode: 'MATH201',
-      courseName: 'Calculus II',
-      description: 'Advanced calculus including integration techniques and applications',
-      instructorName: 'Prof. Michael Chen',
-      classSchedule: 'TTh 2:00-3:30 PM',
-      creditHours: 4,
-      courseCapacity: 35,
-      currentEnrollment: 28,
-    },
-    {
-      id: 3,
-      courseCode: 'PHYS151',
-      courseName: 'Physics I: Mechanics',
-      description: 'Introduction to classical mechanics and physics principles',
-      instructorName: 'Dr. Emma Rodriguez',
-      classSchedule: 'MWF 1:00-2:00 PM',
-      creditHours: 4,
-      courseCapacity: 25,
-      currentEnrollment: 22,
-    },
-    // Add more mock courses as needed
-  ] as Course[],
-  
-  userCourses: [
-    {
-      enrollmentId: 1,
-      userId: 1,
-      courseId: 1,
-      enrollmentDate: '2024-08-15',
-      course: {
-        id: 1,
-        courseCode: 'CS101',
-        courseName: 'Introduction to Computer Science',
-        description: 'Fundamentals of programming and computer science concepts',
-        instructorName: 'Dr. Sarah Mitchell',
-        classSchedule: 'MWF 10:00-11:00 AM',
-        creditHours: 4,
-        courseCapacity: 30,
-        currentEnrollment: 25,
-      },
-    },
-  ] as UserCourse[],
+    const data = await response.json();
+    console.log('✅ Dashboard data:', data);
+    return data;
+  }
 };
-
-// Main course service combining all APIs for backwards compatibility
-export const courseService = {
-  // Course catalog methods
-  getAllCourses: courseApi.getAllCourses,
-  searchCourses: courseApi.searchCourses,
-  getCourseById: courseApi.getCourseById,
-  
-  // User course methods
-  getUserCourses: userCourseApi.getUserCourses,
-  enrollInCourse: userCourseApi.enrollInCourse,
-  dropCourse: userCourseApi.dropCourse,
-  getCoursePeers: userCourseApi.getCoursePeers,
-  getCourseStats: userCourseApi.getCourseStats,
-};
-
-export default courseService;

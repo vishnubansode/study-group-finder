@@ -24,7 +24,7 @@ public class CourseService {
     public Page<CourseResponse> getAllCourses(int page, int size, String sortBy, String sortDirection, Long userId) {
         Sort sort = Sort.by(Sort.Direction.fromString(sortDirection), sortBy);
         Pageable pageable = PageRequest.of(page, size, sort);
-        
+
         Page<Course> coursePage = courseRepository.findAll(pageable);
         return coursePage.map(course -> mapToCourseResponse(course, userId));
     }
@@ -46,44 +46,32 @@ public class CourseService {
         if (courseRepository.existsByCourseCodeIgnoreCase(request.getCourseCode())) {
             throw new IllegalArgumentException("Course code already exists");
         }
-        
+
         Course course = Course.builder()
                 .courseCode(request.getCourseCode())
                 .courseName(request.getCourseName())
                 .description(request.getDescription())
-                .instructorName(request.getInstructorName())
-                .classSchedule(request.getClassSchedule())
-                .creditHours(request.getCreditHours())
-                .courseCapacity(request.getCourseCapacity())
-                .currentEnrollment(0)
                 .build();
-        
+
         Course savedCourse = courseRepository.save(course);
         return mapToCourseResponse(savedCourse, null);
     }
 
     private CourseResponse mapToCourseResponse(Course course, Long userId) {
         Boolean isEnrolled = false;
-        
+
         if (userId != null) {
             User user = userRepository.findById(userId).orElse(null);
             if (user != null) {
                 isEnrolled = user.getCourses().contains(course);
             }
         }
-        
+
         return CourseResponse.builder()
                 .id(course.getId())
                 .courseCode(course.getCourseCode())
                 .courseName(course.getCourseName())
                 .description(course.getDescription())
-                .instructorName(course.getInstructorName())
-                .classSchedule(course.getClassSchedule())
-                .creditHours(course.getCreditHours())
-                .courseCapacity(course.getCourseCapacity())
-                .currentEnrollment(course.getCurrentEnrollment())
-                .enrollmentPercentage(course.getEnrollmentPercentage())
-                .isFull(course.isFull())
                 .isEnrolled(isEnrolled)
                 .build();
     }

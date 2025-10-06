@@ -20,8 +20,8 @@ export function CourseSearch({
   placeholder = "Search courses by code or name..." 
 }: CourseSearchProps) {
   const [query, setQuery] = useState('');
-  const [sortBy, setSortBy] = useState<string>('courseCode');
-  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
+  const [sortBy, setSortBy] = useState<string>('courseName');
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
   const [showFilters, setShowFilters] = useState(false);
 
   const handleSearch = (newQuery?: string) => {
@@ -29,7 +29,7 @@ export function CourseSearch({
     onSearch({
       query: searchQuery || undefined,
       sortBy: sortBy as any,
-      sortDir,
+      sortDirection, // Changed from sortDir to sortDirection
       page: 0, // Reset to first page on new search
     });
   };
@@ -50,12 +50,12 @@ export function CourseSearch({
   };
 
   const toggleSort = () => {
-    const newSortDir = sortDir === 'asc' ? 'desc' : 'asc';
-    setSortDir(newSortDir);
+    const newSortDirection = sortDirection === 'asc' ? 'desc' : 'asc';
+    setSortDirection(newSortDirection);
     onSearch({
       query: query || undefined,
       sortBy: sortBy as any,
-      sortDir: newSortDir,
+      sortDirection: newSortDirection, // Changed from sortDir to sortDirection
       page: 0,
     });
   };
@@ -65,7 +65,7 @@ export function CourseSearch({
     onSearch({
       query: query || undefined,
       sortBy: newSortBy as any,
-      sortDir,
+      sortDirection, // Changed from sortDir to sortDirection
       page: 0,
     });
   };
@@ -80,9 +80,10 @@ export function CourseSearch({
             placeholder={placeholder}
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            onKeyPress={handleKeyPress}
+            onKeyDown={handleKeyPress}
             className="pl-10 pr-10"
             disabled={isLoading}
+            aria-label="Search courses"
           />
           {query && (
             <Button
@@ -90,6 +91,7 @@ export function CourseSearch({
               size="sm"
               className="absolute right-1 top-1/2 transform -translate-y-1/2 h-6 w-6 p-0"
               onClick={clearSearch}
+              aria-label="Clear search"
             >
               <X className="w-4 h-4" />
             </Button>
@@ -101,6 +103,8 @@ export function CourseSearch({
             variant="outline"
             onClick={() => setShowFilters(!showFilters)}
             className="gap-2"
+            aria-expanded={showFilters}
+            aria-controls="advanced-filters"
           >
             <Filter className="w-4 h-4" />
             {showFilters ? 'Hide Filters' : 'Filters'}
@@ -123,18 +127,24 @@ export function CourseSearch({
 
       {/* Advanced Filters */}
       {showFilters && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 p-4 border rounded-lg bg-muted/30">
+        <div 
+          id="advanced-filters"
+          className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 p-4 border rounded-lg bg-muted/30"
+          role="region"
+          aria-label="Advanced search filters"
+        >
           <div className="space-y-2">
-            <label className="text-sm font-medium">Sort by</label>
+            <label htmlFor="sort-by" className="text-sm font-medium">
+              Sort by
+            </label>
             <Select value={sortBy} onValueChange={handleSortByChange}>
-              <SelectTrigger>
+              <SelectTrigger id="sort-by">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="courseCode">Course Code</SelectItem>
                 <SelectItem value="courseName">Course Name</SelectItem>
                 <SelectItem value="instructorName">Instructor</SelectItem>
-                <SelectItem value="creditHours">Credit Hours</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -145,20 +155,21 @@ export function CourseSearch({
               variant="outline"
               onClick={toggleSort}
               className="w-full justify-start gap-2"
+              aria-label={`Sort ${sortDirection === 'asc' ? 'descending' : 'ascending'}`}
             >
-              {sortDir === 'asc' ? (
+              {sortDirection === 'asc' ? (
                 <SortAsc className="w-4 h-4" />
               ) : (
                 <SortDesc className="w-4 h-4" />
               )}
-              {sortDir === 'asc' ? 'Ascending' : 'Descending'}
+              {sortDirection === 'asc' ? 'Ascending' : 'Descending'}
             </Button>
           </div>
 
           <div className="space-y-2 sm:col-span-2 lg:col-span-1">
             <label className="text-sm font-medium">Results</label>
             <div className="flex items-center gap-2 h-10">
-              <Badge variant="secondary" className="text-sm">
+              <Badge variant="secondary" className="text-sm" aria-live="polite">
                 {totalResults} course{totalResults !== 1 ? 's' : ''}
               </Badge>
               {query && (
@@ -178,7 +189,11 @@ export function CourseSearch({
 
       {/* Search Results Summary */}
       {query && (
-        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+        <div 
+          className="flex items-center gap-2 text-sm text-muted-foreground"
+          aria-live="polite"
+          aria-atomic="true"
+        >
           <span>
             {isLoading ? 'Searching...' : `Found ${totalResults} result${totalResults !== 1 ? 's' : ''}`}
           </span>

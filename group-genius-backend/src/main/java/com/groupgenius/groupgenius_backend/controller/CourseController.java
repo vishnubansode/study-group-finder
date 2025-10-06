@@ -1,9 +1,8 @@
+// CourseController.java
 package com.groupgenius.groupgenius_backend.controller;
 
-import com.groupgenius.groupgenius_backend.dto.CourseCreateRequest;
 import com.groupgenius.groupgenius_backend.dto.CourseResponse;
 import com.groupgenius.groupgenius_backend.service.CourseService;
-import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.http.ResponseEntity;
@@ -24,7 +23,7 @@ public class CourseController {
             @RequestParam(defaultValue = "courseName") String sortBy,
             @RequestParam(defaultValue = "asc") String sortDirection,
             @RequestParam(required = false) Long userId) {
-        
+
         Page<CourseResponse> courses = courseService.getAllCourses(page, size, sortBy, sortDirection, userId);
         return ResponseEntity.ok(courses);
     }
@@ -35,7 +34,7 @@ public class CourseController {
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size,
             @RequestParam(required = false) Long userId) {
-        
+
         Page<CourseResponse> courses = courseService.searchCourses(q, page, size, userId);
         return ResponseEntity.ok(courses);
     }
@@ -44,14 +43,8 @@ public class CourseController {
     public ResponseEntity<CourseResponse> getCourse(
             @PathVariable Long id,
             @RequestParam(required = false) Long userId) {
-        
-        CourseResponse course = courseService.getCourse(id, userId);
-        return ResponseEntity.ok(course);
-    }
 
-    @PostMapping
-    public ResponseEntity<CourseResponse> createCourse(@Valid @RequestBody CourseCreateRequest request) {
-        CourseResponse course = courseService.createCourse(request);
+        CourseResponse course = courseService.getCourse(id, userId);
         return ResponseEntity.ok(course);
     }
 }

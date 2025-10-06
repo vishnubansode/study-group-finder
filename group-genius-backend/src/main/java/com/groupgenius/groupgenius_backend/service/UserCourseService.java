@@ -1,16 +1,13 @@
 package com.groupgenius.groupgenius_backend.service;
 
-import com.groupgenius.groupgenius_backend.dto.CoursePeersResponse;
-import com.groupgenius.groupgenius_backend.dto.CourseResponse;
-import com.groupgenius.groupgenius_backend.dto.UserCoursesResponse;
-import com.groupgenius.groupgenius_backend.dto.UserResponse;
+import com.groupgenius.groupgenius_backend.dto.*;
 import com.groupgenius.groupgenius_backend.entity.Course;
 import com.groupgenius.groupgenius_backend.entity.User;
 import com.groupgenius.groupgenius_backend.repository.CourseRepository;
 import com.groupgenius.groupgenius_backend.repository.UserRepository;
+import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.stream.Collectors;
@@ -22,103 +19,58 @@ public class UserCourseService {
     private final UserRepository userRepository;
     private final CourseRepository courseRepository;
 
-    @Transactional
-    public CourseResponse enrollInCourse(Long userId, Long courseId) {
+    public List<CourseResponse> getUserCourses(Long userId) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new IllegalArgumentException("User not found"));
-        
+
+        return user.getCourses().stream()
+                .map(course -> mapToCourseResponse(course, userId))
+                .collect(Collectors.toList());
+    }
+
+    @Transactional
+    public void enrollInCourse(Long userId, Long courseId) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new IllegalArgumentException("User not found"));
         Course course = courseRepository.findById(courseId)
                 .orElseThrow(() -> new IllegalArgumentException("Course not found"));
-        
-        // Check if already enrolled
+
         if (user.getCourses().contains(course)) {
             throw new IllegalArgumentException("User is already enrolled in this course");
         }
-        
-        // Check if course is full
-        if (course.isFull()) {
-            throw new IllegalArgumentException("Course is full");
-        }
-        
-        // Add course to user and user to course
+
         user.getCourses().add(course);
-        course.getEnrolledUsers().add(user);
-        course.setCurrentEnrollment(course.getCurrentEnrollment() + 1);
-        
-        // Save both entities
         userRepository.save(user);
-        courseRepository.save(course);
-        
-        return mapToCourseResponse(course, true);
     }
 
     @Transactional
     public void dropCourse(Long userId, Long courseId) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new IllegalArgumentException("User not found"));
-        
         Course course = courseRepository.findById(courseId)
                 .orElseThrow(() -> new IllegalArgumentException("Course not found"));
-        
-        // Check if user is enrolled
+
         if (!user.getCourses().contains(course)) {
             throw new IllegalArgumentException("User is not enrolled in this course");
         }
-        
-        // Remove course from user and user from course
+
         user.getCourses().remove(course);
-        course.getEnrolledUsers().remove(user);
-        course.setCurrentEnrollment(course.getCurrentEnrollment() - 1);
-        
-        // Save both entities
         userRepository.save(user);
-        courseRepository.save(course);
     }
 
-    public UserCoursesResponse getUserCourses(Long userId) {
-        User user = userRepository.findById(userId)
+    public CoursePeersResponse findCoursePeers(Long courseId, Long userId) {
+        User currentUser = userRepository.findById(userId)
                 .orElseThrow(() -> new IllegalArgumentException("User not found"));
-        
-        List<CourseResponse> enrolledCourses = user.getCourses().stream()
-                .map(course -> mapToCourseResponse(course, true))
-                .collect(Collectors.toList());
-        
-        Integer totalCreditHours = user.getCourses().stream()
-                .mapToInt(Course::getCreditHours)
-                .sum();
-        
-        Double averageEnrollmentPercentage = user.getCourses().stream()
-                .mapToDouble(Course::getEnrollmentPercentage)
-                .average()
-                .orElse(0.0);
-        
-        return UserCoursesResponse.builder()
-                .enrolledCourses(enrolledCourses)
-                .totalCourses(user.getCourses().size())
-                .totalCreditHours(totalCreditHours)
-                .averageEnrollmentPercentage(averageEnrollmentPercentage)
-                .build();
-    }
-
-    public CoursePeersResponse getCoursePeers(Long userId, Long courseId) {
-        User user = userRepository.findById(userId)
-                .orElseThrow(() -> new IllegalArgumentException("User not found"));
-        
         Course course = courseRepository.findById(courseId)
                 .orElseThrow(() -> new IllegalArgumentException("Course not found"));
-        
-        // Check if user is enrolled in the course
-        if (!user.getCourses().contains(course)) {
-            throw new IllegalArgumentException("User is not enrolled in this course");
-        }
-        
+
         List<UserResponse> peers = course.getEnrolledUsers().stream()
-                .filter(peer -> !peer.getId().equals(userId)) // Exclude the requesting user
-                .map(this::mapToUserResponse)
+                .filter(peer -> !peer.getId().equals(userId)) // Exclude current user
+                .map(peer -> mapToUserResponse(currentUser, peer)) // Pass both users
                 .collect(Collectors.toList());
-        
+
         return CoursePeersResponse.builder()
-                .courseId(course.getId())
+                .courseId(courseId)
                 .courseCode(course.getCourseCode())
                 .courseName(course.getCourseName())
                 .peers(peers)
@@ -126,33 +78,68 @@ public class UserCourseService {
                 .build();
     }
 
-    private CourseResponse mapToCourseResponse(Course course, Boolean isEnrolled) {
+    public UserDashboardResponse getUserDashboard(Long userId) {
+        User currentUser = userRepository.findById(userId)
+                .orElseThrow(() -> new IllegalArgumentException("User not found"));
+
+        // Get enrolled courses
+        List<CourseResponse> enrolledCourses = currentUser.getCourses().stream()
+                .map(course -> mapToCourseResponse(course, userId))
+                .collect(Collectors.toList());
+
+        // Get suggested peers (users in same courses)
+        List<UserResponse> suggestedPeers = currentUser.getCourses().stream()
+                .flatMap(course -> course.getEnrolledUsers().stream())
+                .filter(peer -> !peer.getId().equals(userId))
+                .distinct()
+                .limit(10) // Limit to 10 suggested peers
+                .map(peer -> mapToUserResponse(currentUser, peer)) // Pass both users
+                .collect(Collectors.toList());
+
+        return UserDashboardResponse.builder()
+                .userId(userId)
+                .userName(currentUser.getFirstName() + " " + currentUser.getLastName())
+                .enrolledCourses(enrolledCourses)
+                .suggestedPeers(suggestedPeers)
+                .totalCourses(enrolledCourses.size())
+                .totalPeers(suggestedPeers.size())
+                .build();
+    }
+
+    private CourseResponse mapToCourseResponse(Course course, Long userId) {
         return CourseResponse.builder()
                 .id(course.getId())
                 .courseCode(course.getCourseCode())
                 .courseName(course.getCourseName())
                 .description(course.getDescription())
-                .instructorName(course.getInstructorName())
-                .classSchedule(course.getClassSchedule())
-                .creditHours(course.getCreditHours())
-                .courseCapacity(course.getCourseCapacity())
-                .currentEnrollment(course.getCurrentEnrollment())
-                .enrollmentPercentage(course.getEnrollmentPercentage())
-                .isFull(course.isFull())
-                .isEnrolled(isEnrolled)
+                .isEnrolled(true) // Always true for user's courses
                 .build();
     }
 
-    private UserResponse mapToUserResponse(User user) {
+    private UserResponse mapToUserResponse(User currentUser, User peer) {
         return UserResponse.builder()
-                .id(user.getId())
-                .firstName(user.getFirstName())
-                .lastName(user.getLastName())
-                .email(user.getEmail())
-                .profileImageUrl(user.getProfileImageUrl())
-                .university(user.getUniversity())
-                .major(user.getMajor())
-                .currentYear(user.getCurrentYear())
+                .id(peer.getId())
+                .firstName(peer.getFirstName())
+                .lastName(peer.getLastName())
+                .email(peer.getEmail())
+                .profileImageUrl(peer.getProfileImageUrl())
+                .secondarySchool(peer.getSecondarySchool())
+                .graduationYear(peer.getGraduationYear())
+                .university(peer.getUniversity())
+                .major(peer.getMajor())
+                .currentYear(peer.getCurrentYear())
+                .bio(peer.getBio())
+                .commonCourses(getCommonCoursesCount(currentUser, peer))
                 .build();
+    }
+
+    private Integer getCommonCoursesCount(User currentUser, User peer) {
+        if (currentUser == null || peer == null || currentUser.getCourses() == null || peer.getCourses() == null) {
+            return 0;
+        }
+
+        return (int) currentUser.getCourses().stream()
+                .filter(course -> peer.getCourses().contains(course))
+                .count();
     }
 }

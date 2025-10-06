@@ -3,7 +3,8 @@ package com.groupgenius.groupgenius_backend.dto;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import lombok.*;
-import java.util.List;
+
+import java.util.Set;
 
 @Data
 @NoArgsConstructor
@@ -25,13 +26,11 @@ public class UserDto {
     private String password;
 
     private String profileImageUrl;
-
     private String secondarySchool;
     private String graduationYear;
     private String university;
     private String major;
     private String currentYear;
-    private String bio;
-
-    private List<String> selectedCourses;
+    private String bio; // Add bio field
+    private Set<Long> selectedCourseIds;
 }

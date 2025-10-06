@@ -1,16 +1,16 @@
 package com.groupgenius.groupgenius_backend.dto;
 
 import lombok.Builder;
-import lombok.Value;
+import lombok.Data;
 
 import java.util.List;
 
-@Value
+@Data
 @Builder
 public class CoursePeersResponse {
-    Long courseId;
-    String courseCode;
-    String courseName;
-    List<UserResponse> peers;
-    Integer totalPeers;
+    private Long courseId;
+    private String courseCode;
+    private String courseName;
+    private List<UserResponse> peers;
+    private Integer totalPeers;
 }

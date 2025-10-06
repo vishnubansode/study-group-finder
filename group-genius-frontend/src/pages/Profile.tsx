@@ -26,6 +26,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/components/ui/use-toast';
+import { Course } from '@/types/course';
 
 const API_BASE_URL = 'http://localhost:8080/api';
 
@@ -39,19 +40,12 @@ const defaultStudyStats = {
   studyStreak: 12
 };
 
-// Dummy courses data
-const dummyCourses = [
-  { id: 1, courseCode: 'CS101', courseName: 'Introduction to Computer Science' },
-  { id: 2, courseCode: 'MATH201', courseName: 'Calculus I' },
-  { id: 3, courseCode: 'PHYS101', courseName: 'General Physics' },
-  { id: 4, courseCode: 'ENG102', courseName: 'Composition II' },
-  { id: 5, courseCode: 'CS301', courseName: 'Data Structures' }
-];
-
 export default function Profile() {
   const [isEditing, setIsEditing] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [imageLoading, setImageLoading] = useState(false);
+  const [enrolledCourses, setEnrolledCourses] = useState<Course[]>([]);
+  const [coursesLoading, setCoursesLoading] = useState(false);
   const { user, isLoading: authLoading, updateUser } = useAuth();
   const { toast } = useToast();
   const navigate = useNavigate();
@@ -72,7 +66,6 @@ export default function Profile() {
   // Update form data when user data loads from backend
   useEffect(() => {
     if (user) {
-      console.log('🔄 Setting form data from user:', user);
       setFormData({
         firstName: user.firstName || '',
         lastName: user.lastName || '',
@@ -84,8 +77,46 @@ export default function Profile() {
         secondarySchool: user.secondarySchool || '',
         graduationYear: user.graduationYear || '',
       });
+      
+      // Load enrolled courses when user data is available
+      loadEnrolledCourses();
     }
   }, [user]);
+
+  // Load enrolled courses from backend
+  const loadEnrolledCourses = async () => {
+    if (!user) return;
+    
+    setCoursesLoading(true);
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) {
+        throw new Error('No authentication token found');
+      }
+
+      const response = await fetch(`${API_BASE_URL}/user/courses?userId=${user.id}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to fetch enrolled courses');
+      }
+
+      const courses = await response.json();
+      setEnrolledCourses(courses);
+    } catch (error) {
+      console.error('Failed to load enrolled courses:', error);
+      toast({
+        title: "Error",
+        description: "Failed to load enrolled courses",
+        variant: "destructive",
+      });
+    } finally {
+      setCoursesLoading(false);
+    }
+  };
 
   const handleInputChange = (field: string, value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }));
@@ -112,9 +143,6 @@ export default function Profile() {
         bio: formData.bio
       };
 
-      console.log('🔵 Sending update data:', updateData);
-      console.log('🔵 User ID:', user?.id);
-
       const response = await fetch(`${API_BASE_URL}/users/${user?.id}`, {
         method: 'PUT',
         headers: {
@@ -123,17 +151,13 @@ export default function Profile() {
         },
         body: JSON.stringify(updateData)
       });
-
-      console.log('🔵 Response status:', response.status);
       
       if (!response.ok) {
         const errorText = await response.text();
-        console.error('❌ Response error:', errorText);
         throw new Error(`Failed to update profile: ${response.status} ${errorText}`);
       }
 
       const updatedUser = await response.json();
-      console.log('✅ Updated user received:', updatedUser);
       
       // Update the user in auth context
       if (updateUser) {
@@ -147,7 +171,7 @@ export default function Profile() {
       });
       
     } catch (error: any) {
-      console.error('❌ Profile update error:', error);
+      console.error('Profile update error:', error);
       toast({
         title: "Update Failed",
         description: error.message || "Failed to update profile. Please try again.",
@@ -169,8 +193,6 @@ export default function Profile() {
       const formData = new FormData();
       formData.append('avatar', file);
 
-      console.log('🔵 Uploading profile image...');
-
       const response = await fetch(`${API_BASE_URL}/users/${user?.id}/avatar`, {
         method: 'POST',
         headers: {
@@ -184,7 +206,6 @@ export default function Profile() {
       }
 
       const updatedUser = await response.json();
-      console.log('✅ Image upload response:', updatedUser);
       
       // Update the user in auth context
       if (updateUser) {
@@ -197,7 +218,7 @@ export default function Profile() {
       });
       
     } catch (error: any) {
-      console.error('❌ Image upload error:', error);
+      console.error('Image upload error:', error);
       toast({
         title: "Upload Failed",
         description: error.message || "Failed to upload profile photo",
@@ -269,7 +290,6 @@ export default function Profile() {
                       alt="Profile" 
                       className="w-24 h-24 rounded-full object-cover border-4 border-white"
                       onError={(e) => {
-                        console.error('❌ Image failed to load:', user.profileImageUrl);
                         // Show fallback if image fails to load
                         e.currentTarget.style.display = 'none';
                       }}
@@ -303,7 +323,6 @@ export default function Profile() {
                   onChange={(e) => {
                     const file = e.target.files?.[0];
                     if (file) {
-                      console.log('🔵 Selected file:', file.name);
                       handleImageUpload(file);
                     }
                   }}
@@ -511,20 +530,53 @@ export default function Profile() {
               </CardContent>
             </Card>
 
-            {/* Current Courses - Using Dummy Data */}
+            {/* Current Courses - Real Data from Backend */}
             <Card className="border shadow-sm">
               <CardHeader>
-                <CardTitle>Current Courses</CardTitle>
+                <CardTitle className="flex items-center justify-between">
+                  <span>Current Courses</span>
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    onClick={loadEnrolledCourses}
+                    disabled={coursesLoading}
+                  >
+                    {coursesLoading ? (
+                      <Loader2 className="w-3 h-3 animate-spin" />
+                    ) : (
+                      <BookOpen className="w-3 h-3" />
+                    )}
+                  </Button>
+                </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="flex flex-wrap gap-2">
-                  {dummyCourses.map((course) => (
-                    <Badge key={course.id} variant="secondary" className="px-3 py-1">
-                      <BookOpen className="w-3 h-3 mr-1" />
-                      {course.courseCode} - {course.courseName}
-                    </Badge>
-                  ))}
-                </div>
+                {coursesLoading ? (
+                  <div className="flex items-center justify-center py-4">
+                    <Loader2 className="w-6 h-6 animate-spin text-primary" />
+                    <span className="ml-2 text-muted-foreground">Loading courses...</span>
+                  </div>
+                ) : enrolledCourses.length > 0 ? (
+                  <div className="flex flex-wrap gap-2">
+                    {enrolledCourses.map((course) => (
+                      <Badge key={course.id} variant="secondary" className="px-3 py-1">
+                        <BookOpen className="w-3 h-3 mr-1" />
+                        {course.courseCode} - {course.courseName}
+                      </Badge>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-center py-4">
+                    <BookOpen className="w-12 h-12 text-muted-foreground mx-auto mb-2" />
+                    <p className="text-muted-foreground mb-3">No courses enrolled yet</p>
+                    <Button 
+                      variant="outline" 
+                      size="sm"
+                      onClick={() => navigate('/courses')}
+                    >
+                      Browse Courses
+                    </Button>
+                  </div>
+                )}
               </CardContent>
             </Card>
 
@@ -606,7 +658,11 @@ export default function Profile() {
                 <CardTitle>Quick Actions</CardTitle>
               </CardHeader>
               <CardContent className="space-y-3">
-                <Button className="w-full bg-blue-600 hover:bg-blue-700 text-white" size="sm">
+                <Button 
+                  className="w-full bg-blue-600 hover:bg-blue-700 text-white" 
+                  size="sm"
+                  onClick={() => navigate('/courses')}
+                >
                   <Users className="w-4 h-4 mr-2" />
                   Find Study Partners
                 </Button>

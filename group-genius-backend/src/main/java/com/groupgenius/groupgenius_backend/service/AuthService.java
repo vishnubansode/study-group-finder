@@ -47,9 +47,9 @@ public class AuthService {
         user.setPassword(passwordEncoder.encode(userDto.getPassword()));
         user.setProfileImageUrl(profileImageUrl);
 
-        if (userDto.getSelectedCourses() != null) {
-            for (String courseCode : userDto.getSelectedCourses()) {
-                courseRepository.findByCourseCodeIgnoreCase(courseCode)
+        if (userDto.getSelectedCourseIds() != null) {
+            for (Long courseId : userDto.getSelectedCourseIds()) {
+                courseRepository.findById(courseId)
                         .ifPresent(user.getCourses()::add);
             }
         }

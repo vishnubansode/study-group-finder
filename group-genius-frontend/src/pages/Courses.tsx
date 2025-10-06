@@ -1,3 +1,4 @@
+// pages/Courses.tsx
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -18,159 +19,82 @@ import {
   UserPlus,
   RefreshCw,
   AlertCircle,
-  CheckCircle
+  CheckCircle,
+  AlertTriangle
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import { courseApi, userCourseApi, mockData } from '@/services/courseService';
-import { Course, UserCourse, CourseSearchParams, CoursePeer, CourseStats } from '@/types/course';
+import { courseApi, userCourseApi } from '@/services/courseService';
+import { Course, UserCourse, CourseSearchParams, CoursePeer, CourseStats, UserDashboardResponse } from '@/types/course';
 import { CourseCard } from '@/components/course/CourseCard';
 import { CourseSearch } from '@/components/course/CourseSearch';
 import { Pagination } from '@/components/course/Pagination';
+import { useAuth } from '@/contexts/AuthContext';
 
-// Mock enrolled courses with additional UI data
-const enrolledCoursesWithProgress = [
-  {
-    id: 1,
-    enrollmentId: 1,
-    userId: 1,
-    courseId: 1,
-    enrollmentDate: '2024-08-15',
-    course: {
-      id: 1,
-      courseCode: 'CS101',
-      courseName: 'Introduction to Computer Science',
-      description: 'Fundamentals of programming and computer science concepts including algorithms, data structures, and software engineering principles.',
-      instructorName: 'Dr. Sarah Mitchell',
-      classSchedule: 'MWF 10:00-11:00 AM',
-      creditHours: 4,
-      courseCapacity: 30,
-      currentEnrollment: 25,
-      isEnrolled: true,
-    },
-    progress: 75,
-    grade: 'A-',
-    nextAssignment: 'Programming Project 3',
-    dueDate: 'Nov 15, 2024',
-    studyGroupsCount: 3,
-  },
-  {
-    id: 2,
-    enrollmentId: 2,
-    userId: 1,
-    courseId: 2,
-    enrollmentDate: '2024-08-15',
-    course: {
-      id: 2,
-      courseCode: 'MATH201',
-      courseName: 'Calculus II',
-      description: 'Advanced calculus including integration techniques, infinite series, and applications to physics and engineering.',
-      instructorName: 'Prof. Michael Chen',
-      classSchedule: 'TTh 2:00-3:30 PM',
-      creditHours: 4,
-      courseCapacity: 35,
-      currentEnrollment: 28,
-      isEnrolled: true,
-    },
-    progress: 68,
-    grade: 'B+',
-    nextAssignment: 'Integration Techniques Quiz',
-    dueDate: 'Nov 12, 2024',
-    studyGroupsCount: 2,
-  },
-  {
-    id: 3,
-    enrollmentId: 3,
-    userId: 1,
-    courseId: 3,
-    enrollmentDate: '2024-08-15',
-    course: {
-      id: 3,
-      courseCode: 'PHYS151',
-      courseName: 'Physics I: Mechanics',
-      description: 'Introduction to classical mechanics covering kinematics, dynamics, energy, momentum, and rotational motion.',
-      instructorName: 'Dr. Emma Rodriguez',
-      classSchedule: 'MWF 1:00-2:00 PM, Lab W 3:00-5:00 PM',
-      creditHours: 4,
-      courseCapacity: 25,
-      currentEnrollment: 22,
-      isEnrolled: true,
-    },
-    progress: 82,
-    grade: 'A',
-    nextAssignment: 'Lab Report 4',
-    dueDate: 'Nov 18, 2024',
-    studyGroupsCount: 1,
-  },
-];
+// Confirmation Dialog Component
+function ConfirmDropDialog({ 
+  isOpen, 
+  onClose, 
+  onConfirm, 
+  course 
+}: {
+  isOpen: boolean;
+  onClose: () => void;
+  onConfirm: () => void;
+  course: Course | null;
+}) {
+  if (!isOpen || !course) return null;
 
-// Mock available courses for catalog
-const availableCoursesData = [
-  {
-    id: 4,
-    courseCode: 'CS201',
-    courseName: 'Data Structures and Algorithms',
-    description: 'Advanced programming concepts including data structures, algorithm design, and complexity analysis.',
-    instructorName: 'Dr. Lisa Park',
-    classSchedule: 'MWF 9:00-10:00 AM',
-    creditHours: 4,
-    courseCapacity: 30,
-    currentEnrollment: 18,
-    isEnrolled: false,
-  },
-  {
-    id: 5,
-    courseCode: 'MATH301',
-    courseName: 'Linear Algebra',
-    description: 'Vector spaces, linear transformations, matrices, eigenvalues, and applications.',
-    instructorName: 'Prof. Robert Kim',
-    classSchedule: 'TTh 10:00-11:30 AM',
-    creditHours: 3,
-    courseCapacity: 25,
-    currentEnrollment: 20,
-    isEnrolled: false,
-  },
-  {
-    id: 6,
-    courseCode: 'ENG101',
-    courseName: 'English Composition',
-    description: 'Fundamentals of academic writing, research, and communication skills.',
-    instructorName: 'Prof. Jennifer Adams',
-    classSchedule: 'TTh 9:00-10:30 AM',
-    creditHours: 3,
-    courseCapacity: 20,
-    currentEnrollment: 20,
-    isEnrolled: false,
-  },
-  {
-    id: 7,
-    courseCode: 'HIST120',
-    courseName: 'World History',
-    description: 'Survey of world civilizations from ancient times to the present.',
-    instructorName: 'Prof. James Wilson',
-    classSchedule: 'TTh 11:00 AM-12:30 PM',
-    creditHours: 3,
-    courseCapacity: 35,
-    currentEnrollment: 15,
-    isEnrolled: false,
-  },
-  {
-    id: 8,
-    courseCode: 'BIO101',
-    courseName: 'General Biology',
-    description: 'Introduction to biological principles including cell biology, genetics, and evolution.',
-    instructorName: 'Dr. Maria Santos',
-    classSchedule: 'MWF 11:00 AM-12:00 PM, Lab T 2:00-4:00 PM',
-    creditHours: 4,
-    courseCapacity: 30,
-    currentEnrollment: 25,
-    isEnrolled: false,
-  },
-];
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+      <Card className="w-full max-w-md">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-destructive">
+            <AlertTriangle className="w-5 h-5" />
+            Confirm Course Drop
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="space-y-2">
+            <p className="text-sm text-muted-foreground">
+              Are you sure you want to drop this course?
+            </p>
+            <div className="p-3 bg-muted/50 rounded-lg">
+              <div className="flex items-center gap-2 mb-1">
+                <Badge variant="outline" className="text-xs font-mono">
+                  {course.courseCode}
+                </Badge>
+              </div>
+              <p className="font-medium text-sm">{course.courseName}</p>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              This action cannot be undone. You will need to re-enroll if you change your mind.
+            </p>
+          </div>
+          <div className="flex gap-3 justify-end pt-4">
+            <Button
+              variant="outline"
+              onClick={onClose}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={onConfirm}
+            >
+              <AlertTriangle className="w-4 h-4 mr-2" />
+              Drop Course
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
 
 export default function Courses() {
   const [activeTab, setActiveTab] = useState<'enrolled' | 'catalog'>('enrolled');
-  const [enrolledCourses, setEnrolledCourses] = useState(enrolledCoursesWithProgress);
-  const [availableCourses, setAvailableCourses] = useState(availableCoursesData);
+  const [enrolledCourses, setEnrolledCourses] = useState<UserCourse[]>([]);
+  const [availableCourses, setAvailableCourses] = useState<Course[]>([]);
   const [searchParams, setSearchParams] = useState<CourseSearchParams>({ page: 0, size: 10 });
   const [isLoading, setIsLoading] = useState(false);
   const [enrollingCourseId, setEnrollingCourseId] = useState<number | null>(null);
@@ -178,83 +102,77 @@ export default function Courses() {
   const [totalPages, setTotalPages] = useState(1);
   const [totalElements, setTotalElements] = useState(0);
   const [courseStats, setCourseStats] = useState<CourseStats>({
-    totalEnrolledCredits: 15,
-    totalCourses: 3,
-    averageProgress: 75,
-    studyGroupsCount: 6,
+    totalEnrolledCredits: 0,
+    totalCourses: 0,
+    averageProgress: 0,
+    studyGroupsCount: 0,
   });
   const [selectedPeers, setSelectedPeers] = useState<CoursePeer[]>([]);
   const [showPeersDialog, setShowPeersDialog] = useState(false);
+  
+  // Confirmation dialog state
+  const [showConfirmDialog, setShowConfirmDialog] = useState(false);
+  const [courseToDrop, setCourseToDrop] = useState<Course | null>(null);
 
   const { toast } = useToast();
+  const { user } = useAuth();
 
-  // Calculate stats from enrolled courses
+  // Load user dashboard data when component mounts or active tab changes
   useEffect(() => {
-    const stats = {
-      totalEnrolledCredits: enrolledCourses.reduce((sum, course) => sum + course.course.creditHours, 0),
-      totalCourses: enrolledCourses.length,
-      averageProgress: enrolledCourses.length > 0 
-        ? Math.round(enrolledCourses.reduce((sum, course) => sum + course.progress, 0) / enrolledCourses.length)
-        : 0,
-      studyGroupsCount: enrolledCourses.reduce((sum, course) => sum + course.studyGroupsCount, 0),
-    };
-    setCourseStats(stats);
-  }, [enrolledCourses]);
+    if (user && activeTab === 'enrolled') {
+      loadUserDashboard();
+    }
+  }, [user, activeTab]);
 
-  // Load courses based on active tab
+  // Load available courses when catalog tab is active
   useEffect(() => {
     if (activeTab === 'catalog') {
       loadAvailableCourses();
     }
   }, [activeTab, searchParams]);
 
+  const loadUserDashboard = async () => {
+    if (!user) return;
+    
+    setIsLoading(true);
+    try {
+      const dashboard: UserDashboardResponse = await userCourseApi.getUserDashboard(user.id);
+      setEnrolledCourses(dashboard.enrolledCourses);
+      
+      // Calculate stats from enrolled courses
+      const stats = {
+        totalEnrolledCredits: dashboard.enrolledCourses.length * 3, // Assuming 3 credits per course
+        totalCourses: dashboard.enrolledCourses.length,
+        averageProgress: 75, // This would come from backend in real implementation
+        studyGroupsCount: Math.floor(dashboard.enrolledCourses.length * 1.5), // Mock calculation
+      };
+      setCourseStats(stats);
+    } catch (error) {
+      console.error('Failed to load dashboard:', error);
+      toast({
+        title: "Error",
+        description: "Failed to load your courses. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const loadAvailableCourses = async () => {
     setIsLoading(true);
     try {
-      // In a real app, this would call the API
-      // const response = await courseApi.getAllCourses(searchParams);
+      const response = await courseApi.getAllCourses({
+        page: searchParams.page,
+        size: searchParams.size,
+        sortBy: searchParams.sortBy,
+        sortDirection: searchParams.sortDirection,
+        userId: user?.id
+      });
       
-      // For now, use mock data with client-side filtering
-      let filteredCourses = [...availableCoursesData];
-      
-      if (searchParams.query) {
-        const query = searchParams.query.toLowerCase();
-        filteredCourses = filteredCourses.filter(course => 
-          course.courseCode.toLowerCase().includes(query) ||
-          course.courseName.toLowerCase().includes(query) ||
-          course.instructorName.toLowerCase().includes(query)
-        );
-      }
-
-      // Sort results
-      if (searchParams.sortBy) {
-        filteredCourses.sort((a, b) => {
-          const aVal = a[searchParams.sortBy as keyof Course];
-          const bVal = b[searchParams.sortBy as keyof Course];
-          
-          if (typeof aVal === 'string' && typeof bVal === 'string') {
-            const result = aVal.localeCompare(bVal);
-            return searchParams.sortDir === 'desc' ? -result : result;
-          }
-          
-          if (typeof aVal === 'number' && typeof bVal === 'number') {
-            const result = aVal - bVal;
-            return searchParams.sortDir === 'desc' ? -result : result;
-          }
-          
-          return 0;
-        });
-      }
-
-      // Simulate pagination
-      const pageSize = searchParams.size || 10;
-      const page = searchParams.page || 0;
-      const startIndex = page * pageSize;
-      const paginatedCourses = filteredCourses.slice(startIndex, startIndex + pageSize);
-
-      setAvailableCourses(paginatedCourses);
-      setTotalElements(filteredCourses.length);
-      setTotalPages(Math.ceil(filteredCourses.length / pageSize));
+      setAvailableCourses(response.content);
+      setTotalPages(response.totalPages);
+      setTotalElements(response.totalElements);
     } catch (error) {
       console.error('Failed to load courses:', error);
       toast({
@@ -268,7 +186,11 @@ export default function Courses() {
   };
 
   const handleSearch = (params: CourseSearchParams) => {
-    setSearchParams({ ...searchParams, ...params, page: 0 });
+    setSearchParams({ 
+      ...searchParams, 
+      ...params, 
+      page: 0 
+    });
   };
 
   const handlePageChange = (page: number) => {
@@ -280,42 +202,27 @@ export default function Courses() {
   };
 
   const handleEnroll = async (courseId: number) => {
+    if (!user) {
+      toast({
+        title: "Authentication Required",
+        description: "Please log in to enroll in courses.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setEnrollingCourseId(courseId);
     try {
-      // In a real app, this would call the API
-      // await userCourseApi.enrollInCourse(courseId);
+      await userCourseApi.enrollInCourse(user.id, courseId);
       
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      // Refresh the data
+      await loadAvailableCourses();
+      await loadUserDashboard();
       
-      const courseToEnroll = availableCourses.find(c => c.id === courseId);
-      if (courseToEnroll) {
-        const newEnrollment = {
-          id: Date.now(),
-          enrollmentId: Date.now(),
-          userId: 1,
-          courseId: courseId,
-          enrollmentDate: new Date().toISOString().split('T')[0],
-          course: { ...courseToEnroll, isEnrolled: true },
-          progress: 0,
-          grade: 'In Progress',
-          nextAssignment: 'Getting Started',
-          dueDate: 'TBD',
-          studyGroupsCount: 0,
-        };
-        
-        setEnrolledCourses(prev => [...prev, newEnrollment]);
-        setAvailableCourses(prev => prev.map(c => 
-          c.id === courseId 
-            ? { ...c, isEnrolled: true, currentEnrollment: c.currentEnrollment + 1 }
-            : c
-        ));
-        
-        toast({
-          title: "Successfully Enrolled!",
-          description: `You have been enrolled in ${courseToEnroll.courseName}`,
-        });
-      }
+      toast({
+        title: "Successfully Enrolled!",
+        description: "You have been enrolled in the course",
+      });
     } catch (error) {
       console.error('Failed to enroll in course:', error);
       toast({
@@ -328,29 +235,29 @@ export default function Courses() {
     }
   };
 
-  const handleDrop = async (courseId: number) => {
-    setDroppingCourseId(courseId);
+  // Show confirmation dialog when user clicks drop button
+  const handleDropClick = (course: Course) => {
+    setCourseToDrop(course);
+    setShowConfirmDialog(true);
+  };
+
+  // Actually drop the course after confirmation
+  const handleDropConfirm = async () => {
+    if (!user || !courseToDrop) return;
+
+    setShowConfirmDialog(false);
+    setDroppingCourseId(courseToDrop.id);
+    
     try {
-      // In a real app, this would call the API
-      // await userCourseApi.dropCourse(courseId);
+      await userCourseApi.dropCourse(user.id, courseToDrop.id);
       
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      // Refresh the data
+      await loadUserDashboard();
       
-      const courseToDrop = enrolledCourses.find(c => c.course.id === courseId);
-      if (courseToDrop) {
-        setEnrolledCourses(prev => prev.filter(c => c.course.id !== courseId));
-        setAvailableCourses(prev => prev.map(c => 
-          c.id === courseId 
-            ? { ...c, isEnrolled: false, currentEnrollment: Math.max(0, c.currentEnrollment - 1) }
-            : c
-        ));
-        
-        toast({
-          title: "Course Dropped",
-          description: `You have been dropped from ${courseToDrop.course.courseName}`,
-        });
-      }
+      toast({
+        title: "Course Dropped",
+        description: `You have been dropped from ${courseToDrop.courseName}`,
+      });
     } catch (error) {
       console.error('Failed to drop course:', error);
       toast({
@@ -360,40 +267,22 @@ export default function Courses() {
       });
     } finally {
       setDroppingCourseId(null);
+      setCourseToDrop(null);
     }
   };
 
+  // Cancel the drop operation
+  const handleDropCancel = () => {
+    setShowConfirmDialog(false);
+    setCourseToDrop(null);
+  };
+
   const handleViewPeers = async (courseId: number) => {
+    if (!user) return;
+
     try {
-      // In a real app, this would call the API
-      // const peers = await userCourseApi.getCoursePeers(courseId);
-      
-      // Mock peers data
-      const mockPeers: CoursePeer[] = [
-        {
-          id: 1,
-          firstName: 'Alice',
-          lastName: 'Johnson',
-          email: 'alice.johnson@university.edu',
-          enrollmentDate: '2024-08-15',
-        },
-        {
-          id: 2,
-          firstName: 'Bob',
-          lastName: 'Smith',
-          email: 'bob.smith@university.edu',
-          enrollmentDate: '2024-08-16',
-        },
-        {
-          id: 3,
-          firstName: 'Carol',
-          lastName: 'Davis',
-          email: 'carol.davis@university.edu',
-          enrollmentDate: '2024-08-17',
-        },
-      ];
-      
-      setSelectedPeers(mockPeers);
+      const response = await userCourseApi.getCoursePeers(courseId, user.id);
+      setSelectedPeers(response.peers);
       setShowPeersDialog(true);
     } catch (error) {
       console.error('Failed to load course peers:', error);
@@ -405,12 +294,22 @@ export default function Courses() {
     }
   };
 
-  const getProgressColor = (progress: number) => {
-    if (progress >= 80) return 'bg-green-500';
-    if (progress >= 60) return 'bg-blue-500';
-    if (progress >= 40) return 'bg-yellow-500';
-    return 'bg-red-500';
-  };
+  if (!user) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/30 to-indigo-50/40 flex items-center justify-center">
+        <Card className="w-full max-w-md">
+          <CardContent className="pt-6 text-center">
+            <BookOpen className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+            <h2 className="text-2xl font-bold text-gray-900 mb-2">Authentication Required</h2>
+            <p className="text-gray-600 mb-6">Please log in to view and manage your courses.</p>
+            <Button asChild>
+              <Link to="/login">Go to Login</Link>
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/30 to-indigo-50/40 pb-24 lg:pb-8">
@@ -447,7 +346,7 @@ export default function Courses() {
                 asChild
               >
                 <Link to="/calendar">
-                  <Calendar className="w-5  mr-2" />
+                  <Calendar className="w-5 h-5 mr-2" />
                   View Schedule
                 </Link>
               </Button>
@@ -563,7 +462,7 @@ export default function Courses() {
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => activeTab === 'catalog' && loadAvailableCourses()}
+                  onClick={() => activeTab === 'catalog' ? loadAvailableCourses() : loadUserDashboard()}
                   disabled={isLoading}
                   className="gap-2"
                 >
@@ -596,20 +495,14 @@ export default function Courses() {
           <div>
             {enrolledCourses.length > 0 ? (
               <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
-                {enrolledCourses.map((enrollment) => (
+                {enrolledCourses.map((course) => (
                   <CourseCard
-                    key={enrollment.id}
-                    course={enrollment.course}
+                    key={course.id}
+                    course={course}
                     variant="enrolled"
-                    onDrop={handleDrop}
+                    onDrop={handleDropClick} // Changed to handleDropClick
                     onViewPeers={handleViewPeers}
-                    isDropping={droppingCourseId === enrollment.course.id}
-                    showProgress={true}
-                    progress={enrollment.progress}
-                    grade={enrollment.grade}
-                    nextAssignment={enrollment.nextAssignment}
-                    dueDate={enrollment.dueDate}
-                    studyGroupsCount={enrollment.studyGroupsCount}
+                    isDropping={droppingCourseId === course.id}
                   />
                 ))}
               </div>
@@ -686,6 +579,14 @@ export default function Courses() {
           </div>
         )}
 
+        {/* Confirmation Dialog for Dropping Course */}
+        <ConfirmDropDialog
+          isOpen={showConfirmDialog}
+          onClose={handleDropCancel}
+          onConfirm={handleDropConfirm}
+          course={courseToDrop}
+        />
+
         {/* Peers Dialog */}
         {showPeersDialog && (
           <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
@@ -708,7 +609,7 @@ export default function Courses() {
                     <div className="flex-1">
                       <p className="font-medium">{peer.firstName} {peer.lastName}</p>
                       <p className="text-sm text-gray-500">{peer.email}</p>
-                      <p className="text-xs text-gray-400">Enrolled: {peer.enrollmentDate}</p>
+                      <p className="text-xs text-gray-400">{peer.commonCourses} common courses</p>
                     </div>
                     <Button size="sm" variant="outline">
                       Connect

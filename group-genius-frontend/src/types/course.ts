@@ -1,24 +1,27 @@
-// Course Types
+// types/course.ts
 export interface Course {
   id: number;
   courseCode: string;
   courseName: string;
   description: string;
-  instructorName: string;
-  classSchedule: string;
-  creditHours: number;
-  courseCapacity: number;
-  currentEnrollment: number;
-  isEnrolled?: boolean;
-  enrollmentDate?: string;
+  isEnrolled: boolean;
 }
 
 export interface UserCourse {
-  enrollmentId: number;
-  userId: number;
-  courseId: number;
-  enrollmentDate: string;
-  course: Course;
+  id: number;
+  courseCode: string;
+  courseName: string;
+  description: string;
+  isEnrolled: boolean;
+}
+
+// types/course.ts
+export interface CourseSearchParams {
+  page?: number;
+  size?: number;
+  sortBy?: string;
+  sortDirection?: string; // Changed from sortDir to sortDirection
+  query?: string;
 }
 
 export interface CoursePeer {
@@ -27,25 +30,13 @@ export interface CoursePeer {
   lastName: string;
   email: string;
   profileImageUrl?: string;
-  enrollmentDate: string;
-}
-
-export interface CourseSearchParams {
-  page?: number;
-  size?: number;
-  query?: string;
-  sortBy?: 'courseCode' | 'courseName' | 'instructorName' | 'creditHours';
-  sortDir?: 'asc' | 'desc';
-}
-
-export interface PaginatedCourseResponse {
-  content: Course[];
-  totalElements: number;
-  totalPages: number;
-  size: number;
-  number: number;
-  first: boolean;
-  last: boolean;
+  secondarySchool?: string;
+  graduationYear?: string;
+  university?: string;
+  major?: string;
+  currentYear?: string;
+  bio?: string;
+  commonCourses: number;
 }
 
 export interface CourseStats {
@@ -55,28 +46,19 @@ export interface CourseStats {
   studyGroupsCount: number;
 }
 
-// Enrollment request/response types
-export interface EnrollmentRequest {
-  courseId: number;
-}
-
-export interface EnrollmentResponse {
-  success: boolean;
-  message: string;
-  enrollment?: UserCourse;
-}
-
-// User courses response
-export interface UserCoursesResponse {
-  courses: UserCourse[];
-  totalCreditHours: number;
+export interface UserDashboardResponse {
+  userId: number;
+  userName: string;
+  enrolledCourses: Course[];
+  suggestedPeers: CoursePeer[];
   totalCourses: number;
-  averageEnrollmentPercentage: number;
+  totalPeers: number;
 }
 
-// Course peers response
 export interface CoursePeersResponse {
   courseId: number;
+  courseCode: string;
   courseName: string;
   peers: CoursePeer[];
+  totalPeers: number;
 }
