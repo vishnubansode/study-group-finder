@@ -19,27 +19,17 @@ public class Course {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(nullable = false, unique = true, length = 20)
-    private String courseCode;
-
     @Column(nullable = false, length = 100)
     private String courseName;
 
     @Column(length = 500)
     private String description;
 
-    @Column(nullable = false, length = 100)
-    private String instructorName;
-
-    @Column(nullable = false, length = 50)
-    private String classSchedule; // e.g. "Mon/Wed 10:00-11:30"
-
-    @Column(nullable = false)
-    private Integer creditHours;
-
+    // maximum number of students allowed
     @Column(nullable = false)
     private Integer courseCapacity;
 
+    // how many are currently enrolled
     @Column(nullable = false)
     @Builder.Default
     private Integer currentEnrollment = 0;

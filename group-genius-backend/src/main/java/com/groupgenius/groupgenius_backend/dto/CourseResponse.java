@@ -7,12 +7,8 @@ import lombok.Value;
 @Builder
 public class CourseResponse {
     Long id;
-    String courseCode;
     String courseName;
     String description;
-    String instructorName;
-    String classSchedule;
-    Integer creditHours;
     Integer courseCapacity;
     Integer currentEnrollment;
     Double enrollmentPercentage;

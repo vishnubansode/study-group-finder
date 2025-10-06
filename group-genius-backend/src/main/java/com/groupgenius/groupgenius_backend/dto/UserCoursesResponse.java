@@ -10,6 +10,5 @@ import java.util.List;
 public class UserCoursesResponse {
     List<CourseResponse> enrolledCourses;
     Integer totalCourses;
-    Integer totalCreditHours;
     Double averageEnrollmentPercentage;
 }

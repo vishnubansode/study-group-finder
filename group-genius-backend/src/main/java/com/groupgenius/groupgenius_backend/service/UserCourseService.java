@@ -9,6 +9,8 @@ import com.groupgenius.groupgenius_backend.entity.User;
 import com.groupgenius.groupgenius_backend.repository.CourseRepository;
 import com.groupgenius.groupgenius_backend.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -18,6 +20,8 @@ import java.util.stream.Collectors;
 @Service
 @RequiredArgsConstructor
 public class UserCourseService {
+
+        private static final Logger logger = LoggerFactory.getLogger(UserCourseService.class);
 
     private final UserRepository userRepository;
     private final CourseRepository courseRepository;
@@ -46,10 +50,12 @@ public class UserCourseService {
         course.setCurrentEnrollment(course.getCurrentEnrollment() + 1);
         
         // Save both entities
-        userRepository.save(user);
-        courseRepository.save(course);
-        
-        return mapToCourseResponse(course, true);
+                userRepository.save(user);
+                courseRepository.save(course);
+
+                logger.info("User {} enrolled in course {}. New enrollment count={}", userId, courseId, course.getCurrentEnrollment());
+
+                return mapToCourseResponse(course, true);
     }
 
     @Transactional
@@ -71,8 +77,10 @@ public class UserCourseService {
         course.setCurrentEnrollment(course.getCurrentEnrollment() - 1);
         
         // Save both entities
-        userRepository.save(user);
-        courseRepository.save(course);
+                userRepository.save(user);
+                courseRepository.save(course);
+
+                logger.info("User {} dropped course {}. New enrollment count={}", userId, courseId, course.getCurrentEnrollment());
     }
 
     public UserCoursesResponse getUserCourses(Long userId) {
@@ -83,10 +91,6 @@ public class UserCourseService {
                 .map(course -> mapToCourseResponse(course, true))
                 .collect(Collectors.toList());
         
-        Integer totalCreditHours = user.getCourses().stream()
-                .mapToInt(Course::getCreditHours)
-                .sum();
-        
         Double averageEnrollmentPercentage = user.getCourses().stream()
                 .mapToDouble(Course::getEnrollmentPercentage)
                 .average()
@@ -95,7 +99,6 @@ public class UserCourseService {
         return UserCoursesResponse.builder()
                 .enrolledCourses(enrolledCourses)
                 .totalCourses(user.getCourses().size())
-                .totalCreditHours(totalCreditHours)
                 .averageEnrollmentPercentage(averageEnrollmentPercentage)
                 .build();
     }
@@ -119,7 +122,6 @@ public class UserCourseService {
         
         return CoursePeersResponse.builder()
                 .courseId(course.getId())
-                .courseCode(course.getCourseCode())
                 .courseName(course.getCourseName())
                 .peers(peers)
                 .totalPeers(peers.size())
@@ -129,12 +131,8 @@ public class UserCourseService {
     private CourseResponse mapToCourseResponse(Course course, Boolean isEnrolled) {
         return CourseResponse.builder()
                 .id(course.getId())
-                .courseCode(course.getCourseCode())
                 .courseName(course.getCourseName())
                 .description(course.getDescription())
-                .instructorName(course.getInstructorName())
-                .classSchedule(course.getClassSchedule())
-                .creditHours(course.getCreditHours())
                 .courseCapacity(course.getCourseCapacity())
                 .currentEnrollment(course.getCurrentEnrollment())
                 .enrollmentPercentage(course.getEnrollmentPercentage())

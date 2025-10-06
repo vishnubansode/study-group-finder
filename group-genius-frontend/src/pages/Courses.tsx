@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Progress } from '@/components/ui/progress';
-import { useToast } from '@/hooks/use-toast';
+import { useToast } from '@/components/ui/use-toast';
 import { 
   BookOpen, 
   Search, 
@@ -21,156 +21,18 @@ import {
   CheckCircle
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import { courseApi, userCourseApi, mockData } from '@/services/courseService';
+import courseService from '@/services/courseService';
 import { Course, UserCourse, CourseSearchParams, CoursePeer, CourseStats } from '@/types/course';
 import { CourseCard } from '@/components/course/CourseCard';
 import { CourseSearch } from '@/components/course/CourseSearch';
 import { Pagination } from '@/components/course/Pagination';
 
-// Mock enrolled courses with additional UI data
-const enrolledCoursesWithProgress = [
-  {
-    id: 1,
-    enrollmentId: 1,
-    userId: 1,
-    courseId: 1,
-    enrollmentDate: '2024-08-15',
-    course: {
-      id: 1,
-      courseCode: 'CS101',
-      courseName: 'Introduction to Computer Science',
-      description: 'Fundamentals of programming and computer science concepts including algorithms, data structures, and software engineering principles.',
-      instructorName: 'Dr. Sarah Mitchell',
-      classSchedule: 'MWF 10:00-11:00 AM',
-      creditHours: 4,
-      courseCapacity: 30,
-      currentEnrollment: 25,
-      isEnrolled: true,
-    },
-    progress: 75,
-    grade: 'A-',
-    nextAssignment: 'Programming Project 3',
-    dueDate: 'Nov 15, 2024',
-    studyGroupsCount: 3,
-  },
-  {
-    id: 2,
-    enrollmentId: 2,
-    userId: 1,
-    courseId: 2,
-    enrollmentDate: '2024-08-15',
-    course: {
-      id: 2,
-      courseCode: 'MATH201',
-      courseName: 'Calculus II',
-      description: 'Advanced calculus including integration techniques, infinite series, and applications to physics and engineering.',
-      instructorName: 'Prof. Michael Chen',
-      classSchedule: 'TTh 2:00-3:30 PM',
-      creditHours: 4,
-      courseCapacity: 35,
-      currentEnrollment: 28,
-      isEnrolled: true,
-    },
-    progress: 68,
-    grade: 'B+',
-    nextAssignment: 'Integration Techniques Quiz',
-    dueDate: 'Nov 12, 2024',
-    studyGroupsCount: 2,
-  },
-  {
-    id: 3,
-    enrollmentId: 3,
-    userId: 1,
-    courseId: 3,
-    enrollmentDate: '2024-08-15',
-    course: {
-      id: 3,
-      courseCode: 'PHYS151',
-      courseName: 'Physics I: Mechanics',
-      description: 'Introduction to classical mechanics covering kinematics, dynamics, energy, momentum, and rotational motion.',
-      instructorName: 'Dr. Emma Rodriguez',
-      classSchedule: 'MWF 1:00-2:00 PM, Lab W 3:00-5:00 PM',
-      creditHours: 4,
-      courseCapacity: 25,
-      currentEnrollment: 22,
-      isEnrolled: true,
-    },
-    progress: 82,
-    grade: 'A',
-    nextAssignment: 'Lab Report 4',
-    dueDate: 'Nov 18, 2024',
-    studyGroupsCount: 1,
-  },
-];
-
-// Mock available courses for catalog
-const availableCoursesData = [
-  {
-    id: 4,
-    courseCode: 'CS201',
-    courseName: 'Data Structures and Algorithms',
-    description: 'Advanced programming concepts including data structures, algorithm design, and complexity analysis.',
-    instructorName: 'Dr. Lisa Park',
-    classSchedule: 'MWF 9:00-10:00 AM',
-    creditHours: 4,
-    courseCapacity: 30,
-    currentEnrollment: 18,
-    isEnrolled: false,
-  },
-  {
-    id: 5,
-    courseCode: 'MATH301',
-    courseName: 'Linear Algebra',
-    description: 'Vector spaces, linear transformations, matrices, eigenvalues, and applications.',
-    instructorName: 'Prof. Robert Kim',
-    classSchedule: 'TTh 10:00-11:30 AM',
-    creditHours: 3,
-    courseCapacity: 25,
-    currentEnrollment: 20,
-    isEnrolled: false,
-  },
-  {
-    id: 6,
-    courseCode: 'ENG101',
-    courseName: 'English Composition',
-    description: 'Fundamentals of academic writing, research, and communication skills.',
-    instructorName: 'Prof. Jennifer Adams',
-    classSchedule: 'TTh 9:00-10:30 AM',
-    creditHours: 3,
-    courseCapacity: 20,
-    currentEnrollment: 20,
-    isEnrolled: false,
-  },
-  {
-    id: 7,
-    courseCode: 'HIST120',
-    courseName: 'World History',
-    description: 'Survey of world civilizations from ancient times to the present.',
-    instructorName: 'Prof. James Wilson',
-    classSchedule: 'TTh 11:00 AM-12:30 PM',
-    creditHours: 3,
-    courseCapacity: 35,
-    currentEnrollment: 15,
-    isEnrolled: false,
-  },
-  {
-    id: 8,
-    courseCode: 'BIO101',
-    courseName: 'General Biology',
-    description: 'Introduction to biological principles including cell biology, genetics, and evolution.',
-    instructorName: 'Dr. Maria Santos',
-    classSchedule: 'MWF 11:00 AM-12:00 PM, Lab T 2:00-4:00 PM',
-    creditHours: 4,
-    courseCapacity: 30,
-    currentEnrollment: 25,
-    isEnrolled: false,
-  },
-];
+// No local mock data — all courses come from the backend
 
 export default function Courses() {
   const [activeTab, setActiveTab] = useState<'enrolled' | 'catalog'>('enrolled');
-  const [enrolledCourses, setEnrolledCourses] = useState(enrolledCoursesWithProgress);
-  const [availableCourses, setAvailableCourses] = useState(availableCoursesData);
+  const [enrolledCourses, setEnrolledCourses] = useState<UserCourse[]>([]);
+  const [availableCourses, setAvailableCourses] = useState<Course[]>([]);
   const [searchParams, setSearchParams] = useState<CourseSearchParams>({ page: 0, size: 10 });
   const [isLoading, setIsLoading] = useState(false);
   const [enrollingCourseId, setEnrollingCourseId] = useState<number | null>(null);
@@ -178,10 +40,9 @@ export default function Courses() {
   const [totalPages, setTotalPages] = useState(1);
   const [totalElements, setTotalElements] = useState(0);
   const [courseStats, setCourseStats] = useState<CourseStats>({
-    totalEnrolledCredits: 15,
-    totalCourses: 3,
-    averageProgress: 75,
-    studyGroupsCount: 6,
+    totalCourses: 0,
+    averageProgress: 0,
+    studyGroupsCount: 0,
   });
   const [selectedPeers, setSelectedPeers] = useState<CoursePeer[]>([]);
   const [showPeersDialog, setShowPeersDialog] = useState(false);
@@ -189,72 +50,36 @@ export default function Courses() {
   const { toast } = useToast();
 
   // Calculate stats from enrolled courses
-  useEffect(() => {
-    const stats = {
-      totalEnrolledCredits: enrolledCourses.reduce((sum, course) => sum + course.course.creditHours, 0),
-      totalCourses: enrolledCourses.length,
-      averageProgress: enrolledCourses.length > 0 
-        ? Math.round(enrolledCourses.reduce((sum, course) => sum + course.progress, 0) / enrolledCourses.length)
-        : 0,
-      studyGroupsCount: enrolledCourses.reduce((sum, course) => sum + course.studyGroupsCount, 0),
-    };
-    setCourseStats(stats);
-  }, [enrolledCourses]);
+    useEffect(() => {
+      const stats = {
+        totalCourses: enrolledCourses.length,
+        averageProgress: enrolledCourses.length > 0 
+          ? Math.round(
+              enrolledCourses.reduce(
+                (sum, course) => sum + ((course as any).progress ?? 0),
+                0
+              ) / enrolledCourses.length
+            )
+          : 0,
+        studyGroupsCount: enrolledCourses.reduce((sum, course) => sum + ((course as any).studyGroupsCount ?? 0), 0),
+      };
+      setCourseStats(stats);
+    }, [enrolledCourses]);
 
   // Load courses based on active tab
   useEffect(() => {
-    if (activeTab === 'catalog') {
-      loadAvailableCourses();
-    }
+    if (activeTab === 'catalog') loadAvailableCourses();
+    if (activeTab === 'enrolled') loadEnrolledCourses();
   }, [activeTab, searchParams]);
 
   const loadAvailableCourses = async () => {
     setIsLoading(true);
     try {
-      // In a real app, this would call the API
-      // const response = await courseApi.getAllCourses(searchParams);
-      
-      // For now, use mock data with client-side filtering
-      let filteredCourses = [...availableCoursesData];
-      
-      if (searchParams.query) {
-        const query = searchParams.query.toLowerCase();
-        filteredCourses = filteredCourses.filter(course => 
-          course.courseCode.toLowerCase().includes(query) ||
-          course.courseName.toLowerCase().includes(query) ||
-          course.instructorName.toLowerCase().includes(query)
-        );
-      }
-
-      // Sort results
-      if (searchParams.sortBy) {
-        filteredCourses.sort((a, b) => {
-          const aVal = a[searchParams.sortBy as keyof Course];
-          const bVal = b[searchParams.sortBy as keyof Course];
-          
-          if (typeof aVal === 'string' && typeof bVal === 'string') {
-            const result = aVal.localeCompare(bVal);
-            return searchParams.sortDir === 'desc' ? -result : result;
-          }
-          
-          if (typeof aVal === 'number' && typeof bVal === 'number') {
-            const result = aVal - bVal;
-            return searchParams.sortDir === 'desc' ? -result : result;
-          }
-          
-          return 0;
-        });
-      }
-
-      // Simulate pagination
-      const pageSize = searchParams.size || 10;
-      const page = searchParams.page || 0;
-      const startIndex = page * pageSize;
-      const paginatedCourses = filteredCourses.slice(startIndex, startIndex + pageSize);
-
-      setAvailableCourses(paginatedCourses);
-      setTotalElements(filteredCourses.length);
-      setTotalPages(Math.ceil(filteredCourses.length / pageSize));
+      // Use backend API for paginated courses. courseService.getAllCourses expects (page, size, sortBy, sortDirection)
+      const resp = await courseService.getAllCourses(searchParams.page || 0, searchParams.size || 10, searchParams.sortBy || 'courseName', searchParams.sortDir || 'asc');
+      setAvailableCourses(resp.content || []);
+      setTotalElements(resp.totalElements || 0);
+      setTotalPages(resp.totalPages || 1);
     } catch (error) {
       console.error('Failed to load courses:', error);
       toast({
@@ -264,6 +89,16 @@ export default function Courses() {
       });
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const loadEnrolledCourses = async () => {
+    try {
+      const resp = await courseService.getUserCourses();
+      const enrollments = Array.isArray(resp) ? resp : (resp?.courses || []);
+      setEnrolledCourses(enrollments as UserCourse[]);
+    } catch (err) {
+      console.error('Failed to load enrolled courses', err);
     }
   };
 
@@ -282,40 +117,9 @@ export default function Courses() {
   const handleEnroll = async (courseId: number) => {
     setEnrollingCourseId(courseId);
     try {
-      // In a real app, this would call the API
-      // await userCourseApi.enrollInCourse(courseId);
-      
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      const courseToEnroll = availableCourses.find(c => c.id === courseId);
-      if (courseToEnroll) {
-        const newEnrollment = {
-          id: Date.now(),
-          enrollmentId: Date.now(),
-          userId: 1,
-          courseId: courseId,
-          enrollmentDate: new Date().toISOString().split('T')[0],
-          course: { ...courseToEnroll, isEnrolled: true },
-          progress: 0,
-          grade: 'In Progress',
-          nextAssignment: 'Getting Started',
-          dueDate: 'TBD',
-          studyGroupsCount: 0,
-        };
-        
-        setEnrolledCourses(prev => [...prev, newEnrollment]);
-        setAvailableCourses(prev => prev.map(c => 
-          c.id === courseId 
-            ? { ...c, isEnrolled: true, currentEnrollment: c.currentEnrollment + 1 }
-            : c
-        ));
-        
-        toast({
-          title: "Successfully Enrolled!",
-          description: `You have been enrolled in ${courseToEnroll.courseName}`,
-        });
-      }
+      await courseService.enrollInCourse(courseId);
+      await Promise.all([loadEnrolledCourses(), loadAvailableCourses()]);
+      toast({ title: 'Successfully Enrolled!', description: 'You have been enrolled in the course.' });
     } catch (error) {
       console.error('Failed to enroll in course:', error);
       toast({
@@ -331,26 +135,9 @@ export default function Courses() {
   const handleDrop = async (courseId: number) => {
     setDroppingCourseId(courseId);
     try {
-      // In a real app, this would call the API
-      // await userCourseApi.dropCourse(courseId);
-      
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      const courseToDrop = enrolledCourses.find(c => c.course.id === courseId);
-      if (courseToDrop) {
-        setEnrolledCourses(prev => prev.filter(c => c.course.id !== courseId));
-        setAvailableCourses(prev => prev.map(c => 
-          c.id === courseId 
-            ? { ...c, isEnrolled: false, currentEnrollment: Math.max(0, c.currentEnrollment - 1) }
-            : c
-        ));
-        
-        toast({
-          title: "Course Dropped",
-          description: `You have been dropped from ${courseToDrop.course.courseName}`,
-        });
-      }
+      await courseService.dropCourse(courseId);
+      await Promise.all([loadEnrolledCourses(), loadAvailableCourses()]);
+      toast({ title: 'Course Dropped', description: 'You have been dropped from the course.' });
     } catch (error) {
       console.error('Failed to drop course:', error);
       toast({
@@ -365,43 +152,12 @@ export default function Courses() {
 
   const handleViewPeers = async (courseId: number) => {
     try {
-      // In a real app, this would call the API
-      // const peers = await userCourseApi.getCoursePeers(courseId);
-      
-      // Mock peers data
-      const mockPeers: CoursePeer[] = [
-        {
-          id: 1,
-          firstName: 'Alice',
-          lastName: 'Johnson',
-          email: 'alice.johnson@university.edu',
-          enrollmentDate: '2024-08-15',
-        },
-        {
-          id: 2,
-          firstName: 'Bob',
-          lastName: 'Smith',
-          email: 'bob.smith@university.edu',
-          enrollmentDate: '2024-08-16',
-        },
-        {
-          id: 3,
-          firstName: 'Carol',
-          lastName: 'Davis',
-          email: 'carol.davis@university.edu',
-          enrollmentDate: '2024-08-17',
-        },
-      ];
-      
-      setSelectedPeers(mockPeers);
+      const peers = await courseService.getCoursePeers(courseId);
+      setSelectedPeers(Array.isArray(peers) ? peers : peers?.peers || []);
       setShowPeersDialog(true);
     } catch (error) {
       console.error('Failed to load course peers:', error);
-      toast({
-        title: "Error",
-        description: "Failed to load course peers. Please try again.",
-        variant: "destructive",
-      });
+      toast({ title: 'Error', description: 'Failed to load course peers. Please try again.', variant: 'destructive' });
     }
   };
 
@@ -469,7 +225,7 @@ export default function Courses() {
               </div>
             </CardHeader>
             <CardContent>
-              <div className="text-3xl font-bold text-gray-900">{courseStats.totalEnrolledCredits}</div>
+              <div className="text-3xl font-bold text-gray-900">{courseStats.totalCourses}</div>
               <p className="text-sm text-gray-500 mt-1">This semester</p>
             </CardContent>
           </Card>
@@ -598,18 +354,18 @@ export default function Courses() {
               <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
                 {enrolledCourses.map((enrollment) => (
                   <CourseCard
-                    key={enrollment.id}
+                    key={enrollment.course.id}
                     course={enrollment.course}
                     variant="enrolled"
                     onDrop={handleDrop}
                     onViewPeers={handleViewPeers}
                     isDropping={droppingCourseId === enrollment.course.id}
                     showProgress={true}
-                    progress={enrollment.progress}
-                    grade={enrollment.grade}
-                    nextAssignment={enrollment.nextAssignment}
-                    dueDate={enrollment.dueDate}
-                    studyGroupsCount={enrollment.studyGroupsCount}
+                    progress={(enrollment as any).progress}
+                    grade={(enrollment as any).grade}
+                    nextAssignment={(enrollment as any).nextAssignment}
+                    dueDate={(enrollment as any).dueDate}
+                    studyGroupsCount={(enrollment as any).studyGroupsCount}
                   />
                 ))}
               </div>
@@ -702,7 +458,7 @@ export default function Courses() {
                     <Avatar>
                       <AvatarImage src={peer.profileImageUrl} />
                       <AvatarFallback>
-                        {peer.firstName[0]}{peer.lastName[0]}
+                        {(peer.firstName?.[0] || '') + (peer.lastName?.[0] || '')}
                       </AvatarFallback>
                     </Avatar>
                     <div className="flex-1">

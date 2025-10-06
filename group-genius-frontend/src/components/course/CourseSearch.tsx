@@ -20,7 +20,7 @@ export function CourseSearch({
   placeholder = "Search courses by code or name..." 
 }: CourseSearchProps) {
   const [query, setQuery] = useState('');
-  const [sortBy, setSortBy] = useState<string>('courseCode');
+  const [sortBy, setSortBy] = useState<string>('courseName');
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
   const [showFilters, setShowFilters] = useState(false);
 
@@ -131,10 +131,8 @@ export function CourseSearch({
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="courseCode">Course Code</SelectItem>
                 <SelectItem value="courseName">Course Name</SelectItem>
-                <SelectItem value="instructorName">Instructor</SelectItem>
-                <SelectItem value="creditHours">Credit Hours</SelectItem>
+                <SelectItem value="courseCapacity">Capacity</SelectItem>
               </SelectContent>
             </Select>
           </div>

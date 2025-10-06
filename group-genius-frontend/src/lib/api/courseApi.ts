@@ -9,6 +9,14 @@ const getCurrentUserId = (): number | null => {
   return 1; // Replace with actual auth logic
 };
 
+const getAuthHeaders = (includeJson = true) => {
+  const token = localStorage.getItem('token');
+  const headers: Record<string, string> = {};
+  if (includeJson) headers['Content-Type'] = 'application/json';
+  if (token) headers['Authorization'] = `Bearer ${token}`;
+  return headers;
+};
+
 export const courseApi = {
   // Get all courses with pagination
   async getAllCourses(page = 0, size = 10, sortBy = 'courseName', sortDirection = 'asc'): Promise<{
@@ -78,7 +86,9 @@ export const courseApi = {
       throw new Error('User not authenticated');
     }
 
-    const response = await fetch(`${API_BASE}/user/courses?userId=${userId}`);
+    const response = await fetch(`${API_BASE}/user/courses`, {
+      headers: getAuthHeaders(false)
+    });
     if (!response.ok) {
       throw new Error('Failed to fetch user courses');
     }
@@ -92,17 +102,28 @@ export const courseApi = {
       throw new Error('User not authenticated');
     }
 
-    const response = await fetch(`${API_BASE}/user/courses/${courseId}/enroll?userId=${userId}`, {
+    const token = localStorage.getItem('token');
+    console.log('enrollInCourse: token from localStorage =', token);
+    if (!token) {
+      console.error('enrollInCourse: no token found in localStorage');
+      throw new Error('No authentication token found. Please log in.');
+    }
+
+    const headers = getAuthHeaders(true);
+  console.log('enrollInCourse: sending enroll request', `${API_BASE}/user/courses/${courseId}/enroll`);
+    console.log('enrollInCourse: request headers', headers);
+
+    const response = await fetch(`${API_BASE}/user/courses/${courseId}/enroll`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
+      headers,
     });
 
     if (!response.ok) {
-      const error = await response.text();
-      throw new Error(error || 'Failed to enroll in course');
+      const body = await response.text();
+      console.error('enrollInCourse failed', { status: response.status, body });
+      throw new Error(body || `Failed to enroll in course (status ${response.status})`);
     }
+
     return response.json();
   },
 
@@ -113,8 +134,9 @@ export const courseApi = {
       throw new Error('User not authenticated');
     }
 
-    const response = await fetch(`${API_BASE}/user/courses/${courseId}?userId=${userId}`, {
+    const response = await fetch(`${API_BASE}/user/courses/${courseId}`, {
       method: 'DELETE',
+      headers: getAuthHeaders(false),
     });
 
     if (!response.ok) {
@@ -130,7 +152,9 @@ export const courseApi = {
       throw new Error('User not authenticated');
     }
 
-    const response = await fetch(`${API_BASE}/user/courses/peers?courseId=${courseId}&userId=${userId}`);
+    const response = await fetch(`${API_BASE}/user/courses/peers?courseId=${courseId}`, {
+      headers: getAuthHeaders(false)
+    });
     if (!response.ok) {
       throw new Error('Failed to fetch course peers');
     }
@@ -141,9 +165,7 @@ export const courseApi = {
   async createCourse(course: Omit<Course, 'id' | 'currentEnrollment' | 'enrollmentPercentage' | 'isFull' | 'isEnrolled'>): Promise<Course> {
     const response = await fetch(`${API_BASE}/courses`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
+      headers: getAuthHeaders(true),
       body: JSON.stringify(course),
     });
 

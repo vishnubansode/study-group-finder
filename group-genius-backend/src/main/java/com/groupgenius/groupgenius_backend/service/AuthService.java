@@ -48,8 +48,8 @@ public class AuthService {
         user.setProfileImageUrl(profileImageUrl);
 
         if (userDto.getSelectedCourses() != null) {
-            for (String courseCode : userDto.getSelectedCourses()) {
-                courseRepository.findByCourseCodeIgnoreCase(courseCode)
+            for (String courseName : userDto.getSelectedCourses()) {
+                courseRepository.findByCourseNameIgnoreCase(courseName)
                         .ifPresent(user.getCourses()::add);
             }
         }

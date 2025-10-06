@@ -9,7 +9,6 @@ import java.util.List;
 @Builder
 public class CoursePeersResponse {
     Long courseId;
-    String courseCode;
     String courseName;
     List<UserResponse> peers;
     Integer totalPeers;

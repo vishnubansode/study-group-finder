@@ -39,14 +39,7 @@ const defaultStudyStats = {
   studyStreak: 12
 };
 
-// Dummy courses data
-const dummyCourses = [
-  { id: 1, courseCode: 'CS101', courseName: 'Introduction to Computer Science' },
-  { id: 2, courseCode: 'MATH201', courseName: 'Calculus I' },
-  { id: 3, courseCode: 'PHYS101', courseName: 'General Physics' },
-  { id: 4, courseCode: 'ENG102', courseName: 'Composition II' },
-  { id: 5, courseCode: 'CS301', courseName: 'Data Structures' }
-];
+// Enrolled courses are fetched from the backend and shown below in "Current Courses".
 
 export default function Profile() {
   const [isEditing, setIsEditing] = useState(false);
@@ -225,6 +218,11 @@ export default function Profile() {
     }
     setIsEditing(false);
   };
+
+  // Ensure profileCourses is defined (fallback to empty array if user enrollments are missing)
+  // Cast to any to handle variations in the user shape returned by the backend,
+  // and try common alternative property names before falling back to an empty array.
+  const profileCourses = (user as any)?.enrollments ?? (user as any)?.courses ?? [];
 
   // Show loading state while user data is being fetched
   if (authLoading) {
@@ -511,19 +509,23 @@ export default function Profile() {
               </CardContent>
             </Card>
 
-            {/* Current Courses - Using Dummy Data */}
+            {/* Current Courses */}
             <Card className="border shadow-sm">
               <CardHeader>
                 <CardTitle>Current Courses</CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="flex flex-wrap gap-2">
-                  {dummyCourses.map((course) => (
-                    <Badge key={course.id} variant="secondary" className="px-3 py-1">
-                      <BookOpen className="w-3 h-3 mr-1" />
-                      {course.courseCode} - {course.courseName}
-                    </Badge>
-                  ))}
+                  {profileCourses.length === 0 ? (
+                    <div className="text-sm text-muted-foreground">No enrolled courses yet.</div>
+                  ) : (
+                    profileCourses.map((enrollment: any) => (
+                      <Badge key={enrollment.enrollmentId || enrollment.id || enrollment.course?.id} variant="secondary" className="px-3 py-1">
+                        <BookOpen className="w-3 h-3 mr-1" />
+                        {enrollment.course?.courseName || enrollment.courseName}
+                      </Badge>
+                    ))
+                  )}
                 </div>
               </CardContent>
             </Card>

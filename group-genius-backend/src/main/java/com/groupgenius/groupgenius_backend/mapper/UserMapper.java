@@ -36,12 +36,13 @@ public final class UserMapper {
         }
 
         return courses.stream()
-                .map(course -> CourseResponse.builder()
-                        .id(course.getId())
-                        .courseCode(course.getCourseCode())
-                        .courseName(course.getCourseName())
-                        .description(course.getDescription())
-                        .build())
+        .map(course -> CourseResponse.builder()
+            .id(course.getId())
+            .courseName(course.getCourseName())
+            .description(course.getDescription())
+            .courseCapacity(course.getCourseCapacity())
+            .currentEnrollment(course.getCurrentEnrollment())
+            .build())
                 .collect(Collectors.toList());
     }
 }

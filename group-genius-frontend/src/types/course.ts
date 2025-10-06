@@ -1,12 +1,8 @@
 // Course Types
 export interface Course {
   id: number;
-  courseCode: string;
   courseName: string;
   description: string;
-  instructorName: string;
-  classSchedule: string;
-  creditHours: number;
   courseCapacity: number;
   currentEnrollment: number;
   isEnrolled?: boolean;
@@ -34,7 +30,7 @@ export interface CourseSearchParams {
   page?: number;
   size?: number;
   query?: string;
-  sortBy?: 'courseCode' | 'courseName' | 'instructorName' | 'creditHours';
+  sortBy?: 'courseName' | 'courseCapacity';
   sortDir?: 'asc' | 'desc';
 }
 
@@ -49,7 +45,6 @@ export interface PaginatedCourseResponse {
 }
 
 export interface CourseStats {
-  totalEnrolledCredits: number;
   totalCourses: number;
   averageProgress: number;
   studyGroupsCount: number;
@@ -69,7 +64,6 @@ export interface EnrollmentResponse {
 // User courses response
 export interface UserCoursesResponse {
   courses: UserCourse[];
-  totalCreditHours: number;
   totalCourses: number;
   averageEnrollmentPercentage: number;
 }

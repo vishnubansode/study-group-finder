@@ -45,3 +45,4 @@ public class User {
     private Set<Course> courses = new HashSet<>();
 
 }
+

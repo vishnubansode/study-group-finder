@@ -75,9 +75,6 @@ export function CourseCard({
             </div>
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2 mb-1">
-                <Badge variant="outline" className="text-xs font-mono">
-                  {course.courseCode}
-                </Badge>
                 {variant === 'catalog' && (
                   <Badge variant={status.color as any} className="text-xs">
                     {status.text}
@@ -93,17 +90,10 @@ export function CourseCard({
                 {course.courseName}
               </CardTitle>
               <div className="space-y-1 text-sm text-muted-foreground">
+                {/* Only show simplified metadata */}
                 <div className="flex items-center gap-1">
-                  <User className="w-4 h-4" />
-                  <span>{course.instructorName}</span>
-                </div>
-                <div className="flex items-center gap-1">
-                  <Calendar className="w-4 h-4" />
-                  <span>{course.classSchedule}</span>
-                </div>
-                <div className="flex items-center gap-1">
-                  <Clock className="w-4 h-4" />
-                  <span>{course.creditHours} credits</span>
+                  <Users className="w-4 h-4" />
+                  <span>{course.currentEnrollment}/{course.courseCapacity} enrolled</span>
                 </div>
               </div>
             </div>

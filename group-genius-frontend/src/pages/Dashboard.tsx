@@ -43,47 +43,19 @@ export default function Dashboard() {
     return <Navigate to={`/dashboard/${user.id}`} replace />;
   }
 
-  // Mock data for demo purposes
-  const upcomingSessions = [
-    { id: 1, course: 'Data Structures', topic: 'Binary Trees', time: 'Today, 3:00 PM', date: 'Oct 2', group: 'CS Study Group', attendees: 5, type: 'video' },
-    { id: 2, course: 'Calculus II', topic: 'Integration Techniques', time: 'Tomorrow, 10:00 AM', date: 'Oct 3', group: 'Math Masters', attendees: 8, type: 'in-person' },
-    { id: 3, course: 'Web Development', topic: 'React Hooks', time: 'Friday, 2:00 PM', date: 'Oct 4', group: 'Web Dev Warriors', attendees: 6, type: 'video' },
-  ];
-
-  const myCourses = [
-    { id: 1, code: 'CS 301', name: 'Data Structures & Algorithms', professor: 'Dr. Smith', progress: 75, color: 'bg-blue-500' },
-    { id: 2, code: 'MATH 202', name: 'Calculus II', professor: 'Prof. Johnson', progress: 60, color: 'bg-green-500' },
-    { id: 3, code: 'CS 410', name: 'Web Development', professor: 'Dr. Williams', progress: 85, color: 'bg-purple-500' },
-    { id: 4, code: 'PHYS 101', name: 'Physics I', professor: 'Prof. Davis', progress: 45, color: 'bg-orange-500' },
-  ];
-
-  const myGroups = [
-    { id: 1, name: 'CS Study Group', members: 12, active: true, lastActivity: '2 min ago', avatar: '💻' },
-    { id: 2, name: 'Math Masters', members: 8, active: true, lastActivity: '1 hour ago', avatar: '📐' },
-    { id: 3, name: 'Web Dev Warriors', members: 15, active: false, lastActivity: '2 days ago', avatar: '🌐' },
-    { id: 4, name: 'Physics Club', members: 10, active: true, lastActivity: '30 min ago', avatar: '⚡' },
-  ];
-
-  const notifications = [
-    { id: 1, type: 'invite', message: 'Sarah invited you to join "Advanced Algorithms"', time: '5 min ago', unread: true },
-    { id: 2, type: 'reminder', message: 'Study session "Binary Trees" starts in 2 hours', time: '10 min ago', unread: true },
-    { id: 3, type: 'message', message: 'New message from John in CS Study Group', time: '1 hour ago', unread: false },
-  ];
-
-  const suggestedPeers = [
-    { id: 1, name: 'Alex Johnson', courses: 3, avatar: null, commonCourses: 'CS 301, MATH 202, CS 410' },
-    { id: 2, name: 'Maria Garcia', courses: 2, avatar: null, commonCourses: 'CS 301, Web Dev' },
-    { id: 3, name: 'James Wilson', courses: 2, avatar: null, commonCourses: 'MATH 202, PHYS 101' },
-  ];
-
+  // NOTE: The dashboard currently shows simple placeholders. These can be wired to backend
+  // endpoints later (sessions, courses, groups, notifications, suggested peers). For now we
+  // render minimal placeholders so the page is informational without relying on static demo data.
+  const upcomingSessions: any[] = [];
+  const myCourses: any[] = [];
+  const myGroups: any[] = [];
+  const notifications: any[] = [];
+  const suggestedPeers: any[] = [];
   const motivationalTips = [
-    { icon: <Sparkles className="w-5 h-5" />, text: "Great job! You've maintained a 7-day study streak 🔥", color: "from-yellow-500/20 to-orange-500/20" },
-    { icon: <Target className="w-5 h-5" />, text: "Set small goals and celebrate each achievement along the way!", color: "from-blue-500/20 to-purple-500/20" },
-    { icon: <Users className="w-5 h-5" />, text: "Teaching others is one of the best ways to learn. Share your knowledge!", color: "from-green-500/20 to-teal-500/20" },
-    { icon: <Lightbulb className="w-5 h-5" />, text: "Take regular breaks using the Pomodoro technique: 25 min study, 5 min break", color: "from-pink-500/20 to-rose-500/20" },
+    { icon: <Sparkles className="w-5 h-5" />, text: "Keep studying — connect with peers by enrolling in courses!", color: "from-yellow-500/20 to-orange-500/20" }
   ];
 
-  const currentTip = motivationalTips[Math.floor(Date.now() / (24 * 60 * 60 * 1000)) % motivationalTips.length];
+  const currentTip = motivationalTips[0];
   
   return (
     <div className="min-h-screen bg-background">
