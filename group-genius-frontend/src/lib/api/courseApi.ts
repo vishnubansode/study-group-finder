@@ -92,7 +92,31 @@ export const courseApi = {
     if (!response.ok) {
       throw new Error('Failed to fetch user courses');
     }
-    return response.json();
+    // Backend returns { enrolledCourses: [...], totalCourses, averageEnrollmentPercentage }
+    // but some frontend code expects { courses: [...] }. Normalize both shapes to a consistent
+    // object that includes `courses` so the UI will display enrolled courses immediately after enroll.
+    const json = await response.json();
+    const raw = json?.enrolledCourses || json?.courses || [];
+    // Ensure each item matches the frontend UserCourse shape { enrollmentId, userId, courseId, enrollmentDate, course }
+    const courses = raw.map((item: any) => {
+      // If item already has a `course` field, assume it's a UserCourse and return as-is
+      if (item && item.course) return item as UserCourse;
+      // Otherwise assume it's a Course object and wrap it
+      const courseObj = item as Course;
+      return {
+        enrollmentId: null,
+        userId: userId,
+        courseId: courseObj?.id ?? null,
+        enrollmentDate: null,
+        course: courseObj,
+      } as UserCourse;
+    });
+
+    return {
+      courses,
+      totalCourses: json?.totalCourses ?? courses.length,
+      averageEnrollmentPercentage: json?.averageEnrollmentPercentage ?? 0,
+    } as UserCoursesResponse;
   },
 
   // Enroll in a course

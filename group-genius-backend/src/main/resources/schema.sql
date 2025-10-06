@@ -1,6 +1,4 @@
--- Drop dependent tables first to ensure schema changes are applied when files are re-run
-DROP TABLE IF EXISTS user_courses;
-DROP TABLE IF EXISTS courses;
+
 
 CREATE TABLE IF NOT EXISTS users (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
