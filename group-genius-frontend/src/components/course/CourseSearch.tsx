@@ -144,7 +144,6 @@ export function CourseSearch({
               <SelectContent>
                 <SelectItem value="courseCode">Course Code</SelectItem>
                 <SelectItem value="courseName">Course Name</SelectItem>
-                <SelectItem value="instructorName">Instructor</SelectItem>
               </SelectContent>
             </Select>
           </div>

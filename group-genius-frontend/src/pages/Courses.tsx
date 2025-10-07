@@ -483,7 +483,7 @@ export default function Courses() {
                   onSearch={handleSearch}
                   isLoading={isLoading}
                   totalResults={totalElements}
-                  placeholder="Search courses by code, name, or instructor..."
+                  placeholder="Search courses by code or name"
                 />
               </div>
             )}

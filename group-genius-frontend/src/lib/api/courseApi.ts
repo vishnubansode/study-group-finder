@@ -1,4 +1,4 @@
-import { Course, EnrollmentRequest, UserCourse, CoursePeer, UserCoursesResponse, CoursePeersResponse } from '@/types/course';
+import { Course, UserCourse, CoursePeer, CoursePeersResponse } from '@/types/course';
 
 const API_BASE = 'http://localhost:8080/api';
 
@@ -72,7 +72,7 @@ export const courseApi = {
   },
 
   // Get user's enrolled courses
-  async getUserCourses(): Promise<UserCoursesResponse> {
+  async getUserCourses(): Promise<UserCourse[]> {
     const userId = getCurrentUserId();
     if (!userId) {
       throw new Error('User not authenticated');
