@@ -162,17 +162,30 @@ export default function Courses() {
   const loadAvailableCourses = async () => {
     setIsLoading(true);
     try {
-      const response = await courseApi.getAllCourses({
-        page: searchParams.page,
-        size: searchParams.size,
+      let response;
+      const params = {
+        page: searchParams.page || 0,
+        size: searchParams.size || 10,
         sortBy: searchParams.sortBy,
         sortDirection: searchParams.sortDirection,
-        userId: user?.id
-      });
-      
-      setAvailableCourses(response.content);
-      setTotalPages(response.totalPages);
-      setTotalElements(response.totalElements);
+        userId: user?.id,
+      } as any;
+
+      if (searchParams.query) {
+        // courseService.searchCourses expects (query, {page,size,userId})
+        response = await courseApi.searchCourses(searchParams.query, {
+          page: params.page,
+          size: params.size,
+          userId: params.userId,
+        });
+      } else {
+        // courseService.getAllCourses expects a params object
+        response = await courseApi.getAllCourses(params);
+      }
+
+      setAvailableCourses(response.content || []);
+      setTotalPages(response.totalPages || 0);
+      setTotalElements(response.totalElements || 0);
     } catch (error) {
       console.error('Failed to load courses:', error);
       toast({
