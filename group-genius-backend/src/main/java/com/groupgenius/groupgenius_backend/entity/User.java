@@ -34,6 +34,7 @@ public class User {
     private String major;
     private String currentYear;
     private String bio;
+    private String role;
 
     @ManyToMany(fetch = FetchType.LAZY)
     @JoinTable(
@@ -47,5 +48,4 @@ public class User {
     public boolean isEnrolledInCourse(Course course) {
         return courses.contains(course);
     }
-
 }
