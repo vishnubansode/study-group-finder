@@ -72,6 +72,7 @@ public class CourseService {
                 .courseCode(course.getCourseCode())
                 .courseName(course.getCourseName())
                 .description(course.getDescription())
+                .currentEnrollment(course.getCurrentEnrollment())
                 .isEnrolled(isEnrolled)
                 .build();
     }

@@ -100,8 +100,15 @@ public class UserService {
         Course course = courseRepository.findById(courseId)
                 .orElseThrow(() -> new IllegalArgumentException("Course not found"));
 
-        user.getCourses().add(course);
-        course.getEnrolledUsers().add(user);
+        if (!user.getCourses().contains(course)) {
+            user.getCourses().add(course);
+            course.getEnrolledUsers().add(user);
+            Integer curr = course.getCurrentEnrollment();
+            if (curr == null) curr = 0;
+            course.setCurrentEnrollment(curr + 1);
+            courseRepository.save(course);
+            userRepository.save(user);
+        }
         return UserMapper.toResponse(user);
     }
 
@@ -112,8 +119,15 @@ public class UserService {
         Course course = courseRepository.findById(courseId)
                 .orElseThrow(() -> new IllegalArgumentException("Course not found"));
 
-        user.getCourses().remove(course);
-        course.getEnrolledUsers().remove(user);
+        if (user.getCourses().contains(course)) {
+            user.getCourses().remove(course);
+            course.getEnrolledUsers().remove(user);
+            Integer curr = course.getCurrentEnrollment();
+            if (curr == null) curr = 0;
+            course.setCurrentEnrollment(Math.max(0, curr - 1));
+            courseRepository.save(course);
+            userRepository.save(user);
+        }
         return UserMapper.toResponse(user);
     }
 
@@ -126,11 +140,23 @@ public class UserService {
 
         Set<Course> courses = user.getCourses();
         if (active) {
-            courses.add(course);
-            course.getEnrolledUsers().add(user);
+            if (!courses.contains(course)) {
+                courses.add(course);
+                course.getEnrolledUsers().add(user);
+                Integer curr = course.getCurrentEnrollment();
+                if (curr == null) curr = 0;
+                course.setCurrentEnrollment(curr + 1);
+                courseRepository.save(course);
+            }
         } else {
-            courses.remove(course);
-            course.getEnrolledUsers().remove(user);
+            if (courses.contains(course)) {
+                courses.remove(course);
+                course.getEnrolledUsers().remove(user);
+                Integer curr = course.getCurrentEnrollment();
+                if (curr == null) curr = 0;
+                course.setCurrentEnrollment(Math.max(0, curr - 1));
+                courseRepository.save(course);
+            }
         }
         return UserMapper.toResponse(user);
     }

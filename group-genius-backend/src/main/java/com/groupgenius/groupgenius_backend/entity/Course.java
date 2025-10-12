@@ -31,4 +31,8 @@ public class Course {
     @ManyToMany(mappedBy = "courses")
     @Builder.Default
     private Set<User> enrolledUsers = new HashSet<>();
+
+    @Column(name = "current_enrollment", nullable = false)
+    @Builder.Default
+    private Integer currentEnrollment = 0;
 }

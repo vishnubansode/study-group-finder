@@ -39,8 +39,15 @@ public class UserCourseService {
             throw new IllegalArgumentException("User is already enrolled in this course");
         }
 
-        user.getCourses().add(course);
-        userRepository.save(user);
+                // add relation
+                user.getCourses().add(course);
+                userRepository.save(user);
+
+                // increment and persist course enrollment count
+                Integer curr = course.getCurrentEnrollment();
+                if (curr == null) curr = 0;
+                course.setCurrentEnrollment(curr + 1);
+                courseRepository.save(course);
     }
 
     @Transactional
@@ -54,8 +61,15 @@ public class UserCourseService {
             throw new IllegalArgumentException("User is not enrolled in this course");
         }
 
-        user.getCourses().remove(course);
-        userRepository.save(user);
+                // remove relation
+                user.getCourses().remove(course);
+                userRepository.save(user);
+
+                // decrement and persist course enrollment count (never below 0)
+                Integer curr = course.getCurrentEnrollment();
+                if (curr == null) curr = 0;
+                course.setCurrentEnrollment(Math.max(0, curr - 1));
+                courseRepository.save(course);
     }
 
     public CoursePeersResponse findCoursePeers(Long courseId, Long userId) {
@@ -112,6 +126,7 @@ public class UserCourseService {
                 .courseCode(course.getCourseCode())
                 .courseName(course.getCourseName())
                 .description(course.getDescription())
+                .currentEnrollment(course.getCurrentEnrollment())
                 .isEnrolled(true) // Always true for user's courses
                 .build();
     }

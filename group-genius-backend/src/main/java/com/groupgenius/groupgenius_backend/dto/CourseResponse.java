@@ -10,5 +10,6 @@ public class CourseResponse {
     private String courseCode;
     private String courseName;
     private String description;
+    private Integer currentEnrollment;
     private Boolean isEnrolled;
 }
