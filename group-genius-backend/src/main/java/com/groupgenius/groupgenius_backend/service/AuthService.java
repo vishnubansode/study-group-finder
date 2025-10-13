@@ -9,7 +9,6 @@ import com.groupgenius.groupgenius_backend.repository.CourseRepository;
 import com.groupgenius.groupgenius_backend.repository.UserRepository;
 import com.groupgenius.groupgenius_backend.security.JwtUtil;
 import lombok.RequiredArgsConstructor;
-import org.modelmapper.ModelMapper;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
@@ -24,7 +23,6 @@ public class AuthService {
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtUtil jwtUtil;
-    private final ModelMapper modelMapper;
     private final FileStorageService fileStorageService;
     private final CourseRepository courseRepository;
     private final EmailService emailService;
@@ -41,11 +39,21 @@ public class AuthService {
             profileImageUrl = fileStorageService.storeFile(profileImage);
         }
 
-        // Map DTO to Entity
-        User user = modelMapper.map(userDto, User.class);
-        user.setCourses(new HashSet<>());
-        user.setPassword(passwordEncoder.encode(userDto.getPassword()));
-        user.setProfileImageUrl(profileImageUrl);
+    // Map DTO to Entity manually to avoid type mismatches
+    User user = User.builder()
+        .firstName(userDto.getFirstName())
+        .lastName(userDto.getLastName())
+        .email(userDto.getEmail())
+        .password(passwordEncoder.encode(userDto.getPassword()))
+        .secondarySchool(userDto.getSecondarySchool())
+        .graduationYear(userDto.getGraduationYear())
+        .university(userDto.getUniversity())
+        .major(userDto.getMajor())
+        .currentYear(userDto.getCurrentYear())
+        .bio(userDto.getBio())
+        .profileImageUrl(profileImageUrl)
+        .courses(new HashSet<>())
+        .build();
 
         if (userDto.getSelectedCourseIds() != null) {
             for (Long courseId : userDto.getSelectedCourseIds()) {

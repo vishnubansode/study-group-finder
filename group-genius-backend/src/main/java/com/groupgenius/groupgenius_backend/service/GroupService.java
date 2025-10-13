@@ -13,18 +13,21 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 
+import java.util.List;
 import java.util.Optional;
 
 @Service
 public class GroupService {
     private final GroupRepository groupRepository;
     private final UserRepository userRepository;
-    private final MembershipService membershipService; // reuse existing membership logic
+    private final CourseRepository courseRepository;
+    private final GroupMemberService groupMemberService;
 
-    public GroupService(GroupRepository groupRepository, UserRepository userRepository, MembershipService membershipService) {
+    public GroupService(GroupRepository groupRepository, UserRepository userRepository, CourseRepository courseRepository, GroupMemberService groupMemberService) {
         this.groupRepository = groupRepository;
         this.userRepository = userRepository;
-        this.membershipService = membershipService;
+        this.courseRepository = courseRepository;
+        this.groupMemberService = groupMemberService;
     }
 
     public Page<GroupResponse> search(Long courseId, String privacy, String name, Pageable pageable) {
@@ -33,87 +36,63 @@ public class GroupService {
     }
 
     public Optional<GroupResponse> create(GroupCreateRequest req) {
-        // createdBy is expected to be an existing user id
-        Optional<User> u = userRepository.findById(req.getCreatedBy());
-        if (u.isEmpty()) return Optional.empty();
+        Optional<User> user = userRepository.findById(req.getCreatedBy());
+        if (user.isEmpty()) {
+            return Optional.empty();
+        }
 
-        Group g = Group.builder()
-                .groupName(req.getName())
-                .description(req.getDescription())
-                .privacyType(req.getPrivacy() == null ? Group.PrivacyType.PUBLIC : Group.PrivacyType.valueOf(req.getPrivacy()))
-                .createdBy(u.get())
-                .build();
-        Group savedGroup = groupRepository.save(g);
+    Group.GroupBuilder groupBuilder = Group.builder()
+        .groupName(req.getName())
+        .description(req.getDescription())
+        .privacyType(req.getPrivacy() == null ? Group.PrivacyType.PUBLIC : Group.PrivacyType.valueOf(req.getPrivacy()))
+        .createdBy(user.get());
 
-        // Add admin membership using existing MembershipService
-        membershipService.addAdminMembership(savedGroup);
+    if (req.getCourseId() != null) {
+        courseRepository.findById(req.getCourseId()).ifPresent(groupBuilder::course);
+    }
+
+    Group group = groupBuilder.build();
+
+        Group savedGroup = groupRepository.save(group);
+    groupMemberService.addAdminMember(savedGroup);
 
         return Optional.of(toDto(savedGroup));
     }
 
-    private GroupResponse toDto(Group g) {
-        return GroupResponse.builder()
-                .groupId(g.getId())
-                .groupName(g.getGroupName())
-                .description(g.getDescription())
-                .courseName(g.getCourse() != null ? g.getCourse().getCourseName() : null)
-                .createdBy(g.getCreatedBy() != null ? g.getCreatedBy().getId() : null)
-                .privacy(g.getPrivacyType() != null ? g.getPrivacyType().name() : null)
-                .build();
-    }
-}
-package com.groupgenius.groupgenius_backend.service;
-
-import com.groupgenius.groupgenius_backend.entity.Group;
-import com.groupgenius.groupgenius_backend.entity.User;
-import com.groupgenius.groupgenius_backend.repository.GroupRepository;
-import com.groupgenius.groupgenius_backend.repository.UserRepository;
-import lombok.RequiredArgsConstructor;
-import org.springframework.stereotype.Service;
-
-import java.util.List;
-
-@Service
-@RequiredArgsConstructor
-public class GroupService {
-
-    private final GroupRepository groupRepository;
-    private final UserRepository userRepository;
-    private final MembershipService membershipService; // inject MembershipService
-
-    // Create group (Admin only)
     public Group createGroup(String name, String description, Group.PrivacyType privacy, Long createdByUserId) {
         User user = userRepository.findById(createdByUserId)
                 .orElseThrow(() -> new IllegalArgumentException("User not found"));
-
-        // Check if user is Admin
-        if (!"ROLE_ADMIN".equals(user.getRole())) {
-            throw new IllegalArgumentException("Only Admins can create groups");
-        }
 
         if (groupRepository.existsByGroupNameIgnoreCase(name)) {
             throw new IllegalArgumentException("Group name already exists");
         }
 
-        // Build and save the group
-        Group group = Group.builder()
-                .groupName(name)
-                .description(description)
-                .privacyType(privacy)
-                .createdBy(user)
-                .build();
+    Group group = Group.builder()
+        .groupName(name)
+        .description(description)
+        .privacyType(privacy)
+        .createdBy(user)
+        .build();
 
         Group savedGroup = groupRepository.save(group);
-
-        // Automatically add admin membership
-        membershipService.addAdminMembership(savedGroup);
-
+    groupMemberService.addAdminMember(savedGroup);
         return savedGroup;
     }
 
-    // Fetch all groups
     public List<Group> getAllGroups() {
         return groupRepository.findAll();
+    }
+
+    private GroupResponse toDto(Group group) {
+    return GroupResponse.builder()
+        .groupId(group.getId())
+        .groupName(group.getGroupName())
+        .description(group.getDescription())
+        .courseName(group.getCourse() != null ? group.getCourse().getCourseName() : null)
+        .createdBy(group.getCreatedBy() != null ? group.getCreatedBy().getId() : null)
+        .privacyType(group.getPrivacyType() != null ? group.getPrivacyType().name() : null)
+        .createdAt(group.getCreatedAt())
+        .build();
     }
 }
 

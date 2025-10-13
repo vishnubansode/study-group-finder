@@ -1,9 +1,9 @@
 package com.groupgenius.groupgenius_backend.service;
 
-import com.groupgenius.groupgenius_backend.dto.MembershipDto;
+import com.groupgenius.groupgenius_backend.dto.GroupMemberDto;
 import com.groupgenius.groupgenius_backend.entity.*;
 import com.groupgenius.groupgenius_backend.exception.*;
-import com.groupgenius.groupgenius_backend.mapper.MembershipMapper;
+import com.groupgenius.groupgenius_backend.mapper.GroupMemberMapper;
 import com.groupgenius.groupgenius_backend.repository.*;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
@@ -15,11 +15,11 @@ import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
-public class MembershipService {
+public class GroupMemberService {
 
     private final GroupRepository groupRepository;
     private final UserRepository userRepository;
-    private final MembershipRepository membershipRepository;
+    private final GroupMemberRepository groupMemberRepository;
 
     @Transactional
     public void requestToJoin(Long userId, Long groupId) {
@@ -28,22 +28,22 @@ public class MembershipService {
         Group group = groupRepository.findById(groupId)
                 .orElseThrow(() -> new GroupNotFoundException("Group not found"));
 
-        membershipRepository.findByUserAndGroup(user, group)
-                .ifPresent(m -> { throw new DuplicateMembershipException("User already joined or pending approval"); });
+        groupMemberRepository.findByUserAndGroup(user, group)
+                .ifPresent(m -> { throw new DuplicateGroupMemberException("User already joined or pending approval"); });
 
-        Membership.Status status = group.getPrivacyType() == Group.PrivacyType.PUBLIC
-                ? Membership.Status.APPROVED
-                : Membership.Status.PENDING;
+        GroupMember.Status status = group.getPrivacyType() == Group.PrivacyType.PUBLIC
+                ? GroupMember.Status.APPROVED
+                : GroupMember.Status.PENDING;
 
-        Membership membership = Membership.builder()
+        GroupMember groupMember = GroupMember.builder()
                 .user(user)
                 .group(group)
-                .role(Membership.Role.MEMBER)
+                .role(GroupMember.Role.MEMBER)
                 .status(status)
                 .joinedAt(LocalDateTime.now())
                 .build();
 
-        membershipRepository.save(membership);
+        groupMemberRepository.save(groupMember);
     }
 
     @Transactional
@@ -53,20 +53,20 @@ public class MembershipService {
         Group group = groupRepository.findById(groupId)
                 .orElseThrow(() -> new GroupNotFoundException("Group not found"));
 
-        Membership adminMembership = membershipRepository.findByUserAndGroup(admin, group)
+        GroupMember adminMembership = groupMemberRepository.findByUserAndGroup(admin, group)
                 .orElseThrow(() -> new UnauthorizedActionException("You are not part of this group"));
-        if (adminMembership.getRole() != Membership.Role.ADMIN) {
+        if (adminMembership.getRole() != GroupMember.Role.ADMIN) {
             throw new UnauthorizedActionException("Only admins can approve members");
         }
 
-        Membership memberToApprove = membershipRepository.findByUserAndGroup(
+        GroupMember memberToApprove = groupMemberRepository.findByUserAndGroup(
                         userRepository.findById(userId)
                                 .orElseThrow(() -> new IllegalArgumentException("User not found")),
                         group)
-                .orElseThrow(() -> new MembershipNotFoundException("Membership not found"));
+                .orElseThrow(() -> new GroupMemberNotFoundException("Group member not found"));
 
-        memberToApprove.setStatus(Membership.Status.APPROVED);
-        membershipRepository.save(memberToApprove);
+        memberToApprove.setStatus(GroupMember.Status.APPROVED);
+        groupMemberRepository.save(memberToApprove);
     }
 
     @Transactional
@@ -76,46 +76,45 @@ public class MembershipService {
         Group group = groupRepository.findById(groupId)
                 .orElseThrow(() -> new GroupNotFoundException("Group not found"));
 
-        Membership adminMembership = membershipRepository.findByUserAndGroup(admin, group)
+        GroupMember adminMembership = groupMemberRepository.findByUserAndGroup(admin, group)
                 .orElseThrow(() -> new UnauthorizedActionException("You are not part of this group"));
-        if (adminMembership.getRole() != Membership.Role.ADMIN) {
+        if (adminMembership.getRole() != GroupMember.Role.ADMIN) {
             throw new UnauthorizedActionException("Only admins can remove members");
         }
 
-        Membership member = membershipRepository.findByUserAndGroup(
+        GroupMember member = groupMemberRepository.findByUserAndGroup(
                         userRepository.findById(userId)
                                 .orElseThrow(() -> new IllegalArgumentException("User not found")),
                         group)
-                .orElseThrow(() -> new MembershipNotFoundException("Member not found in this group"));
+                .orElseThrow(() -> new GroupMemberNotFoundException("Member not found in this group"));
 
-        membershipRepository.delete(member);
+        groupMemberRepository.delete(member);
     }
 
-    public List<MembershipDto> getGroupMembers(Long groupId) {
+    public List<GroupMemberDto> getGroupMembers(Long groupId) {
         Group group = groupRepository.findById(groupId)
                 .orElseThrow(() -> new GroupNotFoundException("Group not found"));
 
-        return membershipRepository.findByGroup(group)
+        return groupMemberRepository.findByGroup(group)
                 .stream()
-                .map(MembershipMapper::toDto)
+                .map(GroupMemberMapper::toDto)
                 .collect(Collectors.toList());
     }
 
     @Transactional
-    public void addAdminMembership(Group group) {
+        public void addAdminMember(Group group) {
         User admin = group.getCreatedBy();
 
-        if (membershipRepository.findByUserAndGroup(admin, group).isEmpty()) {
-            Membership adminMembership = Membership.builder()
+        if (groupMemberRepository.findByUserAndGroup(admin, group).isEmpty()) {
+            GroupMember adminMembership = GroupMember.builder()
                     .user(admin)
                     .group(group)
-                    .role(Membership.Role.ADMIN)
-                    .status(Membership.Status.APPROVED)
+                    .role(GroupMember.Role.ADMIN)
+                    .status(GroupMember.Status.APPROVED)
                     .joinedAt(LocalDateTime.now())
                     .build();
 
-            membershipRepository.save(adminMembership);
+            groupMemberRepository.save(adminMembership);
         }
     }
-
 }

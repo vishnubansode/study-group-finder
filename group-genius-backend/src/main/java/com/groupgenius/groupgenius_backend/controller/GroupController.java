@@ -2,6 +2,7 @@ package com.groupgenius.groupgenius_backend.controller;
 
 import com.groupgenius.groupgenius_backend.dto.GroupCreateRequest;
 import com.groupgenius.groupgenius_backend.dto.GroupResponse;
+import com.groupgenius.groupgenius_backend.service.GroupMemberService;
 import com.groupgenius.groupgenius_backend.service.GroupService;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -14,11 +15,11 @@ import org.springframework.web.bind.annotation.*;
 @RequestMapping("/api/groups")
 public class GroupController {
     private final GroupService groupService;
-    private final MembershipService membershipService;
+    private final GroupMemberService groupMemberService;
 
-    public GroupController(GroupService groupService, MembershipService membershipService) {
+    public GroupController(GroupService groupService, GroupMemberService groupMemberService) {
         this.groupService = groupService;
-        this.membershipService = membershipService;
+        this.groupMemberService = groupMemberService;
     }
 
     @GetMapping
@@ -30,7 +31,7 @@ public class GroupController {
             @RequestParam(defaultValue = "20") int size,
             @RequestParam(defaultValue = "createdAt,desc") String sort
     ) {
-        Sort sortObj = Sort.by(Sort.Order.by("createdAt").descending());
+        Sort sortObj = Sort.by(Sort.Order.desc("createdAt"));
         try {
             String[] parts = sort.split(",", 2);
             sortObj = Sort.by(Sort.Direction.fromString(parts.length > 1 ? parts[1] : "desc"), parts[0]);
@@ -47,55 +48,22 @@ public class GroupController {
                 .orElseGet(() -> ResponseEntity.badRequest().body(java.util.Map.of("success", false, "message", "Invalid courseId or createdBy", "data", null)));
     }
 
-    // Wrapper endpoints that reuse existing MembershipService
+    // Wrapper endpoints that reuse group membership service
     @PostMapping("/{groupId}/join")
     public ResponseEntity<?> joinGroup(@PathVariable Long groupId, @RequestParam Long userId) {
-        membershipService.requestToJoin(userId, groupId);
+    groupMemberService.requestToJoin(userId, groupId);
         return ResponseEntity.ok(java.util.Map.of("success", true, "message", "Join request submitted"));
     }
 
     @PostMapping("/{groupId}/approve")
     public ResponseEntity<?> approveMember(@PathVariable Long groupId, @RequestParam Long adminId, @RequestParam Long userId) {
-        membershipService.approveMember(adminId, userId, groupId);
+    groupMemberService.approveMember(adminId, userId, groupId);
         return ResponseEntity.ok(java.util.Map.of("success", true, "message", "Member approved"));
     }
 
     @DeleteMapping("/{groupId}/remove-member")
     public ResponseEntity<?> removeMember(@PathVariable Long groupId, @RequestParam Long adminId, @RequestParam Long userId) {
-        membershipService.removeMember(adminId, userId, groupId);
+        groupMemberService.removeMember(adminId, userId, groupId);
         return ResponseEntity.ok(java.util.Map.of("success", true, "message", "Member removed"));
-    }
-}
-package com.groupgenius.groupgenius_backend.controller;
-
-import com.groupgenius.groupgenius_backend.dto.GroupDto;
-import com.groupgenius.groupgenius_backend.entity.Group;
-import com.groupgenius.groupgenius_backend.mapper.GroupMapper;
-import com.groupgenius.groupgenius_backend.service.GroupService;
-import lombok.RequiredArgsConstructor;
-import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.*;
-
-import java.util.List;
-
-@RestController
-@RequestMapping("/api/groups")
-@RequiredArgsConstructor
-public class GroupController {
-
-    private final GroupService groupService;
-
-    // Admin-only group creation
-    @PostMapping("/create")
-    public ResponseEntity<Group> createGroup(@RequestParam String name, @RequestParam String description, @RequestParam Group.PrivacyType privacy, @RequestParam Long createdByUserId) {
-        Group group = groupService.createGroup(name, description, privacy, createdByUserId);
-        return ResponseEntity.ok(group);
-    }
-
-    // List all groups
-    @GetMapping("/all")
-    public ResponseEntity<List<GroupDto>> getAllGroups() {
-        List<GroupDto> groupDTOs = GroupMapper.toDtoList(groupService.getAllGroups());
-        return ResponseEntity.ok(groupDTOs);
     }
 }

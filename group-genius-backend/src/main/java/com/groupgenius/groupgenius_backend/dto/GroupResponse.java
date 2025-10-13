@@ -12,4 +12,5 @@ public class GroupResponse {
     private String courseName;
     private Long createdBy;
     private String privacyType;
+    private java.time.LocalDateTime createdAt;
 }

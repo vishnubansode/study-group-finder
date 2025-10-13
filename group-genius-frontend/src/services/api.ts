@@ -90,9 +90,11 @@ export const userAPI = {
     });
 
     console.log('🌐 API: Profile response status:', response.status);
-    
+
     if (!response.ok) {
-      throw new Error('Failed to fetch user profile');
+      const errorText = await response.text().catch(() => '');
+      console.error('🌐 API: Profile fetch failed body:', errorText);
+      throw new Error(`Failed to fetch user profile${errorText ? `: ${response.status} ${errorText}` : ''}`);
     }
 
     const userData = await response.json();

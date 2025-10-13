@@ -18,6 +18,9 @@ import {
   Loader2,
   UserPlus,
   UserCheck,
+  Calendar as CalendarIcon,
+  Clock,
+  Filter,
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { tokenService } from '@/services/api';
@@ -30,6 +33,7 @@ export default function Groups() {
   
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedPrivacy, setSelectedPrivacy] = useState<string>('ALL');
+  const [selectedCourse, setSelectedCourse] = useState('All Courses');
   const [groups, setGroups] = useState<Group[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -41,11 +45,11 @@ export default function Groups() {
   const [newGroupPrivacy, setNewGroupPrivacy] = useState<'PUBLIC' | 'PRIVATE'>('PUBLIC');
   const [isCreating, setIsCreating] = useState(false);
 
-  // Members dialog
-  const [selectedGroup, setSelectedGroup] = useState<Group | null>(null);
-  const [isMembersDialogOpen, setIsMembersDialogOpen] = useState(false);
-  const [groupMembers, setGroupMembers] = useState<GroupMember[]>([]);
-  const [isLoadingMembers, setIsLoadingMembers] = useState(false);
+  // Members dialog - removed unused states for now since backend doesn't have member list endpoint ready
+  // const [selectedGroup, setSelectedGroup] = useState<Group | null>(null);
+  // const [isMembersDialogOpen, setIsMembersDialogOpen] = useState(false);
+  // const [groupMembers, setGroupMembers] = useState<GroupMember[]>([]);
+  // const [isLoadingMembers, setIsLoadingMembers] = useState(false);
 
   useEffect(() => {
     if (user) {
@@ -88,21 +92,11 @@ export default function Groups() {
   const courseOptions = useMemo(() => {
     const uniqueCourses = new Set<string>();
     groups.forEach((group) => {
-      if (group.course) {
-        uniqueCourses.add(group.course);
+      if (group.courseName) {
+        uniqueCourses.add(group.courseName);
       }
     });
     return ['All Courses', ...Array.from(uniqueCourses).sort()];
-  }, [groups]);
-
-  const activityOptions = useMemo(() => {
-    const uniqueActivities = new Set<string>();
-    groups.forEach((group) => {
-      if (group.activity) {
-        uniqueActivities.add(group.activity);
-      }
-    });
-    return ['All Activity', ...Array.from(uniqueActivities).sort()];
   }, [groups]);
 
   const filteredGroups = useMemo(() => {
@@ -111,27 +105,18 @@ export default function Groups() {
     return groups.filter((group) => {
       const matchesSearch =
         query.length === 0 ||
-        group.name.toLowerCase().includes(query) ||
-        group.description.toLowerCase().includes(query) ||
-        group.tags?.some((tag) => tag.toLowerCase().includes(query));
+        group.groupName.toLowerCase().includes(query) ||
+        group.description.toLowerCase().includes(query);
 
       const matchesCourse =
-        selectedCourse === 'All Courses' || group.course === selectedCourse;
+        selectedCourse === 'All Courses' || group.courseName === selectedCourse;
 
-      const matchesActivity =
-        selectedActivity === 'All Activity' || group.activity === selectedActivity;
+      const matchesPrivacy =
+        selectedPrivacy === 'ALL' || group.privacyType === selectedPrivacy;
 
-      return matchesSearch && matchesCourse && matchesActivity;
+      return matchesSearch && matchesCourse && matchesPrivacy;
     });
-  }, [groups, searchQuery, selectedCourse, selectedActivity]);
-
-  const getActivityColor = (activity: string) => {
-    const normalized = activity.toLowerCase();
-    if (normalized.includes('very')) return 'text-accent';
-    if (normalized.includes('high') || normalized.includes('active')) return 'text-primary';
-    if (normalized.includes('moderate')) return 'text-secondary';
-    return 'text-muted-foreground';
-  };
+  }, [groups, searchQuery, selectedCourse, selectedPrivacy]);
 
   return (
     <div className="min-h-screen bg-background">
@@ -186,20 +171,14 @@ export default function Groups() {
                   ))}
                 </select>
                 <select
-                  value={selectedActivity}
-                  onChange={(e) => setSelectedActivity(e.target.value)}
+                  value={selectedPrivacy}
+                  onChange={(e) => setSelectedPrivacy(e.target.value)}
                   className="px-4 py-2 rounded-lg border border-border bg-background text-foreground"
                 >
-                  {activityOptions.map((activity) => (
-                    <option key={activity} value={activity}>
-                      {activity}
-                    </option>
-                  ))}
+                  <option value="ALL">All Groups</option>
+                  <option value="PUBLIC">Public</option>
+                  <option value="PRIVATE">Private</option>
                 </select>
-                <Button variant="outline" disabled>
-                  <Filter className="w-4 h-4 mr-2" />
-                  More Filters
-                </Button>
               </div>
             </div>
           </CardContent>
@@ -230,25 +209,20 @@ export default function Groups() {
         ) : filteredGroups.length > 0 ? (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 pb-24 lg:pb-8">
             {filteredGroups.map((group) => (
-              <Card key={group.id} className="academic-card hover-lift">
+              <Card key={group.groupId} className="academic-card hover-lift">
                 <CardHeader>
                   <div className="flex items-start justify-between">
                     <div className="flex-1">
                       <div className="flex items-center space-x-2 mb-2">
-                        <CardTitle className="text-lg">{group.name}</CardTitle>
-                        {group.privacy === 'private' ? (
+                        <CardTitle className="text-lg">{group.groupName}</CardTitle>
+                        {group.privacyType === 'PRIVATE' ? (
                           <Lock className="w-4 h-4 text-muted-foreground" />
                         ) : (
                           <Globe className="w-4 h-4 text-muted-foreground" />
                         )}
                       </div>
-                      <p className="text-sm text-muted-foreground mb-2">{group.course}</p>
-                      {group.activity && (
-                        <div className="flex items-center space-x-2 mb-3">
-                          <span className={`text-sm font-medium ${getActivityColor(group.activity)}`}>
-                            {group.activity}
-                          </span>
-                        </div>
+                      {group.courseName && (
+                        <p className="text-sm text-muted-foreground mb-2">{group.courseName}</p>
                       )}
                     </div>
                   </div>
@@ -259,33 +233,11 @@ export default function Groups() {
                     {group.description || 'This study group has no description yet.'}
                   </p>
 
-                  <div className="flex flex-wrap gap-2">
-                    {group.tags?.length ? (
-                      group.tags.map((tag) => (
-                        <Badge key={tag} variant="secondary" className="text-xs">
-                          {tag}
-                        </Badge>
-                      ))
-                    ) : (
-                      <span className="text-xs text-muted-foreground">No tags provided</span>
-                    )}
-                  </div>
-
                   <div className="flex items-center justify-between pt-4 border-t border-border">
                     <div className="flex items-center space-x-4 text-sm text-muted-foreground">
-                      <div className="flex items-center space-x-1">
-                        <Users className="w-4 h-4" />
-                        <span>
-                          {group.members}
-                          {group.maxMembers ? ` / ${group.maxMembers}` : ''}
-                        </span>
-                      </div>
-                      {group.lastActivity && (
-                        <div className="flex items-center space-x-1">
-                          <Clock className="w-4 h-4" />
-                          <span>{group.lastActivity}</span>
-                        </div>
-                      )}
+                      <Badge variant={group.privacyType === 'PUBLIC' ? 'default' : 'secondary'}>
+                        {group.privacyType}
+                      </Badge>
                     </div>
 
                     <Button size="sm" variant="outline" disabled>

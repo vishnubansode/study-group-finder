@@ -46,8 +46,8 @@ INSERT IGNORE INTO courses (course_code, course_name, description, current_enrol
 ('PHYS101','General Physics I','Mechanics and thermodynamics',0);
 
 -- Groups table (core entity for study groups)
--- User-facing groups table (keeps legacy naming used by the entities)
-CREATE TABLE IF NOT EXISTS user_groups (
+-- Groups table (core entity for study groups)
+CREATE TABLE IF NOT EXISTS `groups` (
   id BIGINT NOT NULL AUTO_INCREMENT,
   group_name VARCHAR(150) NOT NULL,
   description TEXT,
@@ -55,8 +55,8 @@ CREATE TABLE IF NOT EXISTS user_groups (
   created_by BIGINT,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (id),
-  KEY idx_user_groups_created_by (created_by),
-  CONSTRAINT fk_user_groups_user FOREIGN KEY (created_by) REFERENCES users (id) ON DELETE SET NULL
+  KEY idx_groups_created_by (created_by),
+  CONSTRAINT fk_groups_user FOREIGN KEY (created_by) REFERENCES users (id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
 -- Group members table (mapped to Membership entity)
@@ -71,6 +71,6 @@ CREATE TABLE IF NOT EXISTS group_members (
   UNIQUE KEY uk_group_user (group_id, user_id),
   KEY idx_group_members_group (group_id),
   KEY idx_group_members_user (user_id),
-  CONSTRAINT fk_group_members_group FOREIGN KEY (group_id) REFERENCES user_groups (id) ON DELETE CASCADE,
+  CONSTRAINT fk_group_members_group FOREIGN KEY (group_id) REFERENCES `groups` (id) ON DELETE CASCADE,
   CONSTRAINT fk_group_members_user FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;

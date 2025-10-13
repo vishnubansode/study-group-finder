@@ -8,14 +8,14 @@ import java.time.LocalDateTime;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-public class MembershipDto {
+public class GroupMemberDto {
 
-    private Long membershipId;
+    private Long groupMemberId;
     private Long userId;
     private String userName;
     private Long groupId;
     private String groupName;
     private String role;
-    private String status;     
+    private String status;
     private LocalDateTime joinedAt;
 }

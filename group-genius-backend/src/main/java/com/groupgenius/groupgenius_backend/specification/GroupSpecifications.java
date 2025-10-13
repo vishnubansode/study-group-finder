@@ -15,12 +15,16 @@ public final class GroupSpecifications {
                 p = cb.and(p, cb.equal(root.get("course").get("id"), courseId));
             }
             if (StringUtils.hasText(privacy)) {
-                p = cb.and(p, cb.equal(root.get("privacy"), privacy));
+                try {
+                    Group.PrivacyType type = Group.PrivacyType.valueOf(privacy.toUpperCase());
+                    p = cb.and(p, cb.equal(root.get("privacyType"), type));
+                } catch (IllegalArgumentException ignored) {
+                }
             }
             if (StringUtils.hasText(name)) {
                 String like = "%" + name.toLowerCase() + "%";
                 p = cb.and(p, cb.or(
-                        cb.like(cb.lower(root.get("name")), like),
+                        cb.like(cb.lower(root.get("groupName")), like),
                         cb.like(cb.lower(root.get("description")), like)
                 ));
             }
