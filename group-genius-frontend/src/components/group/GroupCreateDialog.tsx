@@ -1,0 +1,185 @@
+import { useState, useEffect, useCallback } from 'react';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Shield, Plus, Lock } from 'lucide-react';
+import { courseApi } from '@/lib/api/courseApi';
+import { useAuth } from '@/contexts/AuthContext';
+
+export type GroupPrivacy = 'public' | 'private';
+
+export interface GroupCreateValues {
+  name: string;
+  description: string;
+  course: string;
+  privacy: GroupPrivacy;
+  password?: string;
+}
+
+interface GroupCreateDialogProps {
+  courseOptions?: string[];
+  onCreate?: (values: GroupCreateValues) => void;
+}
+
+export function GroupCreateDialog({ courseOptions, onCreate }: GroupCreateDialogProps) {
+  const { user } = useAuth();
+  const [open, setOpen] = useState(false);
+  const [enrolledCourses, setEnrolledCourses] = useState<string[]>([]);
+  const [isLoadingCourses, setIsLoadingCourses] = useState(false);
+  const [values, setValues] = useState<GroupCreateValues>({
+    name: '',
+    description: '',
+    course: '',
+    privacy: 'public',
+    password: '',
+  });
+
+  // ✅ Wrapped in useCallback to remove ESLint dependency warning
+  const fetchEnrolledCourses = useCallback(async () => {
+    if (!user) return;
+    setIsLoadingCourses(true);
+    try {
+      const courses = await courseApi.getUserCourses();
+      const courseNames = courses.map(course => course.courseName || course.courseCode);
+      setEnrolledCourses(courseNames);
+
+      if (courseNames.length > 0 && !values.course) {
+        setValues(prev => ({ ...prev, course: courseNames[0] }));
+      }
+    } catch (error) {
+      console.error('❌ Failed to fetch enrolled courses:', error);
+      setEnrolledCourses([]);
+    } finally {
+      setIsLoadingCourses(false);
+    }
+  }, [user, values.course]); // ✅ Added dependencies
+
+  // ✅ Fixed dependency warning by including fetchEnrolledCourses
+  useEffect(() => {
+    if (open && user) {
+      fetchEnrolledCourses();
+    }
+  }, [open, user, fetchEnrolledCourses]);
+
+  const isValid =
+    values.name.trim().length > 0 &&
+    values.course.trim().length > 0 &&
+    (values.privacy === 'public' ||
+      (values.privacy === 'private' && values.password?.trim().length > 0));
+
+  const handleSubmit = () => {
+    if (!isValid) return;
+    onCreate?.(values);
+    setOpen(false);
+    setValues({ name: '', description: '', course: '', privacy: 'public', password: '' });
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild>
+        <Button className="btn-hero">
+          <Plus className="w-5 h-5 mr-2" />
+          Create Group
+        </Button>
+      </DialogTrigger>
+
+      <DialogContent className="sm:max-w-lg">
+        <DialogHeader>
+          <DialogTitle>Create a new group</DialogTitle>
+        </DialogHeader>
+
+        <div className="space-y-4">
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Name</label>
+            <Input
+              placeholder="e.g., CS101 Exam Prep"
+              value={values.name}
+              onChange={(e) => setValues((v) => ({ ...v, name: e.target.value }))}
+            />
+          </div>
+
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Description</label>
+            <Textarea
+              placeholder="What is this group about?"
+              value={values.description}
+              onChange={(e) => setValues((v) => ({ ...v, description: e.target.value }))}
+            />
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Course</label>
+              <Select
+                value={values.course}
+                onValueChange={(val) => setValues((v) => ({ ...v, course: val }))}
+                disabled={isLoadingCourses}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder={isLoadingCourses ? "Loading courses..." : "Select a course"} />
+                </SelectTrigger>
+                <SelectContent>
+                  {enrolledCourses.length > 0 ? (
+                    enrolledCourses.map((c) => (
+                      <SelectItem key={c} value={c}>{c}</SelectItem>
+                    ))
+                  ) : (
+                    <SelectItem value="no-courses" disabled>
+                      No enrolled courses found
+                    </SelectItem>
+                  )}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-sm font-medium flex items-center gap-2">
+                <Shield className="w-4 h-4 text-muted-foreground" /> Privacy
+              </label>
+              <Select
+                value={values.privacy}
+                onValueChange={(val: GroupPrivacy) => setValues((v) => ({ ...v, privacy: val }))}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="public">Public</SelectItem>
+                  <SelectItem value="private">Private</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          {values.privacy === 'private' && (
+            <div className="space-y-2">
+              <label className="text-sm font-medium flex items-center gap-2">
+                <Lock className="w-4 h-4 text-muted-foreground" />
+                Group Password
+                <span className="text-destructive">*</span>
+              </label>
+              <Input
+                type="password"
+                placeholder="Enter password for private group"
+                value={values.password || ''}
+                onChange={(e) => setValues((v) => ({ ...v, password: e.target.value }))}
+              />
+              <p className="text-xs text-muted-foreground">
+                Members will need this password to join the group
+              </p>
+            </div>
+          )}
+        </div>
+
+        <DialogFooter className="gap-2">
+          <Button variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
+          <Button onClick={handleSubmit} disabled={!isValid}>Create</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+export default GroupCreateDialog;
