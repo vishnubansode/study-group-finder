@@ -45,6 +45,7 @@ public class AuthService {
         User user = modelMapper.map(userDto, User.class);
         user.setCourses(new HashSet<>());
         user.setPassword(passwordEncoder.encode(userDto.getPassword()));
+        user.setRole("ROLE_MEMBER");
         user.setProfileImageUrl(profileImageUrl);
 
         if (userDto.getSelectedCourseIds() != null) {

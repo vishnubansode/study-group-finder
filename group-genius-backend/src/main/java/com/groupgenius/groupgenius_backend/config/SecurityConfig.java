@@ -7,6 +7,7 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.http.HttpMethod;
 import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
+import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
@@ -22,6 +23,7 @@ import java.util.Arrays;
 
 @Configuration
 @EnableWebSecurity
+@EnableMethodSecurity
 @RequiredArgsConstructor
 public class SecurityConfig {
 
@@ -40,6 +42,15 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.GET, "/api/courses/**").permitAll()
                         .requestMatchers("/api/files/**").permitAll()
                         .requestMatchers("/error").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/groups/all").permitAll()
+
+                        // Membership endpoints
+                        .requestMatchers("/api/memberships/join").authenticated()            // any authenticated user
+                        .requestMatchers("/api/memberships/group/**").authenticated()       // any authenticated user
+                        .requestMatchers("/api/memberships/approve").hasRole("ADMIN")       // ADMIN only
+                        .requestMatchers("/api/memberships/remove").hasRole("ADMIN")        // ADMIN only
+                        .requestMatchers("/api/groups/create").hasRole("ADMIN")             // ADMIN only
+
 
                         // User course management endpoints - require authentication
                         .requestMatchers("/api/user/**").authenticated()
