@@ -2,6 +2,7 @@ package com.groupgenius.groupgenius_backend.entity;
 
 import jakarta.persistence.*;
 import lombok.*;
+
 import java.util.HashSet;
 import java.util.Set;
 

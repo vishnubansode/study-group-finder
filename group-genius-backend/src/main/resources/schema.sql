@@ -16,11 +16,9 @@ CREATE TABLE IF NOT EXISTS users (
   UNIQUE KEY UK_users_email (email)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
--- Drop and recreate courses and user_courses (authoritative course list)
-DROP TABLE IF EXISTS user_courses;
-DROP TABLE IF EXISTS courses;
 
-CREATE TABLE courses (
+
+CREATE TABLE IF NOT EXISTS courses (
   id BIGINT NOT NULL AUTO_INCREMENT,
   course_code VARCHAR(20) NOT NULL,
   course_name VARCHAR(100) NOT NULL,
@@ -30,7 +28,7 @@ CREATE TABLE courses (
   UNIQUE KEY UK_courses_code (course_code)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
-CREATE TABLE user_courses (
+CREATE TABLE IF NOT EXISTS user_courses (
   user_id BIGINT NOT NULL,
   course_id BIGINT NOT NULL,
   PRIMARY KEY (user_id, course_id),
@@ -46,3 +44,33 @@ INSERT IGNORE INTO courses (course_code, course_name, description, current_enrol
 ('CS301','Database Systems','Relational databases, SQL, and design',0),
 ('MATH101','Calculus I','Limits, derivatives, integrals',0),
 ('PHYS101','General Physics I','Mechanics and thermodynamics',0);
+
+-- Groups table (core entity for study groups)
+-- User-facing groups table (keeps legacy naming used by the entities)
+CREATE TABLE IF NOT EXISTS user_groups (
+  id BIGINT NOT NULL AUTO_INCREMENT,
+  group_name VARCHAR(150) NOT NULL,
+  description TEXT,
+  privacy_type VARCHAR(20) NOT NULL DEFAULT 'PUBLIC',
+  created_by BIGINT,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  KEY idx_user_groups_created_by (created_by),
+  CONSTRAINT fk_user_groups_user FOREIGN KEY (created_by) REFERENCES users (id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+-- Group members table (mapped to Membership entity)
+CREATE TABLE IF NOT EXISTS group_members (
+  id BIGINT NOT NULL AUTO_INCREMENT,
+  group_id BIGINT NOT NULL,
+  user_id BIGINT NOT NULL,
+  role VARCHAR(20) NOT NULL DEFAULT 'MEMBER',
+  status VARCHAR(20) NOT NULL DEFAULT 'PENDING',
+  joined_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  UNIQUE KEY uk_group_user (group_id, user_id),
+  KEY idx_group_members_group (group_id),
+  KEY idx_group_members_user (user_id),
+  CONSTRAINT fk_group_members_group FOREIGN KEY (group_id) REFERENCES user_groups (id) ON DELETE CASCADE,
+  CONSTRAINT fk_group_members_user FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;

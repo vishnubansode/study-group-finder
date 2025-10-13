@@ -3,73 +3,87 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { useToast } from '@/hooks/use-toast';
 import {
   Users,
   Search,
-  Filter,
   Plus,
-  Calendar as CalendarIcon,
-  Clock,
   Globe,
   Lock,
   AlertCircle,
   Loader2,
+  UserPlus,
+  UserCheck,
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
-import { groupAPI, tokenService } from '@/services/api';
-
-interface Group {
-  id: number;
-  name: string;
-  course: string;
-  description: string;
-  members: number;
-  maxMembers: number;
-  privacy: 'public' | 'private';
-  activity: string;
-  lastActivity: string;
-  tags: string[];
-}
+import { tokenService } from '@/services/api';
+import { groupAPI } from '@/lib/api/groupApi';
+import { Group, GroupCreateRequest } from '@/types/group';
 
 export default function Groups() {
   const { user } = useAuth();
+  const { toast } = useToast();
+  
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedCourse, setSelectedCourse] = useState('All Courses');
-  const [selectedActivity, setSelectedActivity] = useState('All Activity');
+  const [selectedPrivacy, setSelectedPrivacy] = useState<string>('ALL');
   const [groups, setGroups] = useState<Group[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  
+  // Create group dialog
+  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+  const [newGroupName, setNewGroupName] = useState('');
+  const [newGroupDescription, setNewGroupDescription] = useState('');
+  const [newGroupPrivacy, setNewGroupPrivacy] = useState<'PUBLIC' | 'PRIVATE'>('PUBLIC');
+  const [isCreating, setIsCreating] = useState(false);
+
+  // Members dialog
+  const [selectedGroup, setSelectedGroup] = useState<Group | null>(null);
+  const [isMembersDialogOpen, setIsMembersDialogOpen] = useState(false);
+  const [groupMembers, setGroupMembers] = useState<GroupMember[]>([]);
+  const [isLoadingMembers, setIsLoadingMembers] = useState(false);
 
   useEffect(() => {
-    const fetchGroups = async () => {
-      if (!user) {
-        setGroups([]);
-        return;
-      }
-
-      const token = tokenService.getToken();
-      if (!token) {
-        setError('Authentication token not found. Please sign in again.');
-        setGroups([]);
-        return;
-      }
-
-      try {
-        setIsLoading(true);
-        setError(null);
-        const response = await groupAPI.getAllGroups(token);
-        setGroups(response || []);
-      } catch (err) {
-        console.error('Failed to load study groups:', err);
-        setError(err instanceof Error ? err.message : 'Unable to load study groups.');
-        setGroups([]);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    fetchGroups();
+    if (user) {
+      fetchGroups();
+    }
   }, [user]);
+
+  const fetchGroups = async () => {
+    if (!user) return;
+
+    const token = tokenService.getToken();
+    if (!token) {
+      setError('Authentication token not found. Please sign in again.');
+      return;
+    }
+
+    try {
+      setIsLoading(true);
+      setError(null);
+      
+      const response = await groupAPI.searchGroups(token, {
+        privacy: selectedPrivacy === 'ALL' ? undefined : selectedPrivacy,
+        name: searchQuery || undefined,
+        page: 0,
+        size: 50,
+      });
+      
+      // Handle paginated response
+      const groupsData = response.content || response;
+      setGroups(Array.isArray(groupsData) ? groupsData : []);
+    } catch (err) {
+      console.error('Failed to load study groups:', err);
+      setError(err instanceof Error ? err.message : 'Unable to load study groups.');
+      setGroups([]);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const courseOptions = useMemo(() => {
     const uniqueCourses = new Set<string>();
