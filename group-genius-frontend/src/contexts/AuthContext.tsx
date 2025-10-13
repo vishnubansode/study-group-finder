@@ -42,8 +42,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       try {
         const userData = await userAPI.getProfile(token);
         setUser(userData);
+        // Store user data in localStorage for API access
+        localStorage.setItem('user', JSON.stringify(userData));
       } catch (error) {
         tokenService.removeToken();
+        localStorage.removeItem('user');
       }
     }
     setIsLoading(false);
@@ -88,6 +91,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       
       console.log('🔵 AuthContext: Setting user state');
       setUser(userData);
+      // Store user data in localStorage for API access
+      localStorage.setItem('user', JSON.stringify(userData));
       console.log('✅ AuthContext: User state updated');
       
       return userData;
@@ -101,6 +106,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const logout = () => {
     tokenService.removeToken();
+    localStorage.removeItem('user');
     setUser(null);
   };
 
