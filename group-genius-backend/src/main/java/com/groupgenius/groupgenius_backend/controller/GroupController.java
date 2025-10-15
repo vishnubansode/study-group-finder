@@ -9,11 +9,14 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.http.ResponseEntity;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequestMapping("/api/groups")
 public class GroupController {
+    private static final Logger log = LoggerFactory.getLogger(GroupController.class);
     private final GroupService groupService;
     private final GroupMemberService groupMemberService;
 
@@ -23,7 +26,7 @@ public class GroupController {
     }
 
     @GetMapping
-    public Page<GroupResponse> search(
+    public ResponseEntity<?> search(
             @RequestParam(required = false) Long courseId,
             @RequestParam(required = false) String privacy,
             @RequestParam(required = false) String name,
@@ -31,14 +34,19 @@ public class GroupController {
             @RequestParam(defaultValue = "20") int size,
             @RequestParam(defaultValue = "createdAt,desc") String sort
     ) {
-        Sort sortObj = Sort.by(Sort.Order.desc("createdAt"));
         try {
-            String[] parts = sort.split(",", 2);
-            sortObj = Sort.by(Sort.Direction.fromString(parts.length > 1 ? parts[1] : "desc"), parts[0]);
-        } catch (Exception ignored) {
+            Sort sortObj = Sort.by(Sort.Order.desc("createdAt"));
+            try {
+                String[] parts = sort.split(",", 2);
+                sortObj = Sort.by(Sort.Direction.fromString(parts.length > 1 ? parts[1] : "desc"), parts[0]);
+            } catch (Exception ignored) {
+            }
+            Pageable pageable = PageRequest.of(page, size, sortObj);
+            return ResponseEntity.ok(groupService.search(courseId, privacy, name, pageable));
+        } catch (Exception ex) {
+            log.error("Error while searching groups", ex);
+            return ResponseEntity.status(500).body(java.util.Map.of("timestamp", java.time.OffsetDateTime.now().toString(), "status", 500, "error", "Internal Server Error", "path", "/api/groups", "message", ex.getMessage()));
         }
-        Pageable pageable = PageRequest.of(page, size, sortObj);
-        return groupService.search(courseId, privacy, name, pageable);
     }
 
     @PostMapping

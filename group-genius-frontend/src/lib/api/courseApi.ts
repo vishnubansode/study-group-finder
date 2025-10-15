@@ -87,11 +87,14 @@ export const courseApi = {
     if (!userId) {
       throw new Error('User not authenticated');
     }
-
     const url = `${API_BASE}/user/courses?userId=${userId}`;
     console.log('🔍 Fetching from URL:', url);
-    
-    const response = await fetch(url);
+    const token = localStorage.getItem('token');
+    const response = await fetch(url, {
+      headers: {
+        Authorization: token ? `Bearer ${token}` : '',
+      },
+    });
     console.log('🔍 Response status:', response.status);
     
     if (!response.ok) {
@@ -112,10 +115,12 @@ export const courseApi = {
       throw new Error('User not authenticated');
     }
 
+    const token = localStorage.getItem('token');
     const response = await fetch(`${API_BASE}/user/courses/${courseId}/enroll?userId=${userId}`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
+        Authorization: token ? `Bearer ${token}` : '',
       },
     });
 
@@ -133,8 +138,12 @@ export const courseApi = {
       throw new Error('User not authenticated');
     }
 
+    const token = localStorage.getItem('token');
     const response = await fetch(`${API_BASE}/user/courses/${courseId}?userId=${userId}`, {
       method: 'DELETE',
+      headers: {
+        Authorization: token ? `Bearer ${token}` : '',
+      },
     });
 
     if (!response.ok) {
@@ -150,7 +159,12 @@ export const courseApi = {
       throw new Error('User not authenticated');
     }
 
-    const response = await fetch(`${API_BASE}/user/courses/peers?courseId=${courseId}&userId=${userId}`);
+    const token = localStorage.getItem('token');
+    const response = await fetch(`${API_BASE}/user/courses/peers?courseId=${courseId}&userId=${userId}`, {
+      headers: {
+        Authorization: token ? `Bearer ${token}` : '',
+      },
+    });
     if (!response.ok) {
       throw new Error('Failed to fetch course peers');
     }

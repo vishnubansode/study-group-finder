@@ -25,6 +25,7 @@ import {
 import { useAuth } from '@/contexts/AuthContext';
 import { tokenService } from '@/services/api';
 import { groupAPI } from '@/lib/api/groupApi';
+import GroupCreateDialog, { GroupCreateValues } from '@/components/group/GroupCreateDialog';
 import { Group, GroupCreateRequest } from '@/types/group';
 
 export default function Groups() {
@@ -130,10 +131,35 @@ export default function Groups() {
               </p>
             </div>
             <div className="flex flex-col sm:flex-row gap-3">
-              <Button className="btn-hero" disabled>
-                <Plus className="w-5 h-5 mr-2" />
-                Create Group
-              </Button>
+              <GroupCreateDialog onCreate={async (values: GroupCreateValues) => {
+                if (!user) return;
+                const token = tokenService.getToken();
+                if (!token) {
+                  setError('Authentication required to create a group');
+                  return;
+                }
+
+                try {
+                  setIsCreating(true);
+                  // course mapping: GroupCreateDialog returns course name; backend expects courseId. For now send no courseId.
+                  const groupData = {
+                    name: values.name,
+                    description: values.description,
+                    courseId: undefined,
+                    createdBy: user.id,
+                    privacy: values.privacy.toUpperCase(),
+                  };
+
+                  await groupAPI.createGroup(token, groupData as any);
+                  toast({ title: 'Group created', description: 'Your group was created successfully.' });
+                  await fetchGroups();
+                } catch (err: any) {
+                  console.error('Create group failed', err);
+                  toast({ title: 'Create failed', description: err?.message || String(err) });
+                } finally {
+                  setIsCreating(false);
+                }
+              }} />
               <Button variant="outline" size="lg" className="px-8 py-4" disabled>
                 <CalendarIcon className="w-5 h-5 mr-2" />
                 Scheduler

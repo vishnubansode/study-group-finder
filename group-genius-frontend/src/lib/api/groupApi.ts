@@ -110,9 +110,9 @@ export const groupAPI = {
     return response.json();
   },
 
-  // Get group members
+  // Get group members (backend exposes: GET /api/group-members/group/{groupId})
   getGroupMembers: async (token: string, groupId: number): Promise<GroupMember[]> => {
-    const response = await fetch(`${API_BASE_URL}/memberships/group/${groupId}`, {
+    const response = await fetch(`${API_BASE_URL}/group-members/group/${groupId}`, {
       method: 'GET',
       headers: {
         Authorization: `Bearer ${token}`,

@@ -3,8 +3,9 @@ export interface Group {
   groupName: string;
   description: string;
   courseName?: string | null;
-  createdBy: number;
+  createdBy: number; // backend GroupResponse.createdBy (userId)
   privacyType: 'PUBLIC' | 'PRIVATE';
+  createdAt?: string; // backend returns createdAt as LocalDateTime
 }
 
 export interface GroupCreateRequest {
@@ -16,14 +17,15 @@ export interface GroupCreateRequest {
 }
 
 export interface GroupMember {
-  id: number;
+  // Matches backend GroupMemberDto
+  groupMemberId: number;
   userId: number;
+  userName?: string;
   groupId: number;
+  groupName?: string;
   role: 'ADMIN' | 'MEMBER';
   status: 'PENDING' | 'APPROVED';
-  joinedAt: string;
-  userName?: string;
-  userEmail?: string;
+  joinedAt?: string; // ISO timestamp string
 }
 
 export interface GroupSearchParams {
