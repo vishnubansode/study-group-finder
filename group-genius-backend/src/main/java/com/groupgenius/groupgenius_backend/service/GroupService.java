@@ -12,12 +12,16 @@ import com.groupgenius.groupgenius_backend.specification.GroupSpecifications;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.List;
 import java.util.Optional;
 
 @Service
 public class GroupService {
+    private static final Logger log = LoggerFactory.getLogger(GroupService.class);
     private final GroupRepository groupRepository;
     private final UserRepository userRepository;
     private final CourseRepository courseRepository;
@@ -83,16 +87,24 @@ public class GroupService {
         return groupRepository.findAll();
     }
 
+    @Transactional
     public void deleteGroup(Long groupId, Long adminId) {
+        log.info("Attempting to delete group {} by admin {}", groupId, adminId);
+        
         Group group = groupRepository.findById(groupId)
                 .orElseThrow(() -> new IllegalArgumentException("Group not found"));
         
+        log.info("Found group: {}, created by: {}", group.getGroupName(), group.getCreatedBy().getId());
+        
         // Only the group creator (admin) can delete the group
         if (!group.getCreatedBy().getId().equals(adminId)) {
+            log.warn("Delete group denied - adminId {} is not the creator ({})", adminId, group.getCreatedBy().getId());
             throw new IllegalArgumentException("Only the group creator can delete this group");
         }
         
+        log.info("Deleting group {} and all associated members", groupId);
         groupRepository.delete(group);
+        log.info("Group {} successfully deleted", groupId);
     }
 
     private GroupResponse toDto(Group group) {
