@@ -13,7 +13,7 @@ export type GroupPrivacy = 'public' | 'private';
 export interface GroupCreateValues {
   name: string;
   description: string;
-  course: string;
+  courseId?: number;
   privacy: GroupPrivacy;
   password?: string;
 }
@@ -26,12 +26,13 @@ interface GroupCreateDialogProps {
 export function GroupCreateDialog({ courseOptions, onCreate }: GroupCreateDialogProps) {
   const { user } = useAuth();
   const [open, setOpen] = useState(false);
-  const [enrolledCourses, setEnrolledCourses] = useState<string[]>([]);
+  // store courses as objects so we can pass back the id
+  const [enrolledCourses, setEnrolledCourses] = useState<Array<{ id: number; name: string }>>([]);
   const [isLoadingCourses, setIsLoadingCourses] = useState(false);
   const [values, setValues] = useState<GroupCreateValues>({
     name: '',
     description: '',
-    course: '',
+    courseId: undefined,
     privacy: 'public',
     password: '',
   });
@@ -42,11 +43,12 @@ export function GroupCreateDialog({ courseOptions, onCreate }: GroupCreateDialog
     setIsLoadingCourses(true);
     try {
       const courses = await courseApi.getUserCourses();
-      const courseNames = courses.map(course => course.courseName || course.courseCode);
-      setEnrolledCourses(courseNames);
+      const mapped = courses.map(course => ({ id: course.id, name: course.courseName || course.courseCode }));
+      setEnrolledCourses(mapped);
 
-      if (courseNames.length > 0 && !values.course) {
-        setValues(prev => ({ ...prev, course: courseNames[0] }));
+      // set a sensible default courseId if none selected yet
+      if (mapped.length > 0) {
+        setValues(prev => (prev.courseId ? prev : { ...prev, courseId: mapped[0].id }));
       }
     } catch (error) {
       console.error('❌ Failed to fetch enrolled courses:', error);
@@ -54,7 +56,7 @@ export function GroupCreateDialog({ courseOptions, onCreate }: GroupCreateDialog
     } finally {
       setIsLoadingCourses(false);
     }
-  }, [user, values.course]); // ✅ Added dependencies
+  }, [user]);
 
   // ✅ Fixed dependency warning by including fetchEnrolledCourses
   useEffect(() => {
@@ -65,15 +67,14 @@ export function GroupCreateDialog({ courseOptions, onCreate }: GroupCreateDialog
 
   const isValid =
     values.name.trim().length > 0 &&
-    values.course.trim().length > 0 &&
-    (values.privacy === 'public' ||
-      (values.privacy === 'private' && values.password?.trim().length > 0));
+    (typeof values.courseId === 'number' && !Number.isNaN(values.courseId)) &&
+    (values.privacy === 'public' || (values.privacy === 'private' && values.password?.trim().length > 0));
 
   const handleSubmit = () => {
     if (!isValid) return;
     onCreate?.(values);
     setOpen(false);
-    setValues({ name: '', description: '', course: '', privacy: 'public', password: '' });
+    setValues({ name: '', description: '', courseId: undefined, privacy: 'public', password: '' });
   };
 
   return (
@@ -113,8 +114,8 @@ export function GroupCreateDialog({ courseOptions, onCreate }: GroupCreateDialog
             <div className="space-y-2">
               <label className="text-sm font-medium">Course</label>
               <Select
-                value={values.course}
-                onValueChange={(val) => setValues((v) => ({ ...v, course: val }))}
+                value={values.courseId ? String(values.courseId) : ''}
+                onValueChange={(val) => setValues((v) => ({ ...v, courseId: val ? Number(val) : undefined }))}
                 disabled={isLoadingCourses}
               >
                 <SelectTrigger>
@@ -123,7 +124,7 @@ export function GroupCreateDialog({ courseOptions, onCreate }: GroupCreateDialog
                 <SelectContent>
                   {enrolledCourses.length > 0 ? (
                     enrolledCourses.map((c) => (
-                      <SelectItem key={c} value={c}>{c}</SelectItem>
+                      <SelectItem key={c.id} value={String(c.id)}>{c.name}</SelectItem>
                     ))
                   ) : (
                     <SelectItem value="no-courses" disabled>

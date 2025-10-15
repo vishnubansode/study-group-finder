@@ -83,6 +83,18 @@ public class GroupService {
         return groupRepository.findAll();
     }
 
+    public void deleteGroup(Long groupId, Long adminId) {
+        Group group = groupRepository.findById(groupId)
+                .orElseThrow(() -> new IllegalArgumentException("Group not found"));
+        
+        // Only the group creator (admin) can delete the group
+        if (!group.getCreatedBy().getId().equals(adminId)) {
+            throw new IllegalArgumentException("Only the group creator can delete this group");
+        }
+        
+        groupRepository.delete(group);
+    }
+
     private GroupResponse toDto(Group group) {
     return GroupResponse.builder()
         .groupId(group.getId())

@@ -74,4 +74,17 @@ public class GroupController {
         groupMemberService.removeMember(adminId, userId, groupId);
         return ResponseEntity.ok(java.util.Map.of("success", true, "message", "Member removed"));
     }
+
+    @DeleteMapping("/{groupId}")
+    public ResponseEntity<?> deleteGroup(@PathVariable Long groupId, @RequestParam Long adminId) {
+        try {
+            groupService.deleteGroup(groupId, adminId);
+            return ResponseEntity.ok(java.util.Map.of("success", true, "message", "Group deleted successfully"));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(java.util.Map.of("success", false, "message", e.getMessage()));
+        } catch (Exception e) {
+            log.error("Error deleting group", e);
+            return ResponseEntity.status(500).body(java.util.Map.of("success", false, "message", "Failed to delete group"));
+        }
+    }
 }

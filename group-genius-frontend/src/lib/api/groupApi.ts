@@ -127,4 +127,22 @@ export const groupAPI = {
 
     return response.json();
   },
+
+  // Delete a group (admin only)
+  deleteGroup: async (token: string, groupId: number, adminId: number) => {
+    const response = await fetch(`${API_BASE_URL}/groups/${groupId}?adminId=${adminId}`, {
+      method: 'DELETE',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.message || 'Failed to delete group');
+    }
+
+    return response.json();
+  },
 };
