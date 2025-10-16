@@ -16,11 +16,8 @@ CREATE TABLE IF NOT EXISTS users (
   UNIQUE KEY UK_users_email (email)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
--- Drop and recreate courses and user_courses (authoritative course list)
-DROP TABLE IF EXISTS user_courses;
-DROP TABLE IF EXISTS courses;
 
-CREATE TABLE courses (
+CREATE TABLE if not exists courses (
   id BIGINT NOT NULL AUTO_INCREMENT,
   course_code VARCHAR(20) NOT NULL,
   course_name VARCHAR(100) NOT NULL,
@@ -30,7 +27,7 @@ CREATE TABLE courses (
   UNIQUE KEY UK_courses_code (course_code)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
-CREATE TABLE user_courses (
+CREATE TABLE if not exists user_courses (
   user_id BIGINT NOT NULL,
   course_id BIGINT NOT NULL,
   PRIMARY KEY (user_id, course_id),
