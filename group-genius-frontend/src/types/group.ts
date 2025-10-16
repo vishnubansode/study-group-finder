@@ -6,6 +6,8 @@ export interface Group {
   createdBy: number; // backend GroupResponse.createdBy (userId)
   privacyType: 'PUBLIC' | 'PRIVATE';
   createdAt?: string; // backend returns createdAt as LocalDateTime
+  membershipStatus?: 'APPROVED' | 'PENDING' | 'NOT_MEMBER' | null;
+  membershipRole?: 'ADMIN' | 'MEMBER' | null;
 }
 
 export interface GroupCreateRequest {
@@ -35,4 +37,5 @@ export interface GroupSearchParams {
   page?: number;
   size?: number;
   sort?: string;
+  userId?: number;
 }

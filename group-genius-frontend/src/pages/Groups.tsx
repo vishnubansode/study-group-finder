@@ -45,6 +45,16 @@ export default function Groups() {
   const [groupMembers, setGroupMembers] = useState<GroupMember[]>([]);
   const [isLoadingMembers, setIsLoadingMembers] = useState(false);
   const [isMembersDialogOpen, setIsMembersDialogOpen] = useState(false);
+  const [isAdminForManagingGroup, setIsAdminForManagingGroup] = useState(false);
+
+  const handleMembersDialogOpenChange = (open: boolean) => {
+    setIsMembersDialogOpen(open);
+    if (!open) {
+      setManagingGroupId(null);
+      setIsAdminForManagingGroup(false);
+      setGroupMembers([]);
+    }
+  };
   
   // Create group dialog
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
@@ -83,6 +93,7 @@ export default function Groups() {
         name: searchQuery || undefined,
         page: 0,
         size: 50,
+        userId: user.id,
       });
       
       // Handle paginated response
@@ -188,6 +199,9 @@ export default function Groups() {
       
       const members = await groupAPI.getGroupMembers(token, group.groupId);
       setGroupMembers(members);
+      // Determine if current user is an admin for this group
+      const admin = members.some((m) => m.userId === user.id && m.role === 'ADMIN');
+      setIsAdminForManagingGroup(admin);
       setIsMembersDialogOpen(true);
     } catch (error) {
       console.error('Failed to load group members:', error);
@@ -195,14 +209,19 @@ export default function Groups() {
         title: 'Failed to load members', 
         description: 'Unable to load group members. Please try again.' 
       });
+      setManagingGroupId(null);
+      setIsAdminForManagingGroup(false);
     } finally {
       setIsLoadingMembers(false);
-      setManagingGroupId(null);
     }
   };
 
   const handleApproveMember = async (memberId: number, userId: number) => {
     if (!user || !managingGroupId) return;
+    if (!isAdminForManagingGroup) {
+      toast({ title: 'Not allowed', description: 'Only group admins can approve members.' });
+      return;
+    }
 
     const token = tokenService.getToken();
     if (!token) return;
@@ -225,6 +244,10 @@ export default function Groups() {
 
   const handleRemoveMember = async (memberId: number, userId: number) => {
     if (!user || !managingGroupId) return;
+    if (!isAdminForManagingGroup) {
+      toast({ title: 'Not allowed', description: 'Only group admins can remove members.' });
+      return;
+    }
 
     const token = tokenService.getToken();
     if (!token) return;
@@ -466,68 +489,99 @@ export default function Groups() {
                   <Badge variant="secondary">{availableGroups.length}</Badge>
                 </div>
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                  {availableGroups.map((group) => (
-                    <Card key={group.groupId} className="academic-card hover-lift">
-                      <CardHeader>
-                        <div className="flex items-start justify-between">
-                          <div className="flex-1">
-                            <div className="flex items-center space-x-2 mb-2">
-                              <CardTitle className="text-lg">{group.groupName}</CardTitle>
-                              {group.privacyType === 'PRIVATE' ? (
-                                <Lock className="w-4 h-4 text-muted-foreground" />
-                              ) : (
-                                <Globe className="w-4 h-4 text-muted-foreground" />
+                  {availableGroups.map((group) => {
+                    const membershipStatus = group.membershipStatus ?? 'NOT_MEMBER';
+                    const isJoined = membershipStatus === 'APPROVED';
+                    const isPending = membershipStatus === 'PENDING';
+                    const isRequesting = joiningGroupId === group.groupId;
+                    const isPrivate = group.privacyType === 'PRIVATE';
+
+                    const buttonDisabled = isRequesting || isJoined || isPending;
+
+                    let buttonContent = <></>;
+                    if (isRequesting) {
+                      buttonContent = <Loader2 className="w-4 h-4 animate-spin" />;
+                    } else if (isJoined) {
+                      buttonContent = (
+                        <>
+                          <UserCheck className="w-4 h-4 mr-1" />
+                          Joined
+                        </>
+                      );
+                    } else if (isPending) {
+                      buttonContent = (
+                        <>
+                          <UserPlus className="w-4 h-4 mr-1" />
+                          Requested
+                        </>
+                      );
+                    } else if (isPrivate) {
+                      buttonContent = (
+                        <>
+                          <UserPlus className="w-4 h-4 mr-1" />
+                          Request
+                        </>
+                      );
+                    } else {
+                      buttonContent = (
+                        <>
+                          <UserCheck className="w-4 h-4 mr-1" />
+                          Join
+                        </>
+                      );
+                    }
+
+                    return (
+                      <Card key={group.groupId} className="academic-card hover-lift">
+                        <CardHeader>
+                          <div className="flex items-start justify-between">
+                            <div className="flex-1">
+                              <div className="flex items-center space-x-2 mb-2">
+                                <CardTitle className="text-lg">{group.groupName}</CardTitle>
+                                {isPrivate ? (
+                                  <Lock className="w-4 h-4 text-muted-foreground" />
+                                ) : (
+                                  <Globe className="w-4 h-4 text-muted-foreground" />
+                                )}
+                              </div>
+                              {group.courseName && (
+                                <p className="text-sm text-muted-foreground mb-2">{group.courseName}</p>
                               )}
                             </div>
-                            {group.courseName && (
-                              <p className="text-sm text-muted-foreground mb-2">{group.courseName}</p>
-                            )}
                           </div>
-                        </div>
-                      </CardHeader>
+                        </CardHeader>
 
-                      <CardContent className="space-y-4">
-                        <p className="text-sm text-muted-foreground line-clamp-3">
-                          {group.description || 'This study group has no description yet.'}
-                        </p>
+                        <CardContent className="space-y-4">
+                          <p className="text-sm text-muted-foreground line-clamp-3">
+                            {group.description || 'This study group has no description yet.'}
+                          </p>
 
-                        <div className="flex items-center justify-between pt-4 border-t border-border">
-                          <div className="flex items-center space-x-4 text-sm text-muted-foreground">
-                            <Badge variant={group.privacyType === 'PUBLIC' ? 'default' : 'secondary'}>
-                              {group.privacyType}
-                            </Badge>
-                            {group.createdAt && (
-                              <span className="flex items-center gap-1">
-                                <Clock className="w-3 h-3" />
-                                {new Date(group.createdAt).toLocaleDateString()}
-                              </span>
-                            )}
+                          <div className="flex items-center justify-between pt-4 border-t border-border">
+                            <div className="flex items-center space-x-4 text-sm text-muted-foreground">
+                              <Badge variant={isPrivate ? 'secondary' : 'default'}>
+                                {group.privacyType}
+                              </Badge>
+                              {group.createdAt && (
+                                <span className="flex items-center gap-1">
+                                  <Clock className="w-3 h-3" />
+                                  {new Date(group.createdAt).toLocaleDateString()}
+                                </span>
+                              )}
+                            </div>
+
+                            <Button
+                              size="sm"
+                              variant={isPrivate ? 'outline' : 'default'}
+                              onClick={() => handleJoinGroup(group)}
+                              disabled={buttonDisabled}
+                            >
+                              {buttonContent}
+                            </Button>
                           </div>
-
-                          <Button 
-                            size="sm" 
-                            variant={group.privacyType === 'PRIVATE' ? 'outline' : 'default'}
-                            onClick={() => handleJoinGroup(group)}
-                            disabled={joiningGroupId === group.groupId}
-                          >
-                            {joiningGroupId === group.groupId ? (
-                              <Loader2 className="w-4 h-4 animate-spin" />
-                            ) : group.privacyType === 'PRIVATE' ? (
-                              <>
-                                <UserPlus className="w-4 h-4 mr-1" />
-                                Request
-                              </>
-                            ) : (
-                              <>
-                                <UserCheck className="w-4 h-4 mr-1" />
-                                Join
-                              </>
-                            )}
-                          </Button>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  ))}
+                        </CardContent>
+                      </Card>
+                    );
+                  })}
                 </div>
               </div>
             )}
@@ -548,7 +602,7 @@ export default function Groups() {
       </div>
 
       {/* Members Management Dialog */}
-      <Dialog open={isMembersDialogOpen} onOpenChange={setIsMembersDialogOpen}>
+  <Dialog open={isMembersDialogOpen} onOpenChange={handleMembersDialogOpenChange}>
         <DialogContent className="sm:max-w-2xl max-h-[80vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Manage Group Members</DialogTitle>
@@ -599,27 +653,31 @@ export default function Groups() {
                         </div>
                       </div>
 
-                      <div className="flex items-center space-x-2">
-                        {member.status === 'PENDING' && (
-                          <Button
-                            size="sm"
-                            variant="default"
-                            onClick={() => handleApproveMember(member.groupMemberId, member.userId)}
-                          >
-                            <UserCheck className="w-4 h-4 mr-1" />
-                            Approve
-                          </Button>
-                        )}
-                        {member.role !== 'ADMIN' && (
-                          <Button
-                            size="sm"
-                            variant="destructive"
-                            onClick={() => handleRemoveMember(member.groupMemberId, member.userId)}
-                          >
-                            Remove
-                          </Button>
-                        )}
-                      </div>
+                      {isAdminForManagingGroup ? (
+                        <div className="flex items-center space-x-2">
+                          {member.status === 'PENDING' && (
+                            <Button
+                              size="sm"
+                              variant="default"
+                              onClick={() => handleApproveMember(member.groupMemberId, member.userId)}
+                            >
+                              <UserCheck className="w-4 h-4 mr-1" />
+                              Approve
+                            </Button>
+                          )}
+                          {member.role !== 'ADMIN' && (
+                            <Button
+                              size="sm"
+                              variant="destructive"
+                              onClick={() => handleRemoveMember(member.groupMemberId, member.userId)}
+                            >
+                              Remove
+                            </Button>
+                          )}
+                        </div>
+                      ) : (
+                        <div className="text-sm text-muted-foreground">Only group admins can manage members</div>
+                      )}
                     </div>
                   ))}
               </div>
@@ -632,15 +690,19 @@ export default function Groups() {
           </div>
 
           <DialogFooter className="flex justify-between">
-            <Button 
-              variant="destructive" 
-              onClick={() => managingGroupId && handleDeleteGroup(managingGroupId)}
-              className="mr-auto"
-            >
-              <AlertCircle className="w-4 h-4 mr-1" />
-              Delete Group
-            </Button>
-            <Button variant="outline" onClick={() => setIsMembersDialogOpen(false)}>
+            {isAdminForManagingGroup ? (
+              <Button 
+                variant="destructive" 
+                onClick={() => managingGroupId && handleDeleteGroup(managingGroupId)}
+                className="mr-auto"
+              >
+                <AlertCircle className="w-4 h-4 mr-1" />
+                Delete Group
+              </Button>
+            ) : (
+              <div className="text-sm text-muted-foreground mr-auto">Only group admins can delete this group</div>
+            )}
+            <Button variant="outline" onClick={() => { setIsMembersDialogOpen(false); setIsAdminForManagingGroup(false); }}>
               Close
             </Button>
           </DialogFooter>

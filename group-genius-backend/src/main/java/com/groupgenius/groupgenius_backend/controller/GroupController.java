@@ -30,6 +30,7 @@ public class GroupController {
             @RequestParam(required = false) Long courseId,
             @RequestParam(required = false) String privacy,
             @RequestParam(required = false) String name,
+        @RequestParam(required = false) Long userId,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size,
             @RequestParam(defaultValue = "createdAt,desc") String sort
@@ -42,7 +43,7 @@ public class GroupController {
             } catch (Exception ignored) {
             }
             Pageable pageable = PageRequest.of(page, size, sortObj);
-            return ResponseEntity.ok(groupService.search(courseId, privacy, name, pageable));
+            return ResponseEntity.ok(groupService.search(courseId, privacy, name, userId, pageable));
         } catch (Exception ex) {
             log.error("Error while searching groups", ex);
             return ResponseEntity.status(500).body(java.util.Map.of("timestamp", java.time.OffsetDateTime.now().toString(), "status", 500, "error", "Internal Server Error", "path", "/api/groups", "message", ex.getMessage()));

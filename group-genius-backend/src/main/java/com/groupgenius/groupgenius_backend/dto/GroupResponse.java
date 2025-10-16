@@ -13,4 +13,6 @@ public class GroupResponse {
     private Long createdBy;
     private String privacyType;
     private java.time.LocalDateTime createdAt;
+    private String membershipStatus;
+    private String membershipRole;
 }

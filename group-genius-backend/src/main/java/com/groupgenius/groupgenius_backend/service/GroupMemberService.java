@@ -7,6 +7,8 @@ import com.groupgenius.groupgenius_backend.mapper.GroupMemberMapper;
 import com.groupgenius.groupgenius_backend.repository.*;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
@@ -16,6 +18,8 @@ import java.util.stream.Collectors;
 @Service
 @RequiredArgsConstructor
 public class GroupMemberService {
+
+        private static final Logger log = LoggerFactory.getLogger(GroupMemberService.class);
 
     private final GroupRepository groupRepository;
     private final UserRepository userRepository;
@@ -48,6 +52,7 @@ public class GroupMemberService {
 
     @Transactional
     public void approveMember(Long adminId, Long userId, Long groupId) {
+        log.info("approveMember called by adminId={} for userId={} in groupId={}", adminId, userId, groupId);
         User admin = userRepository.findById(adminId)
                 .orElseThrow(() -> new IllegalArgumentException("Admin not found"));
         Group group = groupRepository.findById(groupId)
@@ -67,10 +72,12 @@ public class GroupMemberService {
 
         memberToApprove.setStatus(GroupMember.Status.APPROVED);
         groupMemberRepository.save(memberToApprove);
+        log.info("User {} approved in group {} by admin {}", userId, groupId, adminId);
     }
 
     @Transactional
     public void removeMember(Long adminId, Long userId, Long groupId) {
+        log.info("removeMember called by adminId={} for userId={} in groupId={}", adminId, userId, groupId);
         User admin = userRepository.findById(adminId)
                 .orElseThrow(() -> new IllegalArgumentException("Admin not found"));
         Group group = groupRepository.findById(groupId)
@@ -88,7 +95,8 @@ public class GroupMemberService {
                         group)
                 .orElseThrow(() -> new GroupMemberNotFoundException("Member not found in this group"));
 
-        groupMemberRepository.delete(member);
+                groupMemberRepository.delete(member);
+                log.info("User {} removed from group {} by admin {}", userId, groupId, adminId);
     }
 
     public List<GroupMemberDto> getGroupMembers(Long groupId) {
