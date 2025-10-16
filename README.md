@@ -106,10 +106,3 @@ Uploaded files are stored in the `uploads/` folder by default. That folder is li
 - You can containerize the app or create a docker-compose for local dev that includes MySQL. If you want, I can add a `docker-compose.yml` that brings up the backend, frontend (or built static files served by a simple server) and a MySQL database.
 
 ---
-
-If you'd like, I can:
-
-- Add a `docker-compose.yml` for easy local setup.
-- Add a short developer-contributing.md with how to run unit tests and formatting/linting commands.
-
-If you want the README adjusted (more detail, screenshots, API docs), tell me which parts to expand.
