@@ -149,4 +149,22 @@ export const groupAPI = {
 
     return response.json();
   },
+
+  // Leave a group (user leaves their membership)
+  leaveGroup: async (token: string, groupId: number, userId: number) => {
+    const response = await fetch(`${API_BASE_URL}/groups/${groupId}/leave?userId=${userId}`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.message || 'Failed to leave group');
+    }
+
+    return response.json();
+  },
 };

@@ -147,6 +147,20 @@ public class GroupMemberService {
                 log.info("User {} removed from group {} by admin {}", userId, groupId, adminId);
     }
 
+            @Transactional
+            public void leaveGroup(Long userId, Long groupId) {
+                User user = userRepository.findById(userId)
+                        .orElseThrow(() -> new IllegalArgumentException("User not found"));
+                Group group = groupRepository.findById(groupId)
+                        .orElseThrow(() -> new GroupNotFoundException("Group not found"));
+
+                GroupMember member = groupMemberRepository.findByUserAndGroup(user, group)
+                        .orElseThrow(() -> new GroupMemberNotFoundException("Member not found in this group"));
+
+                groupMemberRepository.delete(member);
+                log.info("User {} left group {}", userId, groupId);
+            }
+
     public List<GroupMemberDto> getGroupMembers(Long groupId) {
         Group group = groupRepository.findById(groupId)
                 .orElseThrow(() -> new GroupNotFoundException("Group not found"));

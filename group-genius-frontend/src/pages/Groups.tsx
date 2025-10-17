@@ -348,6 +348,21 @@ export default function Groups() {
     }
   };
 
+  const handleLeaveGroup = async (groupId: number) => {
+    if (!user) return;
+    const token = tokenService.getToken();
+    if (!token) return;
+
+    try {
+      await groupAPI.leaveGroup(token, groupId, user.id);
+      toast({ title: 'Left group', description: 'You have successfully left the group.' });
+      await fetchGroups();
+    } catch (err) {
+      console.error('Failed to leave group', err);
+      toast({ title: 'Failed to leave', description: err instanceof Error ? err.message : 'Please try again.' });
+    }
+  };
+
   const handleApproveMember = async (memberId: number, userId: number) => {
     if (!user || !managingGroupId) return;
     if (!isAdminForManagingGroup) {
@@ -634,6 +649,11 @@ export default function Groups() {
                               'Manage'
                             )}
                           </Button>
+                          {group.createdBy !== user?.id && (
+                            <Button size="sm" variant="destructive" onClick={() => handleLeaveGroup(group.groupId)} className="ml-2">
+                              Exit
+                            </Button>
+                          )}
                         </div>
                       </CardContent>
                     </Card>
@@ -730,14 +750,21 @@ export default function Groups() {
                               )}
                             </div>
 
-                            <Button
-                              size="sm"
-                              variant={isPrivate ? 'outline' : 'default'}
-                              onClick={() => handleJoinGroup(group)}
-                              disabled={buttonDisabled}
-                            >
-                              {buttonContent}
-                            </Button>
+                            <div className="flex items-center gap-2">
+                              <Button
+                                size="sm"
+                                variant={isPrivate ? 'outline' : 'default'}
+                                onClick={() => handleJoinGroup(group)}
+                                disabled={buttonDisabled}
+                              >
+                                {buttonContent}
+                              </Button>
+                              {isJoined && (
+                                <Button size="sm" variant="destructive" onClick={() => handleLeaveGroup(group.groupId)}>
+                                  Exit
+                                </Button>
+                              )}
+                            </div>
                           </div>
                         </CardContent>
                       </Card>

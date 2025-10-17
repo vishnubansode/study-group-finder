@@ -70,6 +70,12 @@ public class GroupController {
         return ResponseEntity.ok(java.util.Map.of("success", true, "message", "Member approved"));
     }
 
+    @PostMapping("/{groupId}/leave")
+    public ResponseEntity<?> leaveGroup(@PathVariable Long groupId, @RequestParam Long userId) {
+        groupMemberService.leaveGroup(userId, groupId);
+        return ResponseEntity.ok(java.util.Map.of("success", true, "message", "Left group"));
+    }
+
     @DeleteMapping("/{groupId}/remove-member")
     public ResponseEntity<?> removeMember(@PathVariable Long groupId, @RequestParam Long adminId, @RequestParam Long userId) {
         groupMemberService.removeMember(adminId, userId, groupId);
