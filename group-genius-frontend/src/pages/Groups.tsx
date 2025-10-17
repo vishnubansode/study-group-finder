@@ -66,6 +66,9 @@ export default function Groups() {
   const [isLoadingMembers, setIsLoadingMembers] = useState(false);
   const [isMembersDialogOpen, setIsMembersDialogOpen] = useState(false);
   const [isAdminForManagingGroup, setIsAdminForManagingGroup] = useState(false);
+  const [leaveConfirmOpen, setLeaveConfirmOpen] = useState(false);
+  const [leaveTargetGroupId, setLeaveTargetGroupId] = useState<number | null>(null);
+  const [leaveTargetGroupName, setLeaveTargetGroupName] = useState<string | null>(null);
 
   const handleMembersDialogOpenChange = (open: boolean) => {
     setIsMembersDialogOpen(open);
@@ -363,6 +366,25 @@ export default function Groups() {
     }
   };
 
+  const openLeaveDialog = (groupId: number, groupName?: string) => {
+    setLeaveTargetGroupId(groupId);
+    setLeaveTargetGroupName(groupName ?? null);
+    setLeaveConfirmOpen(true);
+  };
+
+  const closeLeaveDialog = () => {
+    setLeaveConfirmOpen(false);
+    setLeaveTargetGroupId(null);
+    setLeaveTargetGroupName(null);
+  };
+
+  const confirmLeave = async () => {
+    if (!leaveTargetGroupId) return;
+    // close dialog first for snappy UX
+    closeLeaveDialog();
+    await handleLeaveGroup(leaveTargetGroupId);
+  };
+
   const handleApproveMember = async (memberId: number, userId: number) => {
     if (!user || !managingGroupId) return;
     if (!isAdminForManagingGroup) {
@@ -650,7 +672,7 @@ export default function Groups() {
                             )}
                           </Button>
                           {group.createdBy !== user?.id && (
-                            <Button size="sm" variant="destructive" onClick={() => handleLeaveGroup(group.groupId)} className="ml-2">
+                            <Button size="sm" variant="destructive" onClick={() => openLeaveDialog(group.groupId, group.groupName)} className="ml-2">
                               Exit
                             </Button>
                           )}
@@ -760,7 +782,7 @@ export default function Groups() {
                                 {buttonContent}
                               </Button>
                               {isJoined && (
-                                <Button size="sm" variant="destructive" onClick={() => handleLeaveGroup(group.groupId)}>
+                                <Button size="sm" variant="destructive" onClick={() => openLeaveDialog(group.groupId, group.groupName)}>
                                   Exit
                                 </Button>
                               )}
@@ -963,6 +985,22 @@ export default function Groups() {
           <DialogFooter className="flex justify-end gap-2">
             <Button variant="outline" onClick={() => { if (joinChoiceGroupId) sendRequestJoin(joinChoiceGroupId); }}>Request to Join</Button>
             <Button onClick={() => { setJoinChoiceDialogOpen(false); setPasswordForGroupId(joinChoiceGroupId); setJoinPassword(''); setPasswordDialogOpen(true); }}>Enter Password</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Leave confirmation dialog */}
+      <Dialog open={leaveConfirmOpen} onOpenChange={(open) => { if (!open) { closeLeaveDialog(); } setLeaveConfirmOpen(open); }}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Leave Group</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to leave {leaveTargetGroupName ? `"${leaveTargetGroupName}"` : 'this group'}? You can rejoin later if needed.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="flex justify-end gap-2">
+            <Button variant="outline" onClick={() => closeLeaveDialog()}>Cancel</Button>
+            <Button variant="destructive" onClick={() => confirmLeave()}>Leave</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

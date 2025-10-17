@@ -44,13 +44,10 @@ INSERT IGNORE INTO courses (course_code, course_name, description, current_enrol
 ('CS301','Database Systems','Relational databases, SQL, and design',0),
 ('MATH101','Calculus I','Limits, derivatives, integrals',0),
 ('PHYS101','General Physics I','Mechanics and thermodynamics',0);
-
--- Drop existing tables to recreate with new schema
-DROP TABLE IF EXISTS group_members;
-DROP TABLE IF EXISTS `groups`;
+;
 
 -- Groups table (core entity for study groups)
-CREATE TABLE `groups` (
+CREATE TABLE IF NOT EXISTS `groups` (
   id BIGINT NOT NULL AUTO_INCREMENT,
   group_name VARCHAR(150) NOT NULL,
   description TEXT,
@@ -67,7 +64,7 @@ CREATE TABLE `groups` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
 -- Group members table (mapped to Membership entity)
-CREATE TABLE group_members (
+CREATE TABLE IF NOT EXISTS group_members (
   id BIGINT NOT NULL AUTO_INCREMENT,
   group_id BIGINT NOT NULL,
   user_id BIGINT NOT NULL,
