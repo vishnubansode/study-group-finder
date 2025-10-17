@@ -40,6 +40,10 @@ public class Group {
     @Builder.Default
     private Set<GroupMember> members = new HashSet<>();
 
+    // Optional plain password for private groups (stored as plain text for simplicity)
+    @Column(name = "group_password")
+    private String groupPassword;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
 

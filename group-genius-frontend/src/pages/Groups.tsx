@@ -53,6 +53,8 @@ export default function Groups() {
   const [passwordDialogOpen, setPasswordDialogOpen] = useState(false);
   const [passwordForGroupId, setPasswordForGroupId] = useState<number | null>(null);
   const [joinPassword, setJoinPassword] = useState('');
+  const [joinChoiceDialogOpen, setJoinChoiceDialogOpen] = useState(false);
+  const [joinChoiceGroupId, setJoinChoiceGroupId] = useState<number | null>(null);
   const [managingGroupId, setManagingGroupId] = useState<number | null>(null);
   const [groupMembers, setGroupMembers] = useState<GroupMember[]>([]);
   const [isLoadingMembers, setIsLoadingMembers] = useState(false);
@@ -151,7 +153,13 @@ export default function Groups() {
       // Active status filter
       let matchesActive = true;
       if (appliedActiveStatus !== 'ANY') {
-        const last = group.lastMemberJoinedAt ? new Date(group.lastMemberJoinedAt) : null;
+        // lastMemberJoinedAt is not present on Group type in some API versions;
+        // use a type assertion and fall back to createdAt if not available.
+        const last = (group as any).lastMemberJoinedAt
+          ? new Date((group as any).lastMemberJoinedAt)
+          : group.createdAt
+          ? new Date(group.createdAt)
+          : null;
         const now = new Date();
         if (!last) {
           matchesActive = appliedActiveStatus === 'OLDER';
@@ -187,14 +195,15 @@ export default function Groups() {
     }
 
     try {
-      // If private and has password, prompt for it instead of firing request immediately
-      if (group.privacyType === 'PRIVATE' && group.hasPassword) {
-        setPasswordForGroupId(group.groupId);
-        setJoinPassword('');
-        setPasswordDialogOpen(true);
+      // If private, show a small choice dialog: request to join or enter password
+      const hasPassword = (group as any).hasPassword ?? (group as any).passwordProtected ?? false;
+      if (group.privacyType === 'PRIVATE') {
+        setJoinChoiceGroupId(group.groupId);
+        setJoinChoiceDialogOpen(true);
         return;
       }
 
+      // public group: directly join
       setJoiningGroupId(group.groupId);
       await groupAPI.joinGroup(token, group.groupId, user.id);
       
@@ -223,6 +232,26 @@ export default function Groups() {
     }
   };
 
+  const sendRequestJoin = async (groupId: number | null) => {
+    if (!user || !groupId) return;
+    const token = tokenService.getToken();
+    if (!token) return;
+
+    try {
+      setJoiningGroupId(groupId);
+      setJoinChoiceDialogOpen(false);
+      await groupAPI.joinGroup(token, groupId, user.id);
+      toast({ title: 'Request sent', description: 'Your request to join the group has been submitted.' });
+      await fetchGroups();
+    } catch (error) {
+      console.error('Failed to send join request:', error);
+      toast({ title: 'Failed to request join', description: error instanceof Error ? error.message : 'Please try again.' });
+    } finally {
+      setJoiningGroupId(null);
+      setJoinChoiceGroupId(null);
+    }
+  };
+
   const submitPasswordJoin = async () => {
     if (!user || !passwordForGroupId) return;
     const token = tokenService.getToken();
@@ -230,13 +259,23 @@ export default function Groups() {
 
     try {
       setJoiningGroupId(passwordForGroupId);
-      setPasswordDialogOpen(false);
+      // Attempt join with provided password
       await groupAPI.joinGroup(token, passwordForGroupId, user.id, joinPassword);
-      toast({ title: 'Join processed', description: 'Your join request was processed.' });
+      // success
+      toast({ title: 'Joined', description: 'You have successfully joined the group.' });
+      setPasswordDialogOpen(false);
       await fetchGroups();
     } catch (error) {
       console.error('Failed to join with password:', error);
-      toast({ title: 'Failed to join group', description: error instanceof Error ? error.message : 'Please try again.' });
+      const msg = error instanceof Error ? error.message : 'Please try again.';
+      if (msg && msg.toLowerCase().includes('invalid password')) {
+        toast({ title: 'Invalid password', description: 'Password is incorrect. Please try again or request to join.' });
+        // keep dialog open for retry
+      } else {
+        toast({ title: 'Failed to join group', description: msg });
+        // close dialog for other failures
+        setPasswordDialogOpen(false);
+      }
     } finally {
       setJoiningGroupId(null);
       setPasswordForGroupId(null);
@@ -385,6 +424,7 @@ export default function Groups() {
                     courseId: values.courseId ?? undefined,
                     createdBy: user.id,
                     privacy: values.privacy.toUpperCase(),
+                    password: values.privacy === 'private' ? values.password : undefined,
                   };
 
                   await groupAPI.createGroup(token, groupData as any);
@@ -815,6 +855,23 @@ export default function Groups() {
           <DialogFooter className="flex justify-end">
             <Button variant="outline" onClick={() => { setPasswordDialogOpen(false); setPasswordForGroupId(null); setJoinPassword(''); }}>Cancel</Button>
             <Button className="ml-2" onClick={() => submitPasswordJoin()}>Submit</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Join choice dialog for private groups: request or enter password */}
+      <Dialog open={joinChoiceDialogOpen} onOpenChange={(open) => { setJoinChoiceDialogOpen(open); if (!open) { setJoinChoiceGroupId(null); } }}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Private Group</DialogTitle>
+            <DialogDescription>
+              This is a private group. You can either request to join (owner approval required) or enter the group password (if you have it) to join immediately.
+            </DialogDescription>
+          </DialogHeader>
+
+          <DialogFooter className="flex justify-end gap-2">
+            <Button variant="outline" onClick={() => { if (joinChoiceGroupId) sendRequestJoin(joinChoiceGroupId); }}>Request to Join</Button>
+            <Button onClick={() => { setJoinChoiceDialogOpen(false); setPasswordForGroupId(joinChoiceGroupId); setJoinPassword(''); setPasswordDialogOpen(true); }}>Enter Password</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

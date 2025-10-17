@@ -9,4 +9,5 @@ public class GroupCreateRequest {
     private Long courseId;
     private Long createdBy;
     private String privacy;
+    private String password;
 }

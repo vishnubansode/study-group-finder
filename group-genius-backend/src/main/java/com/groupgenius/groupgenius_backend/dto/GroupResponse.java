@@ -15,4 +15,5 @@ public class GroupResponse {
     private java.time.LocalDateTime createdAt;
     private String membershipStatus;
     private String membershipRole;
+    private Boolean hasPassword;
 }

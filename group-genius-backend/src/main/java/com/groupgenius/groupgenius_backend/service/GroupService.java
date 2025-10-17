@@ -66,9 +66,14 @@ public class GroupService {
             courseRepository.findById(req.getCourseId()).ifPresent(groupBuilder::course);
         }
 
-        Group group = groupBuilder.build();
+        // If a password was provided and group is private, store it
+        if (req.getPassword() != null && !req.getPassword().isBlank() && req.getPrivacy() != null && req.getPrivacy().equals("PRIVATE")) {
+            groupBuilder.groupPassword(req.getPassword());
+        }
 
+        Group group = groupBuilder.build();
         Group savedGroup = groupRepository.save(group);
+
         groupMemberService.addAdminMember(savedGroup);
 
         return Optional.of(toDto(savedGroup));
@@ -137,6 +142,8 @@ public class GroupService {
             }
         }
 
+        boolean hasPassword = group.getGroupPassword() != null && !group.getGroupPassword().isEmpty();
+
         return GroupResponse.builder()
                 .groupId(group.getId())
                 .groupName(group.getGroupName())
@@ -147,6 +154,7 @@ public class GroupService {
                 .createdAt(group.getCreatedAt())
                 .membershipStatus(membershipStatus)
                 .membershipRole(membershipRole)
+                .hasPassword(hasPassword)
                 .build();
     }
 }

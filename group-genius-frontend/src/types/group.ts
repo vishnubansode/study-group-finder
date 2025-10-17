@@ -16,6 +16,7 @@ export interface GroupCreateRequest {
   courseId?: number;
   createdBy: number;
   privacy: 'PUBLIC' | 'PRIVATE';
+  password?: string;
 }
 
 export interface GroupMember {

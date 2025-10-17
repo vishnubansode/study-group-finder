@@ -27,6 +27,11 @@ public class GroupMemberService {
 
     @Transactional
     public void requestToJoin(Long userId, Long groupId) {
+        requestToJoin(userId, groupId, null);
+    }
+
+    @Transactional
+    public void requestToJoin(Long userId, Long groupId, String password) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new IllegalArgumentException("User not found"));
         Group group = groupRepository.findById(groupId)
@@ -35,15 +40,58 @@ public class GroupMemberService {
         groupMemberRepository.findByUserAndGroup(user, group)
                 .ifPresent(m -> { throw new DuplicateGroupMemberException("User already joined or pending approval"); });
 
-        GroupMember.Status status = group.getPrivacyType() == Group.PrivacyType.PUBLIC
-                ? GroupMember.Status.APPROVED
-                : GroupMember.Status.PENDING;
+        // Public groups: auto-approve
+        if (group.getPrivacyType() == Group.PrivacyType.PUBLIC) {
+            GroupMember gm = GroupMember.builder()
+                    .user(user)
+                    .group(group)
+                    .role(GroupMember.Role.MEMBER)
+                    .status(GroupMember.Status.APPROVED)
+                    .joinedAt(LocalDateTime.now())
+                    .build();
+            groupMemberRepository.save(gm);
+            return;
+        }
 
+        // Private groups: if password provided, validate and auto-approve; if incorrect, throw error; if no password, create PENDING
+        boolean hasPassword = group.getGroupPassword() != null && !group.getGroupPassword().isEmpty();
+        if (hasPassword) {
+            if (password == null || password.isEmpty()) {
+                // No password supplied -> create PENDING
+                GroupMember pending = GroupMember.builder()
+                        .user(user)
+                        .group(group)
+                        .role(GroupMember.Role.MEMBER)
+                        .status(GroupMember.Status.PENDING)
+                        .joinedAt(LocalDateTime.now())
+                        .build();
+                groupMemberRepository.save(pending);
+                return;
+            }
+
+            // Validate password - simple string comparison (no hashing)
+            if (!group.getGroupPassword().equals(password)) {
+                throw new IllegalArgumentException("Invalid password");
+            }
+
+            // Correct password -> approve
+            GroupMember approved = GroupMember.builder()
+                    .user(user)
+                    .group(group)
+                    .role(GroupMember.Role.MEMBER)
+                    .status(GroupMember.Status.APPROVED)
+                    .joinedAt(LocalDateTime.now())
+                    .build();
+            groupMemberRepository.save(approved);
+            return;
+        }
+
+        // Private but no password set: create PENDING
         GroupMember groupMember = GroupMember.builder()
                 .user(user)
                 .group(group)
                 .role(GroupMember.Role.MEMBER)
-                .status(status)
+                .status(GroupMember.Status.PENDING)
                 .joinedAt(LocalDateTime.now())
                 .build();
 

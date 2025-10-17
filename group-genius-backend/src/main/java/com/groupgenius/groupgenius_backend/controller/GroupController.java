@@ -59,9 +59,9 @@ public class GroupController {
 
     // Wrapper endpoints that reuse group membership service
     @PostMapping("/{groupId}/join")
-    public ResponseEntity<?> joinGroup(@PathVariable Long groupId, @RequestParam Long userId) {
-    groupMemberService.requestToJoin(userId, groupId);
-        return ResponseEntity.ok(java.util.Map.of("success", true, "message", "Join request submitted"));
+    public ResponseEntity<?> joinGroup(@PathVariable Long groupId, @RequestParam Long userId, @RequestParam(required = false) String password) {
+        groupMemberService.requestToJoin(userId, groupId, password);
+        return ResponseEntity.ok(java.util.Map.of("success", true, "message", "Join processed"));
     }
 
     @PostMapping("/{groupId}/approve")
