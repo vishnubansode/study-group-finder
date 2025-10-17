@@ -32,15 +32,27 @@ export default function Groups() {
   const { user } = useAuth();
   const { toast } = useToast();
   
-  const [searchQuery, setSearchQuery] = useState('');
-  const [selectedPrivacy, setSelectedPrivacy] = useState<string>('ALL');
-  const [selectedCourse, setSelectedCourse] = useState('All Courses');
+  // Pending (UI) filter inputs - update immediately as the user interacts
+  const [pendingSearchQuery, setPendingSearchQuery] = useState('');
+  const [pendingSelectedPrivacy, setPendingSelectedPrivacy] = useState<string>('ALL');
+  // Course selector: predefined options (primary/secondary faculty codes)
+  const [pendingSelectedCourse, setPendingSelectedCourse] = useState('All Courses');
+  const [pendingActiveStatus, setPendingActiveStatus] = useState<'ANY' | 'TODAY' | 'WEEK' | 'MONTH' | 'OLDER'>('ANY');
+
+  // Applied filters - used for actual filtering and fetching. These only update when "Apply Filters" is pressed.
+  const [appliedSearchQuery, setAppliedSearchQuery] = useState('');
+  const [appliedSelectedPrivacy, setAppliedSelectedPrivacy] = useState<string>('ALL');
+  const [appliedSelectedCourse, setAppliedSelectedCourse] = useState('All Courses');
+  const [appliedActiveStatus, setAppliedActiveStatus] = useState<'ANY' | 'TODAY' | 'WEEK' | 'MONTH' | 'OLDER'>('ANY');
   const [groups, setGroups] = useState<Group[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   
   // Join/Request functionality state
   const [joiningGroupId, setJoiningGroupId] = useState<number | null>(null);
+  const [passwordDialogOpen, setPasswordDialogOpen] = useState(false);
+  const [passwordForGroupId, setPasswordForGroupId] = useState<number | null>(null);
+  const [joinPassword, setJoinPassword] = useState('');
   const [managingGroupId, setManagingGroupId] = useState<number | null>(null);
   const [groupMembers, setGroupMembers] = useState<GroupMember[]>([]);
   const [isLoadingMembers, setIsLoadingMembers] = useState(false);
@@ -70,12 +82,13 @@ export default function Groups() {
   // const [isLoadingMembers, setIsLoadingMembers] = useState(false);
 
   useEffect(() => {
+    // initial load using the default applied filters
     if (user) {
       fetchGroups();
     }
   }, [user]);
 
-  const fetchGroups = async () => {
+  const fetchGroups = async (overrides?: { privacy?: string | undefined; name?: string | undefined }) => {
     if (!user) return;
 
     const token = tokenService.getToken();
@@ -87,10 +100,13 @@ export default function Groups() {
     try {
       setIsLoading(true);
       setError(null);
-      
+      // allow caller to override applied filters when fetching to avoid waiting for setState
+      const privacyParam = overrides?.privacy ?? (appliedSelectedPrivacy === 'ALL' ? undefined : appliedSelectedPrivacy);
+      const nameParam = overrides?.name ?? (appliedSearchQuery || undefined);
+
       const response = await groupAPI.searchGroups(token, {
-        privacy: selectedPrivacy === 'ALL' ? undefined : selectedPrivacy,
-        name: searchQuery || undefined,
+        privacy: privacyParam,
+        name: nameParam,
         page: 0,
         size: 50,
         userId: user.id,
@@ -108,18 +124,17 @@ export default function Groups() {
     }
   };
 
+  // Build course options dynamically from group.courseName so dropdown reflects real data
   const courseOptions = useMemo(() => {
     const uniqueCourses = new Set<string>();
-    groups.forEach((group) => {
-      if (group.courseName) {
-        uniqueCourses.add(group.courseName);
-      }
+    groups.forEach((g) => {
+      if (g.courseName) uniqueCourses.add(g.courseName);
     });
     return ['All Courses', ...Array.from(uniqueCourses).sort()];
   }, [groups]);
 
   const { myGroups, availableGroups } = useMemo(() => {
-    const query = searchQuery.trim().toLowerCase();
+    const query = appliedSearchQuery.trim().toLowerCase();
 
     const filtered = groups.filter((group) => {
       const matchesSearch =
@@ -128,19 +143,35 @@ export default function Groups() {
         group.description.toLowerCase().includes(query);
 
       const matchesCourse =
-        selectedCourse === 'All Courses' || group.courseName === selectedCourse;
+        appliedSelectedCourse === 'All Courses' || (group.courseName || '') === appliedSelectedCourse;
 
       const matchesPrivacy =
-        selectedPrivacy === 'ALL' || group.privacyType === selectedPrivacy;
+        appliedSelectedPrivacy === 'ALL' || group.privacyType === appliedSelectedPrivacy;
 
-      return matchesSearch && matchesCourse && matchesPrivacy;
+      // Active status filter
+      let matchesActive = true;
+      if (appliedActiveStatus !== 'ANY') {
+        const last = group.lastMemberJoinedAt ? new Date(group.lastMemberJoinedAt) : null;
+        const now = new Date();
+        if (!last) {
+          matchesActive = appliedActiveStatus === 'OLDER';
+        } else {
+          const diffDays = Math.floor((now.getTime() - last.getTime()) / (1000 * 60 * 60 * 24));
+          if (appliedActiveStatus === 'TODAY') matchesActive = diffDays === 0;
+          else if (appliedActiveStatus === 'WEEK') matchesActive = diffDays <= 7;
+          else if (appliedActiveStatus === 'MONTH') matchesActive = diffDays <= 30;
+          else if (appliedActiveStatus === 'OLDER') matchesActive = diffDays > 30;
+        }
+      }
+
+      return matchesSearch && matchesCourse && matchesPrivacy && matchesActive;
     });
 
     const myGroups = filtered.filter(group => group.createdBy === user?.id);
     const availableGroups = filtered.filter(group => group.createdBy !== user?.id);
 
     return { myGroups, availableGroups };
-  }, [groups, searchQuery, selectedCourse, selectedPrivacy, user?.id]);
+  }, [groups, appliedSearchQuery, appliedSelectedCourse, appliedSelectedPrivacy, appliedActiveStatus, user?.id]);
 
   // Join/Request handlers
   const handleJoinGroup = async (group: Group) => {
@@ -156,6 +187,14 @@ export default function Groups() {
     }
 
     try {
+      // If private and has password, prompt for it instead of firing request immediately
+      if (group.privacyType === 'PRIVATE' && group.hasPassword) {
+        setPasswordForGroupId(group.groupId);
+        setJoinPassword('');
+        setPasswordDialogOpen(true);
+        return;
+      }
+
       setJoiningGroupId(group.groupId);
       await groupAPI.joinGroup(token, group.groupId, user.id);
       
@@ -181,6 +220,27 @@ export default function Groups() {
       });
     } finally {
       setJoiningGroupId(null);
+    }
+  };
+
+  const submitPasswordJoin = async () => {
+    if (!user || !passwordForGroupId) return;
+    const token = tokenService.getToken();
+    if (!token) return;
+
+    try {
+      setJoiningGroupId(passwordForGroupId);
+      setPasswordDialogOpen(false);
+      await groupAPI.joinGroup(token, passwordForGroupId, user.id, joinPassword);
+      toast({ title: 'Join processed', description: 'Your join request was processed.' });
+      await fetchGroups();
+    } catch (error) {
+      console.error('Failed to join with password:', error);
+      toast({ title: 'Failed to join group', description: error instanceof Error ? error.message : 'Please try again.' });
+    } finally {
+      setJoiningGroupId(null);
+      setPasswordForGroupId(null);
+      setJoinPassword('');
     }
   };
 
@@ -355,16 +415,16 @@ export default function Groups() {
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground w-4 h-4" />
                   <Input
                     placeholder="Search groups, courses, or topics..."
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
+                    value={pendingSearchQuery}
+                    onChange={(e) => setPendingSearchQuery(e.target.value)}
                     className="pl-10"
                   />
                 </div>
               </div>
               <div className="flex flex-col sm:flex-row gap-3">
                 <select
-                  value={selectedCourse}
-                  onChange={(e) => setSelectedCourse(e.target.value)}
+                  value={pendingSelectedCourse}
+                  onChange={(e) => setPendingSelectedCourse(e.target.value)}
                   className="px-4 py-2 rounded-lg border border-border bg-background text-foreground"
                 >
                   {courseOptions.map((course) => (
@@ -374,14 +434,42 @@ export default function Groups() {
                   ))}
                 </select>
                 <select
-                  value={selectedPrivacy}
-                  onChange={(e) => setSelectedPrivacy(e.target.value)}
+                  value={pendingSelectedPrivacy}
+                  onChange={(e) => setPendingSelectedPrivacy(e.target.value)}
                   className="px-4 py-2 rounded-lg border border-border bg-background text-foreground"
                 >
                   <option value="ALL">All Groups</option>
                   <option value="PUBLIC">Public</option>
                   <option value="PRIVATE">Private</option>
                 </select>
+                <select
+                  value={pendingActiveStatus}
+                  onChange={(e) => setPendingActiveStatus(e.target.value as any)}
+                  className="px-4 py-2 rounded-lg border border-border bg-background text-foreground"
+                >
+                  <option value="ANY">Any Activity</option>
+                  <option value="TODAY">Active Today</option>
+                  <option value="WEEK">Active This Week</option>
+                  <option value="MONTH">Active This Month</option>
+                  <option value="OLDER">Older</option>
+                </select>
+
+                <Button
+                  variant="default"
+                  onClick={async () => {
+                    // Apply the pending UI filters to the applied filters and fetch
+                    setAppliedSearchQuery(pendingSearchQuery);
+                    setAppliedSelectedCourse(pendingSelectedCourse);
+                    setAppliedSelectedPrivacy(pendingSelectedPrivacy);
+                    setAppliedActiveStatus(pendingActiveStatus);
+
+                    // Call fetchGroups with overrides so we don't wait for state to flush
+                    await fetchGroups({ privacy: pendingSelectedPrivacy === 'ALL' ? undefined : pendingSelectedPrivacy, name: pendingSearchQuery || undefined });
+                  }}
+                  className="px-4 py-2"
+                >
+                  Apply Filters
+                </Button>
               </div>
             </div>
           </CardContent>
@@ -705,6 +793,28 @@ export default function Groups() {
             <Button variant="outline" onClick={() => { setIsMembersDialogOpen(false); setIsAdminForManagingGroup(false); }}>
               Close
             </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Join with password dialog for private groups */}
+      <Dialog open={passwordDialogOpen} onOpenChange={(open) => { setPasswordDialogOpen(open); if (!open) { setPasswordForGroupId(null); setJoinPassword(''); } }}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Enter Group Password</DialogTitle>
+            <DialogDescription>
+              This group requires a password. Enter the password to join immediately, or your request will be sent for approval.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <Label>Group Password</Label>
+            <Input type="password" value={joinPassword} onChange={(e) => setJoinPassword(e.target.value)} />
+          </div>
+
+          <DialogFooter className="flex justify-end">
+            <Button variant="outline" onClick={() => { setPasswordDialogOpen(false); setPasswordForGroupId(null); setJoinPassword(''); }}>Cancel</Button>
+            <Button className="ml-2" onClick={() => submitPasswordJoin()}>Submit</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

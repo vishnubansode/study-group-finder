@@ -52,8 +52,11 @@ export const groupAPI = {
   },
 
   // Join a group
-  joinGroup: async (token: string, groupId: number, userId: number) => {
-    const response = await fetch(`${API_BASE_URL}/groups/${groupId}/join?userId=${userId}`, {
+  joinGroup: async (token: string, groupId: number, userId: number, password?: string) => {
+    const params = new URLSearchParams();
+    params.append('userId', String(userId));
+    if (password) params.append('password', password);
+    const response = await fetch(`${API_BASE_URL}/groups/${groupId}/join?${params.toString()}`, {
       method: 'POST',
       headers: {
         Authorization: `Bearer ${token}`,
