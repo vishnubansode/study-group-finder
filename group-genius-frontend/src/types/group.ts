@@ -8,6 +8,7 @@ export interface Group {
   createdAt?: string; // backend returns createdAt as LocalDateTime
   membershipStatus?: 'APPROVED' | 'PENDING' | 'NOT_MEMBER' | null;
   membershipRole?: 'ADMIN' | 'MEMBER' | null;
+  memberCount?: number;
 }
 
 export interface GroupCreateRequest {

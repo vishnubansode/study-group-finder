@@ -4,7 +4,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Shield, Plus, Lock, Eye, EyeOff } from 'lucide-react';
+import { Shield, Plus, Lock, Eye, EyeOff, Check, X } from 'lucide-react';
 import { courseApi } from '@/lib/api/courseApi';
 import { useAuth } from '@/contexts/AuthContext';
 
@@ -190,16 +190,41 @@ export function GroupCreateDialog({ courseOptions, onCreate }: GroupCreateDialog
                 </button>
               </div>
               <div className="mt-2">
-                <div className="h-2 w-full bg-gray-200 rounded overflow-hidden">
-                  <div
-                    className={`h-2 rounded ${passwordStrength <= 1 ? 'bg-red-500' : passwordStrength === 2 ? 'bg-yellow-400' : 'bg-green-500'}`}
-                    style={{ width: `${(passwordStrength / 4) * 100}%` }}
-                  />
-                </div>
-                <p className="text-xs text-muted-foreground mt-1">
-                  {passwordStrength <= 1 ? 'Weak password (try at least 8 chars, add numbers or symbols)' : passwordStrength === 2 ? 'Medium strength' : 'Strong password'}
-                </p>
-                <p className="text-xs text-muted-foreground">
+                <ul className="space-y-1 text-sm">
+                  <li className="flex items-start gap-2">
+                    {values.password && values.password.length >= 8 ? (
+                      <Check className="w-4 h-4 text-green-600 mt-1" />
+                    ) : (
+                      <X className="w-4 h-4 text-red-600 mt-1" />
+                    )}
+                    <span>Minimum 8 characters</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    {/[A-Z]/.test(values.password || '') ? (
+                      <Check className="w-4 h-4 text-green-600 mt-1" />
+                    ) : (
+                      <X className="w-4 h-4 text-red-600 mt-1" />
+                    )}
+                    <span>At least one uppercase letter (A-Z)</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    {/[0-9]/.test(values.password || '') ? (
+                      <Check className="w-4 h-4 text-green-600 mt-1" />
+                    ) : (
+                      <X className="w-4 h-4 text-red-600 mt-1" />
+                    )}
+                    <span>At least one number (0-9)</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    {/[^A-Za-z0-9]/.test(values.password || '') ? (
+                      <Check className="w-4 h-4 text-green-600 mt-1" />
+                    ) : (
+                      <X className="w-4 h-4 text-red-600 mt-1" />
+                    )}
+                    <span>At least one special character (e.g. @#$%&*!^)</span>
+                  </li>
+                </ul>
+                <p className="text-xs text-muted-foreground mt-2">
                   Members will need this password to join the group
                 </p>
               </div>

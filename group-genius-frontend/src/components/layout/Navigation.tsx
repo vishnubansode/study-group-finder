@@ -30,6 +30,21 @@ export function Navigation() {
   const location = useLocation();
   const { user, logout } = useAuth();
 
+  const displayName = user ? `${user.firstName || ''} ${user.lastName || ''}`.trim() : '';
+  const initials = user ? `${user.firstName?.charAt(0) ?? ''}${user.lastName?.charAt(0) ?? ''}`.toUpperCase() : '';
+  // Build image src: prefer `avatar` then `profileImageUrl`. If value is a full URL, use it as-is.
+  const rawImageValue = user?.avatar || user?.profileImageUrl || undefined;
+  let imageSrc: string | undefined = undefined;
+  if (rawImageValue) {
+    if (rawImageValue.startsWith('http://') || rawImageValue.startsWith('https://')) {
+      imageSrc = rawImageValue;
+    } else {
+      // Backend stores path or filename; follow same pattern as Profile.tsx
+      const filename = rawImageValue.split('/').pop();
+      imageSrc = filename ? `http://localhost:8080/api/files/${filename}` : undefined;
+    }
+  }
+
   // Create dynamic menu items with user-specific dashboard URL
   const getDynamicMenuItems = () => {
     if (!user) return [navigationItems[0], navigationItems[navigationItems.length - 1]]; // Home and Contact for guests
@@ -110,7 +125,19 @@ export function Navigation() {
             <Bell className="w-5 h-5" />
             <div className="absolute -top-1 -right-1 w-3 h-3 bg-accent rounded-full" />
           </Button>
-          <Button variant="outline" onClick={logout}>Sign Out</Button>
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2">
+              {imageSrc ? (
+                <img src={imageSrc} alt="Profile" className="w-8 h-8 rounded-full object-cover" onError={(e) => { e.currentTarget.style.display = 'none'; }} />
+              ) : (
+                <div className="w-8 h-8 rounded-full bg-primary/10 text-primary flex items-center justify-center text-sm font-medium">
+                  {initials}
+                </div>
+              )}
+              <span className="text-sm font-medium">{displayName}</span>
+            </div>
+            <Button variant="outline" onClick={logout}>Sign Out</Button>
+          </div>
         </div>
       </nav>
 

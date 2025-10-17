@@ -39,13 +39,24 @@ export default function Groups() {
   const [pendingSelectedPrivacy, setPendingSelectedPrivacy] = useState<string>('ALL');
   // Course selector: predefined options (primary/secondary faculty codes)
   const [pendingSelectedCourse, setPendingSelectedCourse] = useState('All Courses');
+  const [pendingSelectedSize, setPendingSelectedSize] = useState<string>('ALL');
   const [pendingActiveStatus, setPendingActiveStatus] = useState<'ANY' | 'TODAY' | 'WEEK' | 'MONTH' | 'OLDER'>('ANY');
+
+  // New filter controls: member count and date filters
+  const [pendingMemberFilterType, setPendingMemberFilterType] = useState<string>('ANY'); // ANY | BELOW | ABOVE | BETWEEN
+  const [pendingMemberValue1, setPendingMemberValue1] = useState<string>('');
+  const [pendingMemberValue2, setPendingMemberValue2] = useState<string>('');
+
+  const [pendingDateFilterType, setPendingDateFilterType] = useState<string>('ANY'); // ANY | BEFORE | AFTER | BETWEEN
+  const [pendingDateValue1, setPendingDateValue1] = useState<string>('');
+  const [pendingDateValue2, setPendingDateValue2] = useState<string>('');
 
   // Applied filters - used for actual filtering and fetching. These only update when "Apply Filters" is pressed.
   const [appliedSearchQuery, setAppliedSearchQuery] = useState('');
   const [appliedSelectedPrivacy, setAppliedSelectedPrivacy] = useState<string>('ALL');
   const [appliedSelectedCourse, setAppliedSelectedCourse] = useState('All Courses');
   const [appliedActiveStatus, setAppliedActiveStatus] = useState<'ANY' | 'TODAY' | 'WEEK' | 'MONTH' | 'OLDER'>('ANY');
+  const [appliedSelectedSize, setAppliedSelectedSize] = useState<string>('ALL');
   const [groups, setGroups] = useState<Group[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -99,7 +110,7 @@ export default function Groups() {
     }
   }, [user]);
 
-  const fetchGroups = async (overrides?: { privacy?: string | undefined; name?: string | undefined }) => {
+  const fetchGroups = async (overrides?: { privacy?: string | undefined; name?: string | undefined; size?: string | undefined; minMembers?: number; maxMembers?: number; dateBefore?: string; dateAfter?: string }) => {
     if (!user) return;
 
     const token = tokenService.getToken();
@@ -124,8 +135,67 @@ export default function Groups() {
       });
       
       // Handle paginated response
-      const groupsData = response.content || response;
-      setGroups(Array.isArray(groupsData) ? groupsData : []);
+      let groupsData = response.content || response;
+      groupsData = Array.isArray(groupsData) ? groupsData : [];
+
+      // Fetch member counts for these groups and attach memberCount
+      const countsMap = new Map<number, number>();
+      const countPromises = groupsData.map((g: any) =>
+        groupAPI.getGroupMembers(token, g.groupId).then((members) => {
+          const c = Array.isArray(members) ? members.length : 0;
+          countsMap.set(g.groupId, c);
+          g.memberCount = c;
+        }).catch(() => {
+          countsMap.set(g.groupId, 0);
+          g.memberCount = 0;
+        })
+      );
+      await Promise.all(countPromises);
+
+      // Member count filter: use overrides.minMembers / maxMembers when provided
+      const minMembers = overrides?.minMembers;
+      const maxMembers = overrides?.maxMembers;
+      if (minMembers !== undefined || maxMembers !== undefined) {
+        groupsData = groupsData.filter((g: any) => {
+          const c = countsMap.get(g.groupId) ?? 0;
+          if (minMembers !== undefined && c < minMembers) return false;
+          if (maxMembers !== undefined && c > maxMembers) return false;
+          return true;
+        });
+      } else {
+        // Backwards-compatible size shortcut (old preset ranges)
+        const sizeFilter = overrides?.size ?? appliedSelectedSize;
+        if (sizeFilter && sizeFilter !== 'ALL') {
+          const matchesSize = (count: number) => {
+            if (sizeFilter === '1-5') return count >= 1 && count <= 5;
+            if (sizeFilter === '6-10') return count >= 6 && count <= 10;
+            if (sizeFilter === '11-20') return count >= 11 && count <= 20;
+            if (sizeFilter === '21+') return count >= 21;
+            return true;
+          };
+
+          groupsData = groupsData.filter((g: any) => matchesSize(countsMap.get(g.groupId) ?? 0));
+        }
+      }
+
+      // Date filters: dateBefore / dateAfter operate on group's lastMemberJoinedAt or createdAt
+      const dateBefore = overrides?.dateBefore ? new Date(overrides.dateBefore) : undefined;
+      const dateAfter = overrides?.dateAfter ? new Date(overrides.dateAfter) : undefined;
+      if (dateBefore || dateAfter) {
+        groupsData = groupsData.filter((g: any) => {
+          const last = (g as any).lastMemberJoinedAt
+            ? new Date((g as any).lastMemberJoinedAt)
+            : g.createdAt
+            ? new Date(g.createdAt)
+            : null;
+          if (!last) return false;
+          if (dateBefore && last > dateBefore) return false;
+          if (dateAfter && last < dateAfter) return false;
+          return true;
+        });
+      }
+
+      setGroups(groupsData);
     } catch (err) {
       console.error('Failed to load study groups:', err);
       setError(err instanceof Error ? err.message : 'Unable to load study groups.');
@@ -351,6 +421,7 @@ export default function Groups() {
     }
   };
 
+
   const handleLeaveGroup = async (groupId: number) => {
     if (!user) return;
     const token = tokenService.getToken();
@@ -517,73 +588,240 @@ export default function Groups() {
       </div>
 
       <div className="max-w-6xl mx-auto px-6 py-8">
-        <Card className="academic-card mb-8">
-          <CardContent className="p-6">
-            <div className="flex flex-col lg:flex-row gap-4">
-              <div className="flex-1">
-                <div className="relative">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground w-4 h-4" />
-                  <Input
-                    placeholder="Search groups, courses, or topics..."
-                    value={pendingSearchQuery}
-                    onChange={(e) => setPendingSearchQuery(e.target.value)}
-                    className="pl-10"
-                  />
+        {/* Modern Search & Filter Section */}
+        <div className="bg-white/50 backdrop-blur-sm border border-border rounded-xl shadow-sm mb-8 overflow-hidden">
+          {/* Search Bar */}
+          <div className="bg-gradient-to-r from-primary/5 to-primary/10 p-6 border-b">
+            <div className="relative max-w-2xl">
+              <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground w-5 h-5" />
+              <Input
+                placeholder="Search study groups, courses, or topics..."
+                value={pendingSearchQuery}
+                onChange={(e) => setPendingSearchQuery(e.target.value)}
+                className="pl-12 h-12 text-base border-0 bg-white/80 backdrop-blur-sm shadow-sm focus:shadow-md transition-all"
+              />
+            </div>
+          </div>
+
+          {/* Filter Controls */}
+          <div className="p-6">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              
+              {/* Basic Filters */}
+              <div className="space-y-4">
+                <div className="flex items-center gap-2 text-sm font-medium text-foreground">
+                  <Filter className="w-4 h-4" />
+                  Basic Filters
+                </div>
+                <div className="space-y-3">
+                  <div>
+                    <label className="block text-xs font-medium text-muted-foreground mb-1">Course</label>
+                    <Select value={pendingSelectedCourse} onValueChange={setPendingSelectedCourse}>
+                      <SelectTrigger className="h-9">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {courseOptions.map((course) => (
+                          <SelectItem key={course} value={course}>
+                            {course}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-muted-foreground mb-1">Privacy</label>
+                    <Select value={pendingSelectedPrivacy} onValueChange={setPendingSelectedPrivacy}>
+                      <SelectTrigger className="h-9">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="ALL">All Groups</SelectItem>
+                        <SelectItem value="PUBLIC">
+                          <div className="flex items-center gap-2">
+                            <Globe className="w-3 h-3" />
+                            Public
+                          </div>
+                        </SelectItem>
+                        <SelectItem value="PRIVATE">
+                          <div className="flex items-center gap-2">
+                            <Lock className="w-3 h-3" />
+                            Private
+                          </div>
+                        </SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
                 </div>
               </div>
-              <div className="flex flex-col sm:flex-row gap-3">
-                <select
-                  value={pendingSelectedCourse}
-                  onChange={(e) => setPendingSelectedCourse(e.target.value)}
-                  className="px-4 py-2 rounded-lg border border-border bg-background text-foreground"
-                >
-                  {courseOptions.map((course) => (
-                    <option key={course} value={course}>
-                      {course}
-                    </option>
-                  ))}
-                </select>
-                <select
-                  value={pendingSelectedPrivacy}
-                  onChange={(e) => setPendingSelectedPrivacy(e.target.value)}
-                  className="px-4 py-2 rounded-lg border border-border bg-background text-foreground"
-                >
-                  <option value="ALL">All Groups</option>
-                  <option value="PUBLIC">Public</option>
-                  <option value="PRIVATE">Private</option>
-                </select>
-                <select
-                  value={pendingActiveStatus}
-                  onChange={(e) => setPendingActiveStatus(e.target.value as any)}
-                  className="px-4 py-2 rounded-lg border border-border bg-background text-foreground"
-                >
-                  <option value="ANY">Any Activity</option>
-                  <option value="TODAY">Active Today</option>
-                  <option value="WEEK">Active This Week</option>
-                  <option value="MONTH">Active This Month</option>
-                  <option value="OLDER">Older</option>
-                </select>
 
-                <Button
-                  variant="default"
-                  onClick={async () => {
-                    // Apply the pending UI filters to the applied filters and fetch
-                    setAppliedSearchQuery(pendingSearchQuery);
-                    setAppliedSelectedCourse(pendingSelectedCourse);
-                    setAppliedSelectedPrivacy(pendingSelectedPrivacy);
-                    setAppliedActiveStatus(pendingActiveStatus);
+              <div className="space-y-6">
+                {/* Member Count Filter */}
+                <div className="space-y-4">
+                  <div className="flex items-center gap-2 text-sm font-medium text-foreground">
+                    <Users className="w-4 h-4" />
+                    Group Size
+                  </div>
+                  <div className="flex gap-3 items-end">
+                    <div className="flex-1">
+                      <label className="block text-xs font-medium text-muted-foreground mb-1">Filter Type</label>
+                      <Select value={pendingMemberFilterType} onValueChange={setPendingMemberFilterType}>
+                        <SelectTrigger className="h-9">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="ANY">Any Size</SelectItem>
+                          <SelectItem value="BELOW">Below</SelectItem>
+                          <SelectItem value="ABOVE">Above</SelectItem>
+                          <SelectItem value="BETWEEN">Between</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    {pendingMemberFilterType !== 'ANY' && (
+                      <div className={pendingMemberFilterType === 'BETWEEN' ? 'flex gap-2' : ''}>
+                        <div>
+                          <label className="block text-xs font-medium text-muted-foreground mb-1">
+                            {pendingMemberFilterType === 'BETWEEN' ? 'Min' : 'Count'}
+                          </label>
+                          <Input
+                            type="number"
+                            min={0}
+                            value={pendingMemberValue1}
+                            onChange={(e) => setPendingMemberValue1(e.target.value)}
+                            placeholder="0"
+                            className="h-9 w-20"
+                          />
+                        </div>
+                        {pendingMemberFilterType === 'BETWEEN' && (
+                          <div>
+                            <label className="block text-xs font-medium text-muted-foreground mb-1">Max</label>
+                            <Input
+                              type="number"
+                              min={0}
+                              value={pendingMemberValue2}
+                              onChange={(e) => setPendingMemberValue2(e.target.value)}
+                              placeholder="100"
+                              className="h-9 w-20"
+                            />
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </div>
 
-                    // Call fetchGroups with overrides so we don't wait for state to flush
-                    await fetchGroups({ privacy: pendingSelectedPrivacy === 'ALL' ? undefined : pendingSelectedPrivacy, name: pendingSearchQuery || undefined });
-                  }}
-                  className="px-4 py-2"
-                >
-                  Apply Filters
-                </Button>
+                {/* Date Filter */}
+                <div className="space-y-4">
+                  <div className="flex items-center gap-2 text-sm font-medium text-foreground">
+                    <CalendarIcon className="w-4 h-4" />
+                    Activity Date
+                  </div>
+                  <div className="flex gap-3 items-end">
+                    <div className="flex-1">
+                      <label className="block text-xs font-medium text-muted-foreground mb-1">Filter Type</label>
+                      <Select value={pendingDateFilterType} onValueChange={setPendingDateFilterType}>
+                        <SelectTrigger className="h-9">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="ANY">Any Date</SelectItem>
+                          <SelectItem value="BEFORE">Before</SelectItem>
+                          <SelectItem value="AFTER">After</SelectItem>
+                          <SelectItem value="BETWEEN">Between</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    {pendingDateFilterType !== 'ANY' && (
+                      <div className={pendingDateFilterType === 'BETWEEN' ? 'flex gap-2' : ''}>
+                        <div>
+                          <label className="block text-xs font-medium text-muted-foreground mb-1">
+                            {pendingDateFilterType === 'BETWEEN' ? 'From' : 'Date'}
+                          </label>
+                          <Input
+                            type="date"
+                            value={pendingDateValue1}
+                            onChange={(e) => setPendingDateValue1(e.target.value)}
+                            className="h-9 w-36"
+                          />
+                        </div>
+                        {pendingDateFilterType === 'BETWEEN' && (
+                          <div>
+                            <label className="block text-xs font-medium text-muted-foreground mb-1">To</label>
+                            <Input
+                              type="date"
+                              value={pendingDateValue2}
+                              onChange={(e) => setPendingDateValue2(e.target.value)}
+                              className="h-9 w-36"
+                            />
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </div>
               </div>
             </div>
-          </CardContent>
-        </Card>
+
+            {/* Apply Button */}
+            <div className="flex justify-center pt-6 border-t mt-6">
+              <Button
+                size="lg"
+                onClick={async () => {
+                  // Apply the pending UI filters to the applied filters and fetch
+                  setAppliedSearchQuery(pendingSearchQuery);
+                  setAppliedSelectedCourse(pendingSelectedCourse);
+                  setAppliedSelectedPrivacy(pendingSelectedPrivacy);
+
+                  // Build overrides for fetchGroups
+                  const overrides: any = {
+                    privacy: pendingSelectedPrivacy === 'ALL' ? undefined : pendingSelectedPrivacy,
+                    name: pendingSearchQuery || undefined,
+                  };
+
+                  // Member overrides (normalize BETWEEN)
+                  if (pendingMemberFilterType === 'BELOW' && pendingMemberValue1) {
+                    overrides.maxMembers = Number(pendingMemberValue1);
+                  } else if (pendingMemberFilterType === 'ABOVE' && pendingMemberValue1) {
+                    overrides.minMembers = Number(pendingMemberValue1);
+                  } else if (pendingMemberFilterType === 'BETWEEN' && pendingMemberValue1 && pendingMemberValue2) {
+                    let a = Number(pendingMemberValue1);
+                    let b = Number(pendingMemberValue2);
+                    if (a > b) [a, b] = [b, a];
+                    overrides.minMembers = a;
+                    overrides.maxMembers = b;
+                  }
+
+                  // Date overrides
+                  if (pendingDateFilterType === 'BEFORE' && pendingDateValue1) {
+                    overrides.dateBefore = pendingDateValue1;
+                  } else if (pendingDateFilterType === 'AFTER' && pendingDateValue1) {
+                    overrides.dateAfter = pendingDateValue1;
+                  } else if (pendingDateFilterType === 'BETWEEN' && pendingDateValue1 && pendingDateValue2) {
+                    // treat BETWEEN as dateAfter = start, dateBefore = end; normalize order without mutating React state
+                    const start = pendingDateValue1;
+                    const end = pendingDateValue2;
+                    let normalizedStart = start;
+                    let normalizedEnd = end;
+                    const d1 = new Date(start);
+                    const d2 = new Date(end);
+                    if (d1 > d2) {
+                      normalizedStart = end;
+                      normalizedEnd = start;
+                    }
+                    overrides.dateAfter = normalizedStart;
+                    overrides.dateBefore = normalizedEnd;
+                  }
+
+                  await fetchGroups(overrides);
+                }}
+                className="px-8 py-3 shadow-lg hover:shadow-xl transition-all"
+              >
+                <Search className="w-4 h-4 mr-2" />
+                Apply Filters
+              </Button>
+            </div>
+          </div>
+        </div>
 
         <div className="mb-6">
           <p className="text-muted-foreground">
@@ -638,6 +876,7 @@ export default function Groups() {
                               <p className="text-sm text-muted-foreground mb-2">{group.courseName}</p>
                             )}
                           </div>
+                          {/* owner-only edit removed per request */}
                         </div>
                       </CardHeader>
 
@@ -659,18 +898,23 @@ export default function Groups() {
                             )}
                           </div>
 
-                          <Button 
-                            size="sm" 
-                            variant="default" 
-                            onClick={() => handleManageGroup(group)}
-                            disabled={isLoadingMembers && managingGroupId === group.groupId}
-                          >
-                            {isLoadingMembers && managingGroupId === group.groupId ? (
-                              <Loader2 className="w-4 h-4 animate-spin" />
-                            ) : (
-                              'Manage'
-                            )}
-                          </Button>
+                          <div className="relative inline-block">
+                            <Button 
+                              size="sm" 
+                              variant="default" 
+                              onClick={() => handleManageGroup(group)}
+                              disabled={isLoadingMembers && managingGroupId === group.groupId}
+                            >
+                              {isLoadingMembers && managingGroupId === group.groupId ? (
+                                <Loader2 className="w-4 h-4 animate-spin" />
+                              ) : (
+                                'Manage'
+                              )}
+                            </Button>
+                            <span className="absolute -top-2 -right-2 w-5 h-5 flex items-center justify-center rounded-full bg-primary text-white text-[10px] font-medium">
+                              {group.memberCount ?? 0}
+                            </span>
+                          </div>
                           {group.createdBy !== user?.id && (
                             <Button size="sm" variant="destructive" onClick={() => openLeaveDialog(group.groupId, group.groupName)} className="ml-2">
                               Exit
@@ -751,6 +995,14 @@ export default function Groups() {
                                 <p className="text-sm text-muted-foreground mb-2">{group.courseName}</p>
                               )}
                             </div>
+                            {/* Show Exit at top-right for joined available groups */}
+                            {isJoined && (
+                              <div className="ml-4">
+                                <Button size="sm" variant="destructive" onClick={() => openLeaveDialog(group.groupId, group.groupName)} aria-label="Exit group">
+                                  Exit
+                                </Button>
+                              </div>
+                            )}
                           </div>
                         </CardHeader>
 
@@ -773,6 +1025,18 @@ export default function Groups() {
                             </div>
 
                             <div className="flex items-center gap-2">
+                              <div className="relative inline-block">
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => handleManageGroup(group)}
+                                >
+                                  Members
+                                </Button>
+                                <span className="absolute -top-2 -right-2 w-5 h-5 flex items-center justify-center rounded-full bg-primary text-white text-[10px] font-medium">
+                                  {group.memberCount ?? 0}
+                                </span>
+                              </div>
                               <Button
                                 size="sm"
                                 variant={isPrivate ? 'outline' : 'default'}
@@ -781,11 +1045,7 @@ export default function Groups() {
                               >
                                 {buttonContent}
                               </Button>
-                              {isJoined && (
-                                <Button size="sm" variant="destructive" onClick={() => openLeaveDialog(group.groupId, group.groupName)}>
-                                  Exit
-                                </Button>
-                              )}
+                              {/* bottom Exit removed for joined available groups (moved to header) */}
                             </div>
                           </div>
                         </CardContent>
@@ -935,7 +1195,7 @@ export default function Groups() {
               <Input
                 type={passwordVisible ? 'text' : 'password'}
                 value={joinPassword}
-                onChange={(e) => { setJoinPassword(e.target.value); evaluatePasswordStrength(e.target.value); setPasswordStatus('idle'); setPasswordStatusMessage(''); }}
+                onChange={(e) => { setJoinPassword(e.target.value); setPasswordStatus('idle'); setPasswordStatusMessage(''); }}
               />
               <button
                 type="button"
@@ -945,17 +1205,6 @@ export default function Groups() {
               >
                 {passwordVisible ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
               </button>
-            </div>
-
-            {/* Strength meter */}
-            <div className="h-2 w-full bg-gray-200 rounded mt-1 overflow-hidden">
-              <div
-                className={`h-2 rounded ${passwordStrength <= 1 ? 'bg-red-500' : passwordStrength === 2 ? 'bg-yellow-400' : 'bg-green-500'}`}
-                style={{ width: `${(passwordStrength / 4) * 100}%` }}
-              />
-            </div>
-            <div className="text-xs text-muted-foreground">
-              {passwordStrength <= 1 ? 'Weak' : passwordStrength === 2 ? 'Medium' : 'Strong'}
             </div>
 
             {passwordStatus !== 'idle' && (
