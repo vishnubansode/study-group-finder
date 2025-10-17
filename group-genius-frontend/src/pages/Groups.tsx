@@ -21,6 +21,8 @@ import {
   Calendar as CalendarIcon,
   Clock,
   Filter,
+  Eye,
+  EyeOff,
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { tokenService } from '@/services/api';
@@ -53,6 +55,10 @@ export default function Groups() {
   const [passwordDialogOpen, setPasswordDialogOpen] = useState(false);
   const [passwordForGroupId, setPasswordForGroupId] = useState<number | null>(null);
   const [joinPassword, setJoinPassword] = useState('');
+  const [passwordStatus, setPasswordStatus] = useState<'idle' | 'success' | 'error'>('idle');
+  const [passwordStatusMessage, setPasswordStatusMessage] = useState('');
+  const [passwordVisible, setPasswordVisible] = useState(false);
+  const [passwordStrength, setPasswordStrength] = useState(0);
   const [joinChoiceDialogOpen, setJoinChoiceDialogOpen] = useState(false);
   const [joinChoiceGroupId, setJoinChoiceGroupId] = useState<number | null>(null);
   const [managingGroupId, setManagingGroupId] = useState<number | null>(null);
@@ -257,30 +263,57 @@ export default function Groups() {
     const token = tokenService.getToken();
     if (!token) return;
 
+    // Reset status
+    setPasswordStatus('idle');
+    setPasswordStatusMessage('');
+
     try {
       setJoiningGroupId(passwordForGroupId);
       // Attempt join with provided password
       await groupAPI.joinGroup(token, passwordForGroupId, user.id, joinPassword);
-      // success
+      // success -> visual feedback then close
+      setPasswordStatus('success');
+      setPasswordStatusMessage('Password correct — joined successfully.');
       toast({ title: 'Joined', description: 'You have successfully joined the group.' });
-      setPasswordDialogOpen(false);
       await fetchGroups();
+      // close the dialog shortly after showing success
+      setTimeout(() => {
+        setPasswordDialogOpen(false);
+        setPasswordForGroupId(null);
+        setJoinPassword('');
+        setPasswordStatus('idle');
+        setPasswordStatusMessage('');
+      }, 900);
     } catch (error) {
       console.error('Failed to join with password:', error);
       const msg = error instanceof Error ? error.message : 'Please try again.';
       if (msg && msg.toLowerCase().includes('invalid password')) {
+        // invalid password -> show inline red message, keep dialog open
+        setPasswordStatus('error');
+        setPasswordStatusMessage('Invalid password. Please try again or request to join.');
         toast({ title: 'Invalid password', description: 'Password is incorrect. Please try again or request to join.' });
-        // keep dialog open for retry
       } else {
+        // other errors -> show toast and close
         toast({ title: 'Failed to join group', description: msg });
-        // close dialog for other failures
         setPasswordDialogOpen(false);
+        setPasswordForGroupId(null);
+        setJoinPassword('');
+        setPasswordStatus('idle');
+        setPasswordStatusMessage('');
       }
     } finally {
       setJoiningGroupId(null);
-      setPasswordForGroupId(null);
-      setJoinPassword('');
+      // Note: do NOT clear joinPassword here so users can retry when password is invalid
     }
+  };
+
+  const evaluatePasswordStrength = (pw: string) => {
+    let score = 0;
+    if (pw.length >= 8) score += 1;
+    if (/[A-Z]/.test(pw)) score += 1;
+    if (/[0-9]/.test(pw)) score += 1;
+    if (/[^A-Za-z0-9]/.test(pw)) score += 1;
+    setPasswordStrength(score);
   };
 
   const handleManageGroup = async (group: Group) => {
@@ -849,7 +882,38 @@ export default function Groups() {
 
           <div className="space-y-4">
             <Label>Group Password</Label>
-            <Input type="password" value={joinPassword} onChange={(e) => setJoinPassword(e.target.value)} />
+            <div className="relative">
+              <Input
+                type={passwordVisible ? 'text' : 'password'}
+                value={joinPassword}
+                onChange={(e) => { setJoinPassword(e.target.value); evaluatePasswordStrength(e.target.value); setPasswordStatus('idle'); setPasswordStatusMessage(''); }}
+              />
+              <button
+                type="button"
+                className="absolute right-2 top-2 text-gray-500"
+                onClick={() => setPasswordVisible((v) => !v)}
+                aria-label={passwordVisible ? 'Hide password' : 'Show password'}
+              >
+                {passwordVisible ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+              </button>
+            </div>
+
+            {/* Strength meter */}
+            <div className="h-2 w-full bg-gray-200 rounded mt-1 overflow-hidden">
+              <div
+                className={`h-2 rounded ${passwordStrength <= 1 ? 'bg-red-500' : passwordStrength === 2 ? 'bg-yellow-400' : 'bg-green-500'}`}
+                style={{ width: `${(passwordStrength / 4) * 100}%` }}
+              />
+            </div>
+            <div className="text-xs text-muted-foreground">
+              {passwordStrength <= 1 ? 'Weak' : passwordStrength === 2 ? 'Medium' : 'Strong'}
+            </div>
+
+            {passwordStatus !== 'idle' && (
+              <div className={`text-sm mt-1 ${passwordStatus === 'error' ? 'text-red-600' : 'text-green-600'}`}>
+                {passwordStatusMessage}
+              </div>
+            )}
           </div>
 
           <DialogFooter className="flex justify-end">

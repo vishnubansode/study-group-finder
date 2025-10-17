@@ -4,7 +4,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Shield, Plus, Lock } from 'lucide-react';
+import { Shield, Plus, Lock, Eye, EyeOff } from 'lucide-react';
 import { courseApi } from '@/lib/api/courseApi';
 import { useAuth } from '@/contexts/AuthContext';
 
@@ -25,6 +25,8 @@ interface GroupCreateDialogProps {
 
 export function GroupCreateDialog({ courseOptions, onCreate }: GroupCreateDialogProps) {
   const { user } = useAuth();
+  const [passwordVisible, setPasswordVisible] = useState(false);
+  const [passwordStrength, setPasswordStrength] = useState(0);
   const [open, setOpen] = useState(false);
   // store courses as objects so we can pass back the id
   const [enrolledCourses, setEnrolledCourses] = useState<Array<{ id: number; name: string }>>([]);
@@ -161,15 +163,46 @@ export function GroupCreateDialog({ courseOptions, onCreate }: GroupCreateDialog
                 Group Password
                 <span className="text-destructive">*</span>
               </label>
-              <Input
-                type="password"
-                placeholder="Enter password for private group"
-                value={values.password || ''}
-                onChange={(e) => setValues((v) => ({ ...v, password: e.target.value }))}
-              />
-              <p className="text-xs text-muted-foreground">
-                Members will need this password to join the group
-              </p>
+              <div className="relative">
+                <Input
+                  type={passwordVisible ? 'text' : 'password'}
+                  placeholder="Enter password for private group"
+                  value={values.password || ''}
+                  onChange={(e) => {
+                    const pw = e.target.value;
+                    setValues((v) => ({ ...v, password: pw }));
+                    // evaluate strength
+                    let score = 0;
+                    if (pw.length >= 8) score += 1;
+                    if (/[A-Z]/.test(pw)) score += 1;
+                    if (/[0-9]/.test(pw)) score += 1;
+                    if (/[^A-Za-z0-9]/.test(pw)) score += 1;
+                    setPasswordStrength(score);
+                  }}
+                />
+                <button
+                  type="button"
+                  className="absolute right-2 top-2 text-gray-500"
+                  onClick={() => setPasswordVisible((v) => !v)}
+                  aria-label={passwordVisible ? 'Hide password' : 'Show password'}
+                >
+                  {passwordVisible ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
+              <div className="mt-2">
+                <div className="h-2 w-full bg-gray-200 rounded overflow-hidden">
+                  <div
+                    className={`h-2 rounded ${passwordStrength <= 1 ? 'bg-red-500' : passwordStrength === 2 ? 'bg-yellow-400' : 'bg-green-500'}`}
+                    style={{ width: `${(passwordStrength / 4) * 100}%` }}
+                  />
+                </div>
+                <p className="text-xs text-muted-foreground mt-1">
+                  {passwordStrength <= 1 ? 'Weak password (try at least 8 chars, add numbers or symbols)' : passwordStrength === 2 ? 'Medium strength' : 'Strong password'}
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  Members will need this password to join the group
+                </p>
+              </div>
             </div>
           )}
         </div>
