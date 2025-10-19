@@ -23,12 +23,17 @@ import {
   Filter,
   Eye,
   EyeOff,
+
+  Crown,
+  User,
+  Trash,
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { tokenService } from '@/services/api';
 import { groupAPI } from '@/lib/api/groupApi';
 import GroupCreateDialog, { GroupCreateValues } from '@/components/group/GroupCreateDialog';
 import { Group, GroupCreateRequest, GroupMember } from '@/types/group';
+import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 
 export default function Groups() {
   const { user } = useAuth();
@@ -77,6 +82,7 @@ export default function Groups() {
   const [isLoadingMembers, setIsLoadingMembers] = useState(false);
   const [isMembersDialogOpen, setIsMembersDialogOpen] = useState(false);
   const [isAdminForManagingGroup, setIsAdminForManagingGroup] = useState(false);
+  const [selectedPendingIds, setSelectedPendingIds] = useState<number[]>([]);
   const [leaveConfirmOpen, setLeaveConfirmOpen] = useState(false);
   const [leaveTargetGroupId, setLeaveTargetGroupId] = useState<number | null>(null);
   const [leaveTargetGroupName, setLeaveTargetGroupName] = useState<string | null>(null);
@@ -96,6 +102,8 @@ export default function Groups() {
   const [newGroupDescription, setNewGroupDescription] = useState('');
   const [newGroupPrivacy, setNewGroupPrivacy] = useState<'PUBLIC' | 'PRIVATE'>('PUBLIC');
   const [isCreating, setIsCreating] = useState(false);
+  // Generic confirmation modal state
+  const [confirmModal, setConfirmModal] = useState<any>({ open: false });
 
   // Members dialog - removed unused states for now since backend doesn't have member list endpoint ready
   // const [selectedGroup, setSelectedGroup] = useState<Group | null>(null);
@@ -508,6 +516,83 @@ export default function Groups() {
     }
   };
 
+  const handleChangeMemberRole = async (userId: number, newRole: string) => {
+    if (!user || !managingGroupId) return;
+    if (!isAdminForManagingGroup) {
+      toast({ title: 'Not allowed', description: 'Only group admins can change roles.' });
+      return;
+    }
+
+    const token = tokenService.getToken();
+    if (!token) return;
+
+    try {
+      await groupAPI.changeMemberRole(token, managingGroupId, user.id, userId, newRole);
+      toast({ title: 'Role updated', description: `User role changed to ${newRole}.` });
+      // refresh members
+      const updatedMembers = await groupAPI.getGroupMembers(token, managingGroupId);
+      setGroupMembers(updatedMembers);
+    } catch (error) {
+      console.error('Failed to change member role:', error);
+      toast({ title: 'Failed to change role', description: error instanceof Error ? error.message : 'Please try again.' });
+    }
+  };
+
+  const handleTogglePendingSelect = (userId: number) => {
+    setSelectedPendingIds((prev) => {
+      const set = new Set(prev);
+      if (set.has(userId)) set.delete(userId);
+      else set.add(userId);
+      return Array.from(set);
+    });
+  };
+
+  const handleBulkApproveSelected = async () => {
+    if (!user || !managingGroupId) return;
+    if (!isAdminForManagingGroup) {
+      toast({ title: 'Not allowed', description: 'Only group admins can approve members.' });
+      return;
+    }
+    if (selectedPendingIds.length === 0) return;
+
+    const token = tokenService.getToken();
+    if (!token) return;
+
+    try {
+      await Promise.all(selectedPendingIds.map((uid) => groupAPI.approveMember(token, managingGroupId, user.id, uid)));
+      toast({ title: 'Approved', description: `Approved ${selectedPendingIds.length} request(s).` });
+      setSelectedPendingIds([]);
+      const updatedMembers = await groupAPI.getGroupMembers(token, managingGroupId);
+      setGroupMembers(updatedMembers);
+    } catch (error) {
+      console.error('Bulk approve failed', error);
+      toast({ title: 'Failed', description: 'Failed to approve selected members. Try again.' });
+    }
+  };
+
+  const handleBulkRemoveSelected = async () => {
+    if (!user || !managingGroupId) return;
+    if (!isAdminForManagingGroup) {
+      toast({ title: 'Not allowed', description: 'Only group admins can remove members.' });
+      return;
+    }
+    if (selectedPendingIds.length === 0) return;
+
+    const token = tokenService.getToken();
+    if (!token) return;
+
+    try {
+      await Promise.all(selectedPendingIds.map((uid) => groupAPI.removeMember(token, managingGroupId, user.id, uid)));
+      toast({ title: 'Removed', description: `Removed ${selectedPendingIds.length} member(s).` });
+      setSelectedPendingIds([]);
+      const updatedMembers = await groupAPI.getGroupMembers(token, managingGroupId);
+      setGroupMembers(updatedMembers);
+    } catch (error) {
+      console.error('Bulk remove failed', error);
+      toast({ title: 'Failed', description: 'Failed to remove selected members. Try again.' });
+    }
+  };
+
   const handleDeleteGroup = async (groupId: number) => {
     if (!user) return;
 
@@ -537,13 +622,18 @@ export default function Groups() {
   };
 
   return (
-    <div className="min-h-screen bg-background">
-      <div className="bg-gradient-secondary px-6 py-12">
-        <div className="max-w-6xl mx-auto">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/30 to-indigo-50/40 pb-24 lg:pb-8">
+      <div className="bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 text-white px-6 py-12">
+        <div className="max-w-7xl mx-auto">
           <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
             <div>
-              <h1 className="heading-hero mb-4">Study Groups</h1>
-              <p className="text-xl text-muted-foreground max-w-2xl">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="p-3 bg-white/20 rounded-lg backdrop-blur-sm">
+                  <Users className="w-8 h-8" />
+                </div>
+                <h1 className="text-4xl md:text-5xl font-extrabold tracking-tight">Study Groups</h1>
+              </div>
+              <p className="text-xl text-blue-100 max-w-3xl leading-relaxed">
                 Discover and join study groups that match your academic interests. Collaborate, learn, and succeed together.
               </p>
             </div>
@@ -814,7 +904,7 @@ export default function Groups() {
 
                   await fetchGroups(overrides);
                 }}
-                className="px-8 py-3 shadow-lg hover:shadow-xl transition-all"
+                className="bg-white text-blue-600 hover:bg-blue-50 font-semibold px-8 py-3 shadow-lg hover:shadow-xl transition-all"
               >
                 <Search className="w-4 h-4 mr-2" />
                 Apply Filters
@@ -1083,73 +1173,175 @@ export default function Groups() {
 
           <div className="space-y-4">
             {groupMembers.length > 0 ? (
-              <div className="space-y-3">
-                {groupMembers
-                  .sort((a, b) => {
-                    // Sort by status (pending first) then by role (admin first)
-                    if (a.status !== b.status) {
-                      return a.status === 'PENDING' ? -1 : 1;
-                    }
-                    if (a.role !== b.role) {
-                      return a.role === 'ADMIN' ? -1 : 1;
-                    }
-                    return 0;
-                  })
-                  .map((member) => (
-                    <div key={member.groupMemberId} className="flex items-center justify-between p-3 border rounded-lg">
-                      <div className="flex items-center space-x-3">
-                        <div className="w-8 h-8 bg-primary/10 rounded-full flex items-center justify-center">
-                          <Users className="w-4 h-4 text-primary" />
-                        </div>
-                        <div>
-                          <p className="font-medium">{member.userName || `User ${member.userId}`}</p>
-                          <div className="flex items-center space-x-2 text-sm text-muted-foreground">
-                            <Badge variant={member.role === 'ADMIN' ? 'default' : 'secondary'} className="text-xs">
-                              {member.role}
-                            </Badge>
-                            <Badge 
-                              variant={member.status === 'APPROVED' ? 'default' : 'destructive'} 
-                              className="text-xs"
-                            >
-                              {member.status}
-                            </Badge>
-                            {member.joinedAt && (
-                              <span className="flex items-center gap-1">
-                                <Clock className="w-3 h-3" />
-                                {new Date(member.joinedAt).toLocaleDateString()}
-                              </span>
-                            )}
+              <div className="space-y-4">
+                {/* Approved Members */}
+                <div>
+                  <h3 className="text-sm font-semibold mb-2">Members</h3>
+                  <div className="space-y-2">
+                    {groupMembers
+                      .filter((m) => m.status === 'APPROVED')
+                      .sort((a, b) => {
+                        // Put current user first, then admins, then members
+                        if (a.userId === user?.id) return -1;
+                        if (b.userId === user?.id) return 1;
+                        if (a.role !== b.role) return a.role === 'ADMIN' ? -1 : 1;
+                        return 0;
+                      })
+                      .map((member) => (
+                        <div key={member.groupMemberId} className={`flex items-center justify-between p-3 border rounded-lg ${member.role === 'ADMIN' ? 'border-l-4 border-l-blue-600' : 'border-l-4 border-l-purple-600'}`}>
+                          <div className="flex items-center space-x-3">
+                            <div className="w-8 h-8 bg-primary/10 rounded-full flex items-center justify-center">
+                              <Users className="w-4 h-4 text-primary" />
+                            </div>
+                            <div>
+                              <p className="font-medium">{member.userName || `User ${member.userId}`}{member.userId === user?.id ? ' (you)' : ''}</p>
+                              <div className="flex items-center space-x-2 text-sm text-muted-foreground">
+                                {/* Role pill */}
+                                <span className={`inline-flex items-center gap-2 px-3 py-1 rounded-full shadow-sm text-white font-medium ${member.role === 'ADMIN' ? 'bg-[#1E40AF]' : 'bg-[#6B21A8]'}`}>
+                                  {member.role === 'ADMIN' ? <Crown className="w-4 h-4" /> : <User className="w-4 h-4" />}
+                                  <span className="text-sm">{member.role === 'ADMIN' ? 'Admin' : 'Member'}</span>
+                                </span>
+                                {member.joinedAt && (
+                                  <span className="flex items-center gap-1">
+                                    <Clock className="w-3 h-3" />
+                                    {new Date(member.joinedAt).toLocaleDateString()}
+                                  </span>
+                                )}
+                              </div>
+                            </div>
                           </div>
-                        </div>
-                      </div>
 
-                      {isAdminForManagingGroup ? (
-                        <div className="flex items-center space-x-2">
-                          {member.status === 'PENDING' && (
-                            <Button
-                              size="sm"
-                              variant="default"
-                              onClick={() => handleApproveMember(member.groupMemberId, member.userId)}
-                            >
-                              <UserCheck className="w-4 h-4 mr-1" />
-                              Approve
-                            </Button>
-                          )}
-                          {member.role !== 'ADMIN' && (
-                            <Button
-                              size="sm"
-                              variant="destructive"
-                              onClick={() => handleRemoveMember(member.groupMemberId, member.userId)}
-                            >
-                              Remove
-                            </Button>
+                              {isAdminForManagingGroup ? (
+                            <div className="flex items-center space-x-2">
+                              {/* Inline promote/demote buttons for convenience (admins only, not for self) */}
+                              {member.userId !== user?.id && (
+                                <div className="flex items-center gap-2">
+                                  {member.role !== 'ADMIN' ? (
+                                    <button
+                                      className="px-2 py-1 text-xs rounded bg-blue-600 text-white"
+                                      onClick={() => setConfirmModal({ open: true, type: 'promote', payload: { userId: member.userId, userName: member.userName }, title: 'Promote member', message: `Promote ${member.userName || 'this user'} to Admin?` })}
+                                    >
+                                      Promote
+                                    </button>
+                                  ) : (
+                                    <button
+                                      className="px-2 py-1 text-xs rounded bg-gray-200 text-foreground"
+                                      onClick={() => setConfirmModal({ open: true, type: 'demote', payload: { userId: member.userId, userName: member.userName }, title: 'Demote member', message: `Demote ${member.userName || 'this user'} to Member?` })}
+                                    >
+                                      Demote
+                                    </button>
+                                  )}
+                                </div>
+                              )}
+                              {/* Trash icon button */}
+                              {/* Only show delete if the member is not an admin and not the current user */}
+                              {member.userId !== user?.id && (
+                                <Tooltip>
+                                  <TooltipTrigger>
+                                    <button
+                                      onClick={() => setConfirmModal({ open: true, type: 'removeMember', payload: { memberId: member.groupMemberId, userId: member.userId, userName: member.userName }, title: 'Remove member', message: `Remove ${member.userName || 'this member'} from the group?` })}
+                                      className="p-2 rounded hover:bg-red-50"
+                                      aria-label={`Delete ${member.userName || member.userId}`}
+                                    >
+                                      <Trash className="w-4 h-4 text-destructive" />
+                                    </button>
+                                  </TooltipTrigger>
+                                  <TooltipContent>Delete member</TooltipContent>
+                                </Tooltip>
+                              )}
+
+                              {/* If this row is the current user and they are not an admin, allow them to leave the group */}
+                              {member.userId === user?.id && !isAdminForManagingGroup && (
+                                <button
+                                  onClick={() => handleLeaveGroup(member.groupId)}
+                                  className="ml-2 px-2 py-1 text-sm rounded border border-gray-200 text-destructive hover:bg-red-50"
+                                >
+                                  Leave
+                                </button>
+                              )}
+
+                              {/* More menu removed: inline Promote/Demote and Delete buttons are used instead */}
+                            </div>
+                          ) : (
+                            <div className="text-sm text-muted-foreground">Only group admins can manage members</div>
                           )}
                         </div>
-                      ) : (
-                        <div className="text-sm text-muted-foreground">Only group admins can manage members</div>
-                      )}
-                    </div>
-                  ))}
+                      ))}
+                  </div>
+                </div>
+
+                {/* Pending Requests */}
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <h3 className="text-sm font-semibold">Pending Requests</h3>
+                    {isAdminForManagingGroup && (
+                      <div className="flex items-center gap-2">
+                        <Button size="sm" onClick={handleBulkApproveSelected} disabled={selectedPendingIds.length === 0}>Approve Selected</Button>
+                        <Button size="sm" variant="destructive" onClick={handleBulkRemoveSelected} disabled={selectedPendingIds.length === 0}>Remove Selected</Button>
+                      </div>
+                    )}
+                  </div>
+                  <div className="space-y-2">
+                    {groupMembers
+                      .filter((m) => m.status === 'PENDING')
+                      .map((member) => (
+                        <div key={`pending-${member.groupMemberId}`} className={`flex items-center justify-between p-3 border rounded-lg border-l-4 border-l-purple-600`}>
+                          <div className="flex items-center space-x-3">
+                            {isAdminForManagingGroup && (
+                              <input
+                                type="checkbox"
+                                checked={selectedPendingIds.includes(member.userId)}
+                                onChange={() => handleTogglePendingSelect(member.userId)}
+                                className="w-4 h-4"
+                                aria-label={`Select ${member.userName || member.userId} for approval`}
+                              />
+                            )}
+                            <div className="w-8 h-8 bg-primary/10 rounded-full flex items-center justify-center">
+                              <Users className="w-4 h-4 text-primary" />
+                            </div>
+                            <div>
+                              <p className="font-medium">{member.userName || `User ${member.userId}`}</p>
+                              <div className="flex items-center space-x-2 text-sm text-muted-foreground">
+                                <span className="inline-flex items-center gap-2 px-3 py-1 rounded-full shadow-sm text-[#374151] bg-[#E5E7EB] font-medium text-sm">You</span>
+                                {member.joinedAt && (
+                                  <span className="flex items-center gap-1">
+                                    <Clock className="w-3 h-3" />
+                                    {new Date(member.joinedAt).toLocaleDateString()}
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+
+                          {isAdminForManagingGroup ? (
+                            <div className="flex items-center gap-2">
+                              <Button size="sm" onClick={() => handleApproveMember(member.groupMemberId, member.userId)}>
+                                <UserCheck className="w-4 h-4 mr-1" />
+                                Approve
+                              </Button>
+                              <Tooltip>
+                                <TooltipTrigger>
+                                  <button
+                                    onClick={() => handleRemoveMember(member.groupMemberId, member.userId)}
+                                    className="p-2 rounded hover:bg-red-50"
+                                    aria-label={`Delete ${member.userName || member.userId}`}
+                                  >
+                                    <Trash className="w-4 h-4 text-destructive" />
+                                  </button>
+                                </TooltipTrigger>
+                                <TooltipContent>Delete member</TooltipContent>
+                              </Tooltip>
+                            </div>
+                          ) : (
+                            <div className="text-sm text-muted-foreground">Only group admins can review requests</div>
+                          )}
+                        </div>
+                      ))}
+                    {groupMembers.filter((m) => m.status === 'PENDING').length === 0 && (
+                      <div className="text-sm text-muted-foreground">No pending requests</div>
+                    )}
+                  </div>
+                </div>
               </div>
             ) : (
               <div className="text-center py-8">
@@ -1250,6 +1442,37 @@ export default function Groups() {
           <DialogFooter className="flex justify-end gap-2">
             <Button variant="outline" onClick={() => closeLeaveDialog()}>Cancel</Button>
             <Button variant="destructive" onClick={() => confirmLeave()}>Leave</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Generic confirmation dialog */}
+      <Dialog open={confirmModal.open === true} onOpenChange={(open) => { if (!open) setConfirmModal({ open: false }); }}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>{confirmModal.title || 'Confirm'}</DialogTitle>
+            <DialogDescription>{confirmModal.message || 'Are you sure?'}</DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="flex justify-end gap-2">
+            <Button variant="outline" onClick={() => setConfirmModal({ open: false })}>Cancel</Button>
+            <Button variant="destructive" onClick={async () => {
+              const type = confirmModal.type;
+              const payload = confirmModal.payload || {};
+              setConfirmModal({ open: false });
+              try {
+                if (type === 'promote') {
+                  await handleChangeMemberRole(payload.userId, 'ADMIN');
+                } else if (type === 'demote') {
+                  await handleChangeMemberRole(payload.userId, 'MEMBER');
+                } else if (type === 'removeMember') {
+                  await handleRemoveMember(payload.memberId, payload.userId);
+                } else if (type === 'deleteGroup') {
+                  if (managingGroupId) await handleDeleteGroup(managingGroupId);
+                }
+              } catch (err) {
+                // handlers already show toasts; swallow here
+              }
+            }}>Confirm</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

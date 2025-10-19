@@ -1,6 +1,7 @@
 package com.groupgenius.groupgenius_backend.controller;
 
 import com.groupgenius.groupgenius_backend.dto.GroupMemberDto;
+import com.groupgenius.groupgenius_backend.entity.GroupMember;
 import com.groupgenius.groupgenius_backend.service.GroupMemberService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -42,5 +43,17 @@ public class GroupMemberController {
     @GetMapping("/group/{groupId}")
     public ResponseEntity<List<GroupMemberDto>> getGroupMembers(@PathVariable Long groupId) {
         return ResponseEntity.ok(groupMemberService.getGroupMembers(groupId));
+    }
+
+    @PostMapping("/change-role")
+    public ResponseEntity<String> changeMemberRole(@RequestParam Long adminId, @RequestParam Long userId, @RequestParam Long groupId, @RequestParam String role) {
+        // map role string to enum
+        try {
+            GroupMember.Role newRole = GroupMember.Role.valueOf(role.toUpperCase());
+            groupMemberService.changeMemberRole(adminId, userId, groupId, newRole);
+            return ResponseEntity.ok("Member role changed successfully!");
+        } catch (IllegalArgumentException ex) {
+            return ResponseEntity.badRequest().body("Invalid role specified");
+        }
     }
 }

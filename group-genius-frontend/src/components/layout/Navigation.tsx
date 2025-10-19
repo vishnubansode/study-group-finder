@@ -17,8 +17,8 @@ import { useAuth } from '@/contexts/AuthContext';
 
 const navigationItems = [
   { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
-  { name: 'Groups', href: '/groups', icon: Users },
   { name: 'Courses', href: '/courses', icon: BookOpen },
+  { name: 'Groups', href: '/groups', icon: Users },
   { name: 'Chat', href: '/chat', icon: MessageCircle },
   { name: 'Calendar', href: '/calendar', icon: Calendar },
   { name: 'Profile', href: '/profile', icon: User },

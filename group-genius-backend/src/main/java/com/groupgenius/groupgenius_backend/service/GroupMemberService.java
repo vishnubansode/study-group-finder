@@ -143,7 +143,28 @@ public class GroupMemberService {
                         group)
                 .orElseThrow(() -> new GroupMemberNotFoundException("Member not found in this group"));
 
-                groupMemberRepository.delete(member);
+                                // Allow admins to remove any member, including admins.
+                                GroupMember.Role removedRole = member.getRole();
+                                groupMemberRepository.delete(member);
+
+                                // If the removed member was an admin, ensure at least one admin remains.
+                                if (removedRole == GroupMember.Role.ADMIN) {
+                                        long remainingAdmins = groupMemberRepository.countByGroupAndRole(group, GroupMember.Role.ADMIN);
+                                        if (remainingAdmins == 0) {
+                                                // promote the oldest approved member to admin
+                                                List<GroupMember> remainingMembers = groupMemberRepository.findByGroup(group).stream()
+                                                                .filter(m -> m.getStatus() == GroupMember.Status.APPROVED)
+                                                                .sorted((a, b) -> a.getJoinedAt().compareTo(b.getJoinedAt()))
+                                                                .collect(Collectors.toList());
+                                                if (!remainingMembers.isEmpty()) {
+                                                        GroupMember promote = remainingMembers.get(0);
+                                                        promote.setRole(GroupMember.Role.ADMIN);
+                                                        groupMemberRepository.save(promote);
+                                                        log.info("Promoted user {} to admin in group {} because last admin was removed", promote.getUser().getId(), groupId);
+                                                }
+                                        }
+                                }
+
                 log.info("User {} removed from group {} by admin {}", userId, groupId, adminId);
     }
 
@@ -157,8 +178,13 @@ public class GroupMemberService {
                 GroupMember member = groupMemberRepository.findByUserAndGroup(user, group)
                         .orElseThrow(() -> new GroupMemberNotFoundException("Member not found in this group"));
 
-                groupMemberRepository.delete(member);
-                log.info("User {} left group {}", userId, groupId);
+                                                // Prevent admins from leaving the group directly
+                                                if (member.getRole() == GroupMember.Role.ADMIN) {
+                                                        throw new IllegalStateException("Group admins cannot leave the group. Transfer ownership or demote yourself first.");
+                                                }
+
+                                                groupMemberRepository.delete(member);
+                                                log.info("User {} left group {}", userId, groupId);
             }
 
     public List<GroupMemberDto> getGroupMembers(Long groupId) {
@@ -169,6 +195,39 @@ public class GroupMemberService {
                 .stream()
                 .map(GroupMemberMapper::toDto)
                 .collect(Collectors.toList());
+    }
+
+    @Transactional
+    public void changeMemberRole(Long adminId, Long userId, Long groupId, GroupMember.Role newRole) {
+        log.info("changeMemberRole called by adminId={} to set userId={} role={} in groupId={}", adminId, userId, newRole, groupId);
+        User admin = userRepository.findById(adminId)
+                .orElseThrow(() -> new IllegalArgumentException("Admin not found"));
+        Group group = groupRepository.findById(groupId)
+                .orElseThrow(() -> new GroupNotFoundException("Group not found"));
+
+        GroupMember adminMembership = groupMemberRepository.findByUserAndGroup(admin, group)
+                .orElseThrow(() -> new UnauthorizedActionException("You are not part of this group"));
+        if (adminMembership.getRole() != GroupMember.Role.ADMIN) {
+            throw new UnauthorizedActionException("Only admins can change member roles");
+        }
+
+        GroupMember member = groupMemberRepository.findByUserAndGroup(
+                        userRepository.findById(userId)
+                                .orElseThrow(() -> new IllegalArgumentException("User not found")),
+                        group)
+                .orElseThrow(() -> new GroupMemberNotFoundException("Member not found in this group"));
+
+        // Prevent demoting the only admin (ensure at least one admin remains)
+        if (member.getRole() == GroupMember.Role.ADMIN && newRole != GroupMember.Role.ADMIN) {
+            long adminCount = groupMemberRepository.countByGroupAndRole(group, GroupMember.Role.ADMIN);
+            if (adminCount <= 1) {
+                throw new IllegalStateException("Cannot remove the last admin from the group");
+            }
+        }
+
+        member.setRole(newRole);
+        groupMemberRepository.save(member);
+        log.info("User {} role changed to {} in group {} by admin {}", userId, newRole, groupId, adminId);
     }
 
     @Transactional

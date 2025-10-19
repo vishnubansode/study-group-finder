@@ -132,6 +132,27 @@ export const groupAPI = {
     return response.json();
   },
 
+  // Change a member's role (admin only)
+  changeMemberRole: async (token: string, groupId: number, adminId: number, userId: number, role: string) => {
+    const response = await fetch(
+      `${API_BASE_URL}/group-members/change-role?adminId=${adminId}&userId=${userId}&groupId=${groupId}&role=${encodeURIComponent(role)}`,
+      {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      }
+    );
+
+    if (!response.ok) {
+      const error = await response.text();
+      throw new Error(error || 'Failed to change member role');
+    }
+
+    return response.text();
+  },
+
   // Delete a group (admin only)
   deleteGroup: async (token: string, groupId: number, adminId: number) => {
     const response = await fetch(`${API_BASE_URL}/groups/${groupId}?adminId=${adminId}`, {
