@@ -78,3 +78,25 @@ CREATE TABLE IF NOT EXISTS group_members (
   CONSTRAINT fk_group_members_group FOREIGN KEY (group_id) REFERENCES `groups` (id) ON DELETE CASCADE,
   CONSTRAINT fk_group_members_user FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+  -- Chat messages table (for group chat functionality)
+  CREATE TABLE IF NOT EXISTS chat_messages (
+    id BIGINT NOT NULL AUTO_INCREMENT,
+    group_id BIGINT NOT NULL,
+    sender_id BIGINT NOT NULL,
+    content TEXT NOT NULL,
+    `timestamp` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    `status` ENUM('SENT','DELIVERED','READ') DEFAULT 'SENT',
+    message_type ENUM('TEXT','FILE','IMAGE','SYSTEM') DEFAULT 'TEXT',
+    file_url VARCHAR(255) DEFAULT NULL,
+    reply_to_id BIGINT DEFAULT NULL,
+    deleted BOOLEAN DEFAULT FALSE,
+    edited BOOLEAN DEFAULT FALSE,
+    PRIMARY KEY (id),
+    KEY idx_chat_group (group_id),
+    KEY idx_chat_sender (sender_id),
+    KEY idx_chat_reply (reply_to_id),
+    CONSTRAINT fk_chat_group FOREIGN KEY (group_id) REFERENCES `groups` (id) ON DELETE CASCADE,
+    CONSTRAINT fk_chat_sender FOREIGN KEY (sender_id) REFERENCES users (id) ON DELETE SET NULL,
+    CONSTRAINT fk_chat_reply FOREIGN KEY (reply_to_id) REFERENCES chat_messages (id) ON DELETE SET NULL
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
