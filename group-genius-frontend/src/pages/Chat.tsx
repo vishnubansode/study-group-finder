@@ -1,178 +1,206 @@
-import { useState, useEffect, useRef } from "react";
-import SockJS from "sockjs-client";
-import { Client } from "@stomp/stompjs";
-import { Send, Users, Info, Smile, Paperclip, Phone, Video } from "lucide-react";
+import React, { useState, useEffect, useCallback } from "react";
+import { Link } from "react-router-dom";
+import { Card, CardHeader, CardTitle, CardContent, CardDescription } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Users, Plus, ArrowLeft } from "lucide-react";
+import ChatContainer from "@/components/Chat/ChatContainer";
+import { groupAPI } from '@/lib/api/groupApi';
+import { chatAPI } from '@/lib/api/chatApi';
+import { tokenService } from '@/services/api';
+import { useAuth } from "@/contexts/AuthContext";
 
 export default function Chat() {
-  const [messages, setMessages] = useState<any[]>([]);
-  const [newMessage, setNewMessage] = useState("");
-  const [connected, setConnected] = useState(false);
-  const [showMembers, setShowMembers] = useState(false);
-  const groupId = "1"; // replace dynamically
-  const username = "Sarran"; // replace dynamically
-  const messagesEndRef = useRef<HTMLDivElement | null>(null);
-  const clientRef = useRef<Client | null>(null);
-  const subRef = useRef<any>(null);
+  const { user } = useAuth();
+  const [groups, setGroups] = useState<any[]>([]);
+  const [selectedGroupId, setSelectedGroupId] = useState<number | null>(null);
+  const [initialMessages, setInitialMessages] = useState<any[]>([]);
+  const [isLoadingGroups, setIsLoadingGroups] = useState(false);
+  const [isLoadingHistory, setIsLoadingHistory] = useState(false);
+  const [search, setSearch] = useState("");
+  const [isConnected, setIsConnected] = useState(false);
 
   useEffect(() => {
-    const client = new Client({
-      webSocketFactory: () => new SockJS("http://localhost:8080/ws-chat"),
-      reconnectDelay: 5000,
-      debug: () => {},
-    });
-
-    client.onConnect = () => {
-      setConnected(true);
+    const loadGroups = async () => {
+      setIsLoadingGroups(true);
       try {
-        subRef.current = client.subscribe(`/ws/group/${groupId}`, (payload) => {
-          if (!payload.body) return;
-          const msg = JSON.parse(payload.body);
-          setMessages((prev) => [...prev, msg]);
+        const token = tokenService.getToken();
+
+        if (!token || !user?.id) {
+          setGroups([]);
+          return;
+        }
+
+        const res = await groupAPI.searchGroups(token, { userId: user.id });
+        const normalized = Array.isArray(res)
+          ? res.map((g: any) => ({
+              id: g.groupId ?? g.id,
+              name: g.groupName ?? g.name,
+              lastMessagePreview: g.lastMessagePreview ?? g.last_message_preview ?? '',
+              unreadCount: g.unreadCount ?? g.unread_count ?? 0,
+              membershipStatus: g.membershipStatus ?? g.membership_status ?? null,
+              createdBy: g.createdBy ?? g.ownerId ?? g.owner_id ?? null,
+              raw: g,
+            }))
+          : [];
+
+        const joinedOnly = normalized.filter((g: any) => {
+          const isOwner = g.createdBy && user?.id && g.createdBy === user.id;
+          const isApproved = g.membershipStatus === 'APPROVED';
+          return isOwner || isApproved;
         });
-      } catch (e) {
-        console.error("Subscribe failed", e);
+
+        setGroups(joinedOnly);
+      } catch (err) {
+        console.error('Failed to load groups', err);
+        setGroups([]);
+      } finally {
+        setIsLoadingGroups(false);
       }
     };
 
-    client.onStompError = (frame) => {
-      console.error("Broker error", frame);
-      setConnected(false);
-    };
+    loadGroups();
+  }, [user?.id]);
 
-    client.onWebSocketClose = () => setConnected(false);
-
-    client.activate();
-    clientRef.current = client;
-
-    return () => {
-      try {
-        if (subRef.current) subRef.current.unsubscribe();
-      } catch (e) {}
-      if (clientRef.current) clientRef.current.deactivate();
-      setConnected(false);
-    };
+  // Restore last selected group after groups load
+  useEffect(() => {
+    if (!groups.length) return;
+    const last = localStorage.getItem('sgf:lastChatGroupId');
+    const lastId = last ? Number(last) : null;
+    if (lastId && groups.some(g => g.id === lastId) && !selectedGroupId) {
+      void openGroupById(lastId);
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [groups]);
+
+  const openGroupById = useCallback(async (groupId: number) => {
+    try {
+      setIsLoadingHistory(true);
+      const token = tokenService.getToken();
+      const history = token ? await chatAPI.getHistory(token, groupId) : [];
+      setInitialMessages(history || []);
+      setSelectedGroupId(groupId);
+      localStorage.setItem('sgf:lastChatGroupId', String(groupId));
+    } catch (err) {
+      console.error('Failed to load chat history', err);
+      setInitialMessages([]);
+      setSelectedGroupId(groupId);
+      localStorage.setItem('sgf:lastChatGroupId', String(groupId));
+    } finally {
+      setIsLoadingHistory(false);
+    }
   }, []);
 
-  const sendMessage = () => {
-    const client = clientRef.current;
-    if (client && connected && newMessage.trim()) {
-      const chatMsg = {
-        sender: username,
-        content: newMessage,
-        timestamp: new Date().toISOString(),
-      };
-      try {
-        client.publish({ destination: `/ws/app/chat/${groupId}`, body: JSON.stringify(chatMsg) });
-        setMessages((prev) => [...prev, chatMsg]);
-        setNewMessage("");
-      } catch (e) {
-        console.error("Send failed", e);
-      }
-    }
-  };
-
-  const handleKeyPress = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === "Enter" && !e.shiftKey) {
-      e.preventDefault();
-      sendMessage();
-    }
-  };
-
-  useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages]);
+  const visibleGroups = groups.filter(g => (g.name || '').toLowerCase().includes(search.toLowerCase()));
+  const selectedGroup = groups.find(g => g.id === selectedGroupId) || null;
+  // Full-page flow: show either the groups list OR the chat view
 
   return (
-    <div className="flex h-screen bg-gray-100">
-      {/* Sidebar */}
-      <div className="hidden md:flex flex-col w-64 border-r bg-white">
-        <div className="flex items-center justify-between px-4 py-3 border-b">
-          <h1 className="font-semibold text-gray-800 text-lg">Study Chat</h1>
-          <Info size={18} className="text-gray-500" />
-        </div>
-        <div className="p-4 text-sm text-gray-500">
-          <p>Connected: {connected ? "Yes" : "No"}</p>
-        </div>
-      </div>
-
-      {/* Main Chat Section */}
-      <div className="flex-1 flex flex-col">
-        {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b bg-white">
-          <div>
-            <h2 className="font-semibold text-gray-800 text-lg">#general</h2>
-            <p className="text-sm text-gray-500">Study Group Discussion</p>
-          </div>
-          <div className="flex items-center space-x-3">
-            <Phone className="text-gray-500 cursor-pointer" size={18} />
-            <Video className="text-gray-500 cursor-pointer" size={18} />
-            <Users
-              className="text-gray-500 cursor-pointer"
-              size={18}
-              onClick={() => setShowMembers(!showMembers)}
-            />
-          </div>
-        </div>
-
-        {/* Messages */}
-        <div className="flex-1 overflow-y-auto p-6 space-y-4">
-          {messages.map((msg, idx) => (
-            <div
-              key={idx}
-              className={`flex ${
-                msg.sender === username ? "justify-end" : "justify-start"
-              }`}
-            >
-              <div
-                className={`max-w-[70%] p-3 rounded-2xl ${
-                  msg.sender === username
-                    ? "bg-blue-500 text-white"
-                    : "bg-gray-200 text-gray-900"
-                }`}
-              >
-                <p className="text-sm">{msg.content}</p>
-                <div className="text-[10px] opacity-70 mt-1 text-right">
-                  {msg.timestamp ? new Date(msg.timestamp).toLocaleTimeString() : ""}
-                </div>
+    <div className="w-full px-4 md:px-6 py-4">
+      {/* When no group selected, show the full-page groups list */}
+      {!selectedGroupId && ( 
+        <Card className="h-[85vh] flex flex-col">
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <CardTitle className="flex items-center gap-2"><Users className="w-4 h-4" /> Groups</CardTitle>
+              <Button size="sm" asChild>
+                <Link to="/groups"><Plus className="w-4 h-4" /></Link>
+              </Button>
+            </div>
+            <CardDescription className="text-xs">Your joined study groups</CardDescription>
+          </CardHeader>
+          <CardContent className="p-0 flex-1 overflow-hidden">
+            <div className="flex flex-col h-full">
+              <div className="p-3 border-b flex items-center gap-2">
+                <input
+                  placeholder="Search groups"
+                  className="flex-1 px-3 py-2 border rounded-md"
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                />
+              </div>
+              <div className="p-3 flex-1 overflow-y-auto">
+                {isLoadingGroups ? (
+                  <div className="p-4 text-sm text-muted-foreground">Loading groups...</div>
+                ) : visibleGroups.length ? (
+                  <ul className="space-y-2">
+                    {visibleGroups.map((g) => (
+                      <li key={g.id}>
+                        <button
+                          onClick={() => openGroupById(g.id)}
+                          className={`w-full text-left p-3 rounded hover:bg-accent/5 flex items-center gap-3 ${selectedGroupId === g.id ? 'bg-accent/10' : ''}`}
+                        >
+                          <Avatar className="w-10 h-10"><AvatarFallback>{g.name?.[0]}</AvatarFallback></Avatar>
+                          <div className="flex-1 min-w-0">
+                            <div className="font-semibold truncate">{g.name}</div>
+                            <div className="text-xs text-muted-foreground truncate">{g.lastMessagePreview || 'No messages yet'}</div>
+                          </div>
+                          {g.unreadCount > 0 && (
+                            <div className="text-xs bg-red-600 text-white rounded-full px-2">{g.unreadCount}</div>
+                          )}
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <div className="p-4 text-sm text-muted-foreground">
+                    {user?.id
+                      ? 'You have no groups yet. Create or join a group to start chatting.'
+                      : 'Sign in to see your joined groups here.'}
+                  </div>
+                )}
               </div>
             </div>
-          ))}
-          <div ref={messagesEndRef}></div>
-        </div>
+          </CardContent>
+        </Card>
+      )}
 
-        {/* Message Input */}
-        <div className="p-4 border-t bg-white flex items-center space-x-3">
-          <button className="p-2 text-gray-500 hover:text-gray-700">
-            <Paperclip size={18} />
-          </button>
-          <button className="p-2 text-gray-500 hover:text-gray-700">
-            <Smile size={18} />
-          </button>
-          <input
-            type="text"
-            placeholder="Type your message..."
-            className="flex-1 px-4 py-2 border rounded-full outline-none focus:ring-1 focus:ring-blue-400"
-            value={newMessage}
-            onChange={(e) => setNewMessage(e.target.value)}
-            onKeyPress={handleKeyPress}
-          />
-          <button
-            onClick={sendMessage}
-            disabled={!newMessage.trim()}
-            className="bg-blue-500 text-white px-4 py-2 rounded-full hover:bg-blue-600 transition disabled:opacity-50"
-          >
-            <Send size={18} />
-          </button>
-        </div>
-      </div>
-
-      {/* Members Sidebar */}
-      {showMembers && (
-        <div className="w-60 border-l bg-white p-4">
-          <h3 className="font-semibold mb-2 text-gray-800">Members</h3>
-          <p className="text-sm text-gray-500">Online list integration later</p>
-        </div>
+      {/* When a group is selected, show the full-page chat view */}
+      {selectedGroupId && (
+        <Card className="h-[85vh] flex flex-col">
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => setSelectedGroupId(null)}
+                  aria-label="Back to groups"
+                >
+                  <ArrowLeft className="w-5 h-5" />
+                </Button>
+                <Avatar className="w-10 h-10"><AvatarFallback>{selectedGroup?.name?.[0] ?? 'G'}</AvatarFallback></Avatar>
+                <div>
+                  <div className="font-semibold">{selectedGroup ? selectedGroup.name : 'Select a group'}</div>
+                  <div className="text-xs text-muted-foreground flex items-center gap-2">
+                    <span>{isConnected ? 'Connected' : 'Connecting...'}</span>
+                    <span className={`inline-block w-2 h-2 rounded-full ${isConnected ? 'bg-green-500' : 'bg-amber-500'}`}></span>
+                  </div>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <Button variant="outline" size="sm" asChild>
+                  <Link to="/groups">Explore Groups</Link>
+                </Button>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent className="p-0 flex-1">
+            <div className="h-full">
+              {isLoadingHistory ? (
+                <div className="h-full flex items-center justify-center">Loading messages...</div>
+              ) : (
+                <ChatContainer
+                  groupId={selectedGroupId}
+                  username={user?.firstName || user?.email || 'Guest'}
+                  userId={user?.id}
+                  initialMessages={initialMessages}
+                  onConnectionChange={setIsConnected}
+                />
+              )}
+            </div>
+          </CardContent>
+        </Card>
       )}
     </div>
   );

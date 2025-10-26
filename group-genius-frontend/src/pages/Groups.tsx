@@ -112,24 +112,17 @@ export default function Groups() {
   // const [isLoadingMembers, setIsLoadingMembers] = useState(false);
 
   useEffect(() => {
-    // initial load using the default applied filters
-    if (user) {
-      fetchGroups();
-    }
+    // initial load using the default applied filters — fetch public groups even if not logged in
+    fetchGroups();
   }, [user]);
 
   const fetchGroups = async (overrides?: { privacy?: string | undefined; name?: string | undefined; size?: string | undefined; minMembers?: number; maxMembers?: number; dateBefore?: string; dateAfter?: string }) => {
-    if (!user) return;
-
+    // allow fetching public groups when not authenticated; token is optional
     const token = tokenService.getToken();
-    if (!token) {
-      setError('Authentication token not found. Please sign in again.');
-      return;
-    }
 
     try {
-      setIsLoading(true);
-      setError(null);
+  setIsLoading(true);
+  setError(null);
       // allow caller to override applied filters when fetching to avoid waiting for setState
       const privacyParam = overrides?.privacy ?? (appliedSelectedPrivacy === 'ALL' ? undefined : appliedSelectedPrivacy);
       const nameParam = overrides?.name ?? (appliedSearchQuery || undefined);
@@ -146,19 +139,24 @@ export default function Groups() {
       let groupsData = response.content || response;
       groupsData = Array.isArray(groupsData) ? groupsData : [];
 
-      // Fetch member counts for these groups and attach memberCount
+      // Fetch member counts for these groups and attach memberCount (only if token present)
       const countsMap = new Map<number, number>();
-      const countPromises = groupsData.map((g: any) =>
-        groupAPI.getGroupMembers(token, g.groupId).then((members) => {
-          const c = Array.isArray(members) ? members.length : 0;
-          countsMap.set(g.groupId, c);
-          g.memberCount = c;
-        }).catch(() => {
-          countsMap.set(g.groupId, 0);
-          g.memberCount = 0;
-        })
-      );
-      await Promise.all(countPromises);
+      if (token) {
+        const countPromises = groupsData.map((g: any) =>
+          groupAPI.getGroupMembers(token, g.groupId).then((members) => {
+            const c = Array.isArray(members) ? members.length : 0;
+            countsMap.set(g.groupId, c);
+            g.memberCount = c;
+          }).catch(() => {
+            countsMap.set(g.groupId, 0);
+            g.memberCount = 0;
+          })
+        );
+        await Promise.all(countPromises);
+      } else {
+        // unauthenticated view: set memberCount to 0 (or undefined) to avoid extra network calls
+        groupsData.forEach((g: any) => { g.memberCount = g.memberCount ?? 0; countsMap.set(g.groupId, g.memberCount ?? 0); });
+      }
 
       // Member count filter: use overrides.minMembers / maxMembers when provided
       const minMembers = overrides?.minMembers;
@@ -929,6 +927,9 @@ export default function Groups() {
               <div>
                 <h3 className="text-sm font-semibold text-destructive">Unable to load study groups</h3>
                 <p className="text-sm text-muted-foreground">{error}</p>
+                <div className="mt-3">
+                  <Button onClick={() => fetchGroups()}>Retry</Button>
+                </div>
               </div>
             </CardContent>
           </Card>

@@ -505,17 +505,19 @@ export default function Dashboard() {
             </Card>
 
             {/* Motivational/Tip Card */}
-            <Card className={`bg-gradient-to-br ${currentTip.color} border-primary/20`}>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-lg">
-                  {currentTip.icon}
-                  Daily Tip
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-sm leading-relaxed">{currentTip.text}</p>
-              </CardContent>
-            </Card>
+            {currentTip ? (
+              <Card className={`bg-gradient-to-br ${currentTip.color} border-primary/20`}>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2 text-lg">
+                    {currentTip.icon}
+                    Daily Tip
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-sm leading-relaxed">{currentTip.text}</p>
+                </CardContent>
+              </Card>
+            ) : null}
           </div>
         </div>
       </div>

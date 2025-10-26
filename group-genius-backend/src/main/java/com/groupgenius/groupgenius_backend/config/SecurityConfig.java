@@ -40,6 +40,8 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.GET, "/api/courses/**").permitAll()
                         .requestMatchers("/api/files/**").permitAll()
                         .requestMatchers("/error").permitAll()
+                        // Allow SockJS/websocket endpoints to be accessed without JWT for handshake/info
+                        .requestMatchers("/ws-chat/**").permitAll()
 
                         // User course management endpoints - require authentication
                         .requestMatchers("/api/user/**").authenticated()
