@@ -24,7 +24,7 @@ const getDateLabel = (timestamp) => {
   }
 };
 
-const MessageList = ({ messages, username, userId }) => {
+const MessageList = ({ messages, username, userId, onEdit, onDelete }) => {
   const bottomRef = useRef(null);
 
   useEffect(() => {
@@ -56,7 +56,12 @@ const MessageList = ({ messages, username, userId }) => {
                 </div>
               </div>
             )}
-            <MessageBubble message={msg} isOwn={isOwn} />
+            <MessageBubble 
+              message={msg} 
+              isOwn={isOwn}
+              onEdit={onEdit}
+              onDelete={onDelete}
+            />
           </React.Fragment>
         );
       })}

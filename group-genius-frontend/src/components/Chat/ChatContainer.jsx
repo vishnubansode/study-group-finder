@@ -1,18 +1,88 @@
-import React, { useEffect, useState, useRef } from "react";
+import React, { useEffect, useState, useRef, forwardRef, useImperativeHandle } from "react";
 import SockJS from "sockjs-client";
 import { Client } from "@stomp/stompjs";
 import MessageList from "./MessageList";
-import MessageInput from "./MessageInput";
 
 // Resolve WebSocket URL from env, with robust fallbacks
 const WS_URL = (import.meta?.env?.VITE_WS_URL)
   || `${import.meta?.env?.VITE_API_BASE_URL ?? "http://localhost:8080"}/ws-chat`;
 
-const ChatContainer = ({ groupId, username, userId, initialMessages = [], onConnectionChange }) => {
+const ChatContainer = forwardRef(({ groupId, username, userId, initialMessages = [], onConnectionChange }, ref) => {
   const [messages, setMessages] = useState([]);
   const [connected, setConnected] = useState(false);
   const clientRef = useRef(null);
   const subRef = useRef(null);
+
+  // Expose sendMessage function to parent component via ref
+  useImperativeHandle(ref, () => ({
+    sendMessage: (text) => {
+      const client = clientRef.current;
+      if (!client || !connected || !text.trim()) return;
+
+      const id = (globalThis.crypto && typeof globalThis.crypto.randomUUID === 'function')
+        ? globalThis.crypto.randomUUID()
+        : `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+
+      const chatMessage = {
+        sender: username,
+        senderId: userId,
+        content: text,
+        timestamp: new Date().toISOString(),
+        clientMessageId: id,
+      };
+
+      try {
+        client.publish({
+          destination: `/ws/app/chat/${groupId}`,
+          body: JSON.stringify(chatMessage),
+        });
+      } catch (e) {
+        console.error("Send failed", e);
+      }
+    }
+  }));
+
+  const handleEditMessage = (message) => {
+    const newContent = prompt("Edit message:", message.content);
+    if (newContent && newContent.trim() && newContent !== message.content) {
+      const client = clientRef.current;
+      if (!client || !connected) return;
+
+      try {
+        client.publish({
+          destination: `/ws/app/chat/${groupId}/edit`,
+          body: JSON.stringify({
+            messageId: message.id,
+            content: newContent,
+            timestamp: new Date().toISOString(),
+          }),
+        });
+        // No need for optimistic update - WebSocket will broadcast the change
+      } catch (e) {
+        console.error("Edit failed", e);
+      }
+    }
+  };
+
+  const handleDeleteMessage = (message) => {
+    if (confirm("Are you sure you want to delete this message?")) {
+      const client = clientRef.current;
+      if (!client || !connected) return;
+
+      try {
+        client.publish({
+          destination: `/ws/app/chat/${groupId}/delete`,
+          body: JSON.stringify({
+            messageId: message.id,
+            timestamp: new Date().toISOString(),
+          }),
+        });
+        // No need for optimistic update - WebSocket will broadcast the deletion
+      } catch (e) {
+        console.error("Delete failed", e);
+      }
+    }
+  };
 
   // propagate connection state upwards
   useEffect(() => {
@@ -68,10 +138,28 @@ const ChatContainer = ({ groupId, username, userId, initialMessages = [], onConn
                   return copy;
                 }
               }
+              // Check if message already exists (for edits)
+              const existingIdx = prev.findIndex(m => m.id === normalized.id);
+              if (existingIdx !== -1) {
+                const copy = prev.slice();
+                copy[existingIdx] = normalized;
+                return copy;
+              }
               return [...prev, normalized];
             });
           } catch (err) {
             console.error("Invalid message payload", err);
+          }
+        });
+
+        // Subscribe to delete events
+        client.subscribe(`/ws/group/${groupId}/delete`, (message) => {
+          if (!message.body) return;
+          try {
+            const payload = JSON.parse(message.body);
+            setMessages((prev) => prev.filter((m) => m.id !== payload.id));
+          } catch (err) {
+            console.error("Invalid delete payload", err);
           }
         });
       } catch (e) {
@@ -110,41 +198,17 @@ const ChatContainer = ({ groupId, username, userId, initialMessages = [], onConn
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [groupId]);
 
-  const sendMessage = (text) => {
-    const client = clientRef.current;
-    if (!client || !connected || !text.trim()) return;
-
-    const id = (globalThis.crypto && typeof globalThis.crypto.randomUUID === 'function')
-      ? globalThis.crypto.randomUUID()
-      : `${Date.now()}-${Math.random().toString(16).slice(2)}`;
-
-    const chatMessage = {
-      sender: username,
-      senderId: userId,
-      content: text,
-      timestamp: new Date().toISOString(),
-      clientMessageId: id,
-    };
-
-    try {
-      client.publish({
-        destination: `/ws/app/chat/${groupId}`,
-        body: JSON.stringify(chatMessage),
-      });
-      // Rely on server echo to render the message to avoid duplicates
-      // If you prefer optimistic UI, ensure the server echoes clientMessageId;
-      // the subscription handler above will replace the pending item when it arrives.
-    } catch (e) {
-      console.error("Send failed", e);
-    }
-  };
-
   return (
-    <div className="flex flex-col h-full bg-gray-50 border rounded-2xl shadow-md">
-      <MessageList messages={messages} username={username} userId={userId} />
-      <MessageInput onSend={sendMessage} />
+    <div className="flex flex-col h-full bg-gray-50">
+      <MessageList 
+        messages={messages} 
+        username={username} 
+        userId={userId}
+        onEdit={handleEditMessage}
+        onDelete={handleDeleteMessage}
+      />
     </div>
   );
-};
+});
 
 export default ChatContainer;

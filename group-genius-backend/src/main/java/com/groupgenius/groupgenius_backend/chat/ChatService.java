@@ -30,11 +30,14 @@ public class ChatService {
             });
         }
         
-        // Persist server-side
-        ChatMessage saved = chatMessageRepository.save(message);
+    // Persist server-side and obtain entity with generated identifier
+    ChatMessage saved = chatMessageRepository.save(message);
+
+    // Preserve client reference id for optimistic UI reconciliation
+    saved.setClientMessageId(message.getClientMessageId());
         
-        // Echo to subscribers with enriched metadata
-        messagingTemplate.convertAndSend("/ws/group/" + saved.getGroupId(), message);
+    // Echo to subscribers with enriched metadata (including generated id)
+    messagingTemplate.convertAndSend("/ws/group/" + saved.getGroupId(), saved);
     }
 
     public List<ChatMessage> getHistory(Long groupId) {
@@ -52,5 +55,39 @@ public class ChatService {
         });
         
         return history;
+    }
+
+    public void editMessage(Long messageId, String newContent, Long groupId) {
+        chatMessageRepository.findById(messageId).ifPresent(message -> {
+            message.setContent(newContent);
+            message.setEdited(true);
+
+            // Enrich with sender metadata and persist changes
+            if (message.getSenderId() != null) {
+                userRepository.findById(message.getSenderId()).ifPresent(user -> {
+                    message.setSender(user.getFirstName() + " " + user.getLastName());
+                    message.setSenderPhone(user.getEmail());
+                    message.setSenderProfileImageUrl(user.getProfileImageUrl());
+                });
+            }
+
+            ChatMessage updated = chatMessageRepository.save(message);
+
+            // Broadcast updated message
+            messagingTemplate.convertAndSend("/ws/group/" + groupId, updated);
+        });
+    }
+
+    public void deleteMessage(Long messageId, Long groupId) {
+        chatMessageRepository.findById(messageId).ifPresent(message -> {
+            chatMessageRepository.deleteById(messageId);
+
+            // Broadcast delete event
+            ChatMessage deleteEvent = new ChatMessage();
+            deleteEvent.setId(messageId);
+            deleteEvent.setGroupId(groupId);
+            deleteEvent.setContent("[DELETED]");
+            messagingTemplate.convertAndSend("/ws/group/" + groupId + "/delete", deleteEvent);
+        });
     }
 }

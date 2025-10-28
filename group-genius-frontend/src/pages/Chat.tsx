@@ -1,10 +1,11 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import { Link } from "react-router-dom";
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Users, Plus, ArrowLeft } from "lucide-react";
 import ChatContainer from "@/components/Chat/ChatContainer";
+import MessageInput from "@/components/Chat/MessageInput";
 import { groupAPI } from '@/lib/api/groupApi';
 import { chatAPI } from '@/lib/api/chatApi';
 import { tokenService } from '@/services/api';
@@ -12,6 +13,7 @@ import { useAuth } from "@/contexts/AuthContext";
 
 export default function Chat() {
   const { user } = useAuth();
+  const chatContainerRef = useRef<any>(null);
   const [groups, setGroups] = useState<any[]>([]);
   const [selectedGroupId, setSelectedGroupId] = useState<number | null>(null);
   const [initialMessages, setInitialMessages] = useState<any[]>([]);
@@ -93,6 +95,13 @@ export default function Chat() {
 
   const visibleGroups = groups.filter(g => (g.name || '').toLowerCase().includes(search.toLowerCase()));
   const selectedGroup = groups.find(g => g.id === selectedGroupId) || null;
+
+  const handleSendMessage = (text: string) => {
+    if (chatContainerRef.current && chatContainerRef.current.sendMessage) {
+      chatContainerRef.current.sendMessage(text);
+    }
+  };
+
   // Full-page flow: show either the groups list OR the chat view
 
   return (
@@ -157,7 +166,7 @@ export default function Chat() {
 
       {/* When a group is selected, show the full-page chat view */}
       {selectedGroupId && (
-        <Card className="h-[85vh] flex flex-col">
+        <Card className="h-[85vh] flex flex-col relative">
           <CardHeader>
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
@@ -185,12 +194,13 @@ export default function Chat() {
               </div>
             </div>
           </CardHeader>
-          <CardContent className="p-0 flex-1">
-            <div className="h-full">
+          <CardContent className="p-0 flex-1 relative overflow-hidden">
+            <div className="h-full pb-24 md:pb-28 overflow-hidden">
               {isLoadingHistory ? (
                 <div className="h-full flex items-center justify-center">Loading messages...</div>
               ) : (
                 <ChatContainer
+                  ref={chatContainerRef}
                   groupId={selectedGroupId}
                   username={user?.firstName || user?.email || 'Guest'}
                   userId={user?.id}
@@ -198,6 +208,13 @@ export default function Chat() {
                   onConnectionChange={setIsConnected}
                 />
               )}
+            </div>
+            
+            {/* Floating Message Input Widget - Fixed at bottom of chat card */}
+            <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-white via-white to-transparent pt-4 pb-4 px-4">
+              <div className="bg-white rounded-xl shadow-lg border border-gray-200 p-3">
+                <MessageInput onSend={handleSendMessage} />
+              </div>
             </div>
           </CardContent>
         </Card>

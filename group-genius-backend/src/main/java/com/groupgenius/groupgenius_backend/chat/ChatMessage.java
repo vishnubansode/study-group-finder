@@ -32,6 +32,9 @@ public class ChatMessage {
     @Column(name = "message_type")
     private String messageType = "TEXT";
 
+    @Column(name = "edited")
+    private Boolean edited = false;
+
     // Not persisted; used for UI echoing (client may send sender display name)
     @Transient
     private String sender;
