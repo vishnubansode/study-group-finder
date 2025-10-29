@@ -10,6 +10,7 @@ import { groupAPI } from '@/lib/api/groupApi';
 import { chatAPI } from '@/lib/api/chatApi';
 import { tokenService } from '@/services/api';
 import { useAuth } from "@/contexts/AuthContext";
+import { useToast } from "@/components/ui/use-toast";
 
 export default function Chat() {
   const { user } = useAuth();
@@ -21,6 +22,8 @@ export default function Chat() {
   const [isLoadingHistory, setIsLoadingHistory] = useState(false);
   const [search, setSearch] = useState("");
   const [isConnected, setIsConnected] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
+  const { toast } = useToast();
 
   useEffect(() => {
     const loadGroups = async () => {
@@ -96,11 +99,63 @@ export default function Chat() {
   const visibleGroups = groups.filter(g => (g.name || '').toLowerCase().includes(search.toLowerCase()));
   const selectedGroup = groups.find(g => g.id === selectedGroupId) || null;
 
-  const handleSendMessage = (text: string) => {
-    if (chatContainerRef.current && chatContainerRef.current.sendMessage) {
-      chatContainerRef.current.sendMessage(text);
+  const generateClientMessageId = () => {
+    const cryptoApi = globalThis.crypto;
+    if (cryptoApi && typeof cryptoApi.randomUUID === 'function') {
+      return cryptoApi.randomUUID();
     }
+    return `${Date.now()}-${Math.random().toString(16).slice(2)}`;
   };
+
+  const handleSendMessage = useCallback((text: string) => {
+    if (!isConnected) {
+      toast({ title: 'Still connecting', description: 'Please wait for the chat connection before sending messages.' });
+      return false;
+    }
+
+    const sender = chatContainerRef.current;
+    if (sender && typeof sender.sendMessage === 'function') {
+      sender.sendMessage(text);
+      return true;
+    }
+    return false;
+  }, [isConnected, toast]);
+
+  const handleUploadAttachment = useCallback(async (file: File, caption: string) => {
+    if (!selectedGroupId) {
+      toast({ title: 'Select a group', description: 'Choose a group before sharing files.' });
+      return false;
+    }
+
+    if (!user?.id) {
+      toast({ title: 'Authentication required', description: 'Please sign in again to share files.' });
+      return false;
+    }
+
+    const token = tokenService.getToken();
+    if (!token) {
+      toast({ title: 'Session expired', description: 'Please log in again to continue.' });
+      return false;
+    }
+
+    setIsUploading(true);
+    try {
+      const clientMessageId = generateClientMessageId();
+      await chatAPI.uploadAttachment(token, selectedGroupId, file, {
+        senderId: user.id,
+        caption,
+        clientMessageId,
+      });
+      return true;
+    } catch (err) {
+      console.error('Failed to upload attachment', err);
+      const description = err instanceof Error ? err.message : 'Please try again.';
+      toast({ title: 'Upload failed', description });
+      return false;
+    } finally {
+      setIsUploading(false);
+    }
+  }, [selectedGroupId, user?.id, toast]);
 
   // Full-page flow: show either the groups list OR the chat view
 
@@ -213,7 +268,12 @@ export default function Chat() {
             {/* Floating Message Input Widget - Fixed at bottom of chat card */}
             <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-white via-white to-transparent pt-4 pb-4 px-4">
               <div className="bg-white rounded-xl shadow-lg border border-gray-200 p-3">
-                <MessageInput onSend={handleSendMessage} />
+                <MessageInput
+                  onSend={handleSendMessage}
+                  onUpload={handleUploadAttachment}
+                  disabled={!isConnected}
+                  isUploading={isUploading}
+                />
               </div>
             </div>
           </CardContent>

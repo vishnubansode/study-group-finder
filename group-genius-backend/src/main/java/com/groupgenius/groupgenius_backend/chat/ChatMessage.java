@@ -35,6 +35,18 @@ public class ChatMessage {
     @Column(name = "edited")
     private Boolean edited = false;
 
+    @Column(name = "attachment_url")
+    private String attachmentUrl;
+
+    @Column(name = "attachment_type")
+    private String attachmentType;
+
+    @Column(name = "attachment_name")
+    private String attachmentName;
+
+    @Column(name = "attachment_size")
+    private Long attachmentSize;
+
     // Not persisted; used for UI echoing (client may send sender display name)
     @Transient
     private String sender;

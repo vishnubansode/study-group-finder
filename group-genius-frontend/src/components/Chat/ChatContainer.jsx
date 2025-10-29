@@ -29,6 +29,7 @@ const ChatContainer = forwardRef(({ groupId, username, userId, initialMessages =
         content: text,
         timestamp: new Date().toISOString(),
         clientMessageId: id,
+        messageType: "TEXT",
       };
 
       try {

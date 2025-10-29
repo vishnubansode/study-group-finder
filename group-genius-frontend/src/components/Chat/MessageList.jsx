@@ -41,6 +41,7 @@ const MessageList = ({ messages, username, userId, onEdit, onDelete }) => {
           : false;
         const ownByName = msg.sender === username;
         const isOwn = ownById || ownByName;
+        const messageKey = msg.id ?? msg.clientMessageId ?? `${idx}-${msg.timestamp ?? 'pending'}`;
         
         // Determine if we should show a date separator
         const currentDateLabel = getDateLabel(msg.timestamp);
@@ -48,7 +49,7 @@ const MessageList = ({ messages, username, userId, onEdit, onDelete }) => {
         lastDateLabel = currentDateLabel;
         
         return (
-          <React.Fragment key={idx}>
+          <React.Fragment key={messageKey}>
             {showDateSeparator && (
               <div className="flex justify-center my-4">
                 <div className="bg-gray-200 text-gray-600 text-xs font-medium px-3 py-1 rounded-full">
