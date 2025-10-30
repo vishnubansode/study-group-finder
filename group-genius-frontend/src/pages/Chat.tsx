@@ -3,9 +3,10 @@ import { Link } from "react-router-dom";
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Users, Plus, ArrowLeft } from "lucide-react";
+import { Users, Plus, ArrowLeft, FolderOpen } from "lucide-react";
 import ChatContainer from "@/components/Chat/ChatContainer";
 import MessageInput from "@/components/Chat/MessageInput";
+import MediaGallery from "@/components/Chat/MediaGallery";
 import { groupAPI } from '@/lib/api/groupApi';
 import { chatAPI } from '@/lib/api/chatApi';
 import { tokenService } from '@/services/api';
@@ -23,6 +24,7 @@ export default function Chat() {
   const [search, setSearch] = useState("");
   const [isConnected, setIsConnected] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
+  const [showMediaGallery, setShowMediaGallery] = useState(false);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -243,6 +245,15 @@ export default function Chat() {
                 </div>
               </div>
               <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShowMediaGallery(true)}
+                  className="flex items-center gap-2"
+                >
+                  <FolderOpen className="w-4 h-4" />
+                  <span className="hidden md:inline">Media</span>
+                </Button>
                 <Button variant="outline" size="sm" asChild>
                   <Link to="/groups">Explore Groups</Link>
                 </Button>
@@ -278,6 +289,14 @@ export default function Chat() {
             </div>
           </CardContent>
         </Card>
+      )}
+
+      {/* Media Gallery Modal */}
+      {showMediaGallery && selectedGroupId && (
+        <MediaGallery
+          groupId={selectedGroupId}
+          onClose={() => setShowMediaGallery(false)}
+        />
       )}
     </div>
   );

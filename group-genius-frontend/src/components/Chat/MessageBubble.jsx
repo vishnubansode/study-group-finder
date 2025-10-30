@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Pencil, Trash2, MoreVertical, Download, FileText } from "lucide-react";
+import { Pencil, Trash2, MoreVertical, Download, FileText, Music, Mic } from "lucide-react";
 
 const API_ROOT = (import.meta?.env?.VITE_API_BASE_URL ?? "http://localhost:8080").replace(/\/$/, "");
 
@@ -94,7 +94,24 @@ const formatTime = (ts) => {
 
 const MessageBubble = ({ message, isOwn, onEdit, onDelete }) => {
   const [showMenu, setShowMenu] = useState(false);
+  const [audioProgress, setAudioProgress] = useState(0);
+  const [audioDuration, setAudioDuration] = useState(0);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [isDownloadingImage, setIsDownloadingImage] = useState(false);
   const menuRef = useRef(null);
+  const audioRef = useRef(null);
+
+  // Check if this image was already downloaded by checking localStorage
+  const getDownloadKey = () => {
+    if (!message?.id && !message?.attachmentUrl) return null;
+    return `downloaded_${message.id || message.attachmentUrl}`;
+  };
+
+  const [imageDownloaded, setImageDownloaded] = useState(() => {
+    const key = getDownloadKey();
+    if (!key) return false;
+    return localStorage.getItem(key) === 'true';
+  });
 
   const rawTimestamp = message?.timestamp;
   const time = formatTime(rawTimestamp);
@@ -134,6 +151,80 @@ const MessageBubble = ({ message, isOwn, onEdit, onDelete }) => {
   const handleDelete = () => {
     setShowMenu(false);
     if (canDelete && onDelete) onDelete(message);
+  };
+
+  const handlePlayPause = () => {
+    if (audioRef.current) {
+      if (isPlaying) {
+        audioRef.current.pause();
+      } else {
+        audioRef.current.play();
+      }
+    }
+  };
+
+  const formatAudioTime = (seconds) => {
+    if (!seconds || isNaN(seconds)) return '0:00';
+    const mins = Math.floor(seconds / 60);
+    const secs = Math.floor(seconds % 60);
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
+  };
+
+  const saveDownloadMetadata = (type) => {
+    // Get groupId from message or URL
+    const groupId = message?.groupId || message?.recipientId;
+    if (!groupId || !message?.id) return;
+
+    const downloadKey = `download_${groupId}_${message.id}`;
+    const metadata = {
+      messageId: message.id,
+      url: attachmentUrl,
+      type: type,
+      name: message?.attachmentName || `file_${message.id}`,
+      size: message?.attachmentSize || 0,
+      downloadedAt: new Date().toISOString(),
+    };
+
+    try {
+      localStorage.setItem(downloadKey, JSON.stringify(metadata));
+    } catch (e) {
+      console.error('Failed to save download metadata:', e);
+    }
+  };
+
+  const handleImageDownload = async () => {
+    if (!attachmentUrl || isDownloadingImage) return;
+    
+    setIsDownloadingImage(true);
+    try {
+      const response = await fetch(attachmentUrl);
+      if (!response.ok) throw new Error('Download failed');
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = message?.attachmentName || 'image.jpg';
+      link.style.display = 'none';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      
+      // Mark as downloaded in state and localStorage so blur stays off
+      const key = getDownloadKey();
+      if (key) {
+        localStorage.setItem(key, 'true');
+      }
+      setImageDownloaded(true);
+      
+      // Save download metadata for gallery
+      saveDownloadMetadata('IMAGE');
+      
+      setTimeout(() => URL.revokeObjectURL(url), 100);
+    } catch (error) {
+      console.error('Image download failed:', error);
+    } finally {
+      setIsDownloadingImage(false);
+    }
   };
 
   // Close menu when clicking outside
@@ -206,28 +297,190 @@ const MessageBubble = ({ message, isOwn, onEdit, onDelete }) => {
                   }`}
                 >
                   {isImageAttachment && (
-                    <img
-                      src={attachmentUrl}
-                      alt={message?.attachmentName || "Shared image"}
-                      className="max-h-60 w-full object-cover"
-                      loading="lazy"
-                    />
+                    <div className="relative max-w-xs group">
+                      <img
+                        src={attachmentUrl}
+                        alt={message?.attachmentName || "Shared image"}
+                        className={`max-h-80 w-full object-cover rounded-md transition-all ${
+                          !isOwn && !imageDownloaded ? "blur-[50px] scale-105" : ""
+                        }`}
+                        loading="lazy"
+                        style={!isOwn && !imageDownloaded ? { filter: 'blur(50px)' } : {}}
+                      />
+                      
+                      {/* Download overlay for receiver (blurred image) */}
+                      {!isOwn && !imageDownloaded && (
+                        <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/40 rounded-md">
+                          <button
+                            onClick={handleImageDownload}
+                            disabled={isDownloadingImage}
+                            className="flex flex-col items-center gap-2 px-6 py-4 bg-white/90 hover:bg-white rounded-lg transition-all active:scale-95 disabled:opacity-50"
+                          >
+                            {isDownloadingImage ? (
+                              <>
+                                <div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin" />
+                                <span className="text-sm font-medium text-gray-700">Downloading...</span>
+                              </>
+                            ) : (
+                              <>
+                                <Download className="w-8 h-8 text-blue-500" />
+                                <span className="text-sm font-medium text-gray-900">Download to View</span>
+                                <span className="text-xs text-gray-500">
+                                  {message?.attachmentSize 
+                                    ? `${(message.attachmentSize / 1024 / 1024).toFixed(1)} MB`
+                                    : 'Tap to download'}
+                                </span>
+                              </>
+                            )}
+                          </button>
+                        </div>
+                      )}
+                      
+                      {/* Download button for sender OR after receiver downloads */}
+                      {(isOwn || imageDownloaded) && (
+                        <button
+                          onClick={handleImageDownload}
+                          disabled={isDownloadingImage}
+                          className="absolute top-2 right-2 bg-black/50 hover:bg-black/70 text-white p-2 rounded-full opacity-0 group-hover:opacity-100 transition-opacity disabled:opacity-50"
+                          aria-label="Download image"
+                        >
+                          {isDownloadingImage ? (
+                            <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                          ) : (
+                            <Download className="w-4 h-4" />
+                          )}
+                        </button>
+                      )}
+                    </div>
                   )}
                   {isVideoAttachment && (
-                    <video
-                      controls
-                      className="max-h-60 w-full rounded-md"
-                      src={attachmentUrl}
-                    >
-                      Your browser does not support the video element.
-                    </video>
+                    <div className="relative group">
+                      <video
+                        controls
+                        className="max-h-60 w-full rounded-md"
+                        src={attachmentUrl}
+                      >
+                        Your browser does not support the video element.
+                      </video>
+                      <button
+                        onClick={(e) => {
+                          e.preventDefault();
+                          const link = document.createElement('a');
+                          link.href = resolveDownloadUrl(message?.attachmentUrl) || attachmentUrl;
+                          link.download = message?.attachmentName || 'video.mp4';
+                          link.click();
+                          saveDownloadMetadata('VIDEO');
+                        }}
+                        className="absolute top-2 right-2 bg-black/50 hover:bg-black/70 text-white p-2 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
+                        aria-label="Download video"
+                      >
+                        <Download className="w-4 h-4" />
+                      </button>
+                    </div>
                   )}
                   {isAudioAttachment && (
-                    <div className={`p-2 ${isOwn ? "bg-white/5" : "bg-gray-100"}`}>
-                      <audio controls className="w-full">
-                        <source src={attachmentUrl} />
-                        Your browser does not support the audio element.
-                      </audio>
+                    <div className={`rounded-xl p-3 min-w-[280px] max-w-sm ${
+                      isOwn ? "bg-white/10 backdrop-blur-sm" : "bg-white shadow-sm"
+                    }`}>
+                      <div className="flex items-center gap-3">
+                        {/* Play/Pause Button */}
+                        <button
+                          onClick={handlePlayPause}
+                          className={`relative w-12 h-12 rounded-full flex items-center justify-center cursor-pointer shrink-0 transition-all ${
+                            isOwn 
+                              ? "bg-white text-blue-500 hover:bg-white/90 active:scale-95 shadow-lg" 
+                              : "bg-blue-500 hover:bg-blue-600 active:scale-95 shadow-lg"
+                          }`}
+                        >
+                          {isPlaying ? (
+                            // Pause icon (two bars)
+                            <div className="flex gap-1.5">
+                              <div className={`w-1 h-5 rounded-sm ${isOwn ? "bg-blue-500" : "bg-white"}`}></div>
+                              <div className={`w-1 h-5 rounded-sm ${isOwn ? "bg-blue-500" : "bg-white"}`}></div>
+                            </div>
+                          ) : (
+                            // Play icon (triangle)
+                            <div 
+                              className="w-0 h-0 ml-1"
+                              style={{
+                                borderLeft: `14px solid ${isOwn ? '#3b82f6' : 'white'}`,
+                                borderTop: '9px solid transparent',
+                                borderBottom: '9px solid transparent'
+                              }}
+                            ></div>
+                          )}
+                        </button>
+                        
+                        {/* Hidden audio element */}
+                        <audio 
+                          ref={audioRef}
+                          src={attachmentUrl}
+                          onLoadedMetadata={(e) => setAudioDuration(e.target.duration)}
+                          onTimeUpdate={(e) => setAudioProgress((e.target.currentTime / e.target.duration) * 100)}
+                          onPlay={() => setIsPlaying(true)}
+                          onPause={() => setIsPlaying(false)}
+                          onEnded={() => {
+                            setIsPlaying(false);
+                            setAudioProgress(0);
+                          }}
+                        />
+                        
+                        {/* Waveform and progress */}
+                        <div className="flex-1 min-w-0">
+                          {/* File name */}
+                          <div className={`text-xs font-medium truncate mb-2 ${
+                            isOwn ? "text-white/90" : "text-gray-700"
+                          }`}>
+                            <Music className="w-3 h-3 inline mr-1 -mt-0.5" />
+                            {message?.attachmentName || "Voice Message"}
+                          </div>
+                          
+                          {/* Progress bar */}
+                          <div className="relative mb-2 h-1 rounded-full overflow-hidden bg-gray-300">
+                            {/* Grey background (total length) - already applied above */}
+                            {/* Progress fill (white/blue line showing current position) */}
+                            <div 
+                              className={`absolute top-0 left-0 h-full rounded-full transition-all duration-100 ${
+                                isOwn ? "bg-white" : "bg-blue-600"
+                              }`}
+                              style={{ width: `${audioProgress}%` }}
+                            />
+                          </div>
+                          
+                          {/* Time display */}
+                          <div className={`text-[10px] flex justify-between ${
+                            isOwn ? "text-white/70" : "text-gray-500"
+                          }`}>
+                            <span>
+                              {audioRef.current ? formatAudioTime(audioRef.current.currentTime) : '0:00'}
+                            </span>
+                            <span>
+                              {formatAudioTime(audioDuration)}
+                            </span>
+                          </div>
+                        </div>
+                        
+                        {/* Download Button */}
+                        <button
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            const link = document.createElement('a');
+                            link.href = downloadUrl || attachmentUrl;
+                            link.download = message?.attachmentName || 'audio.mp3';
+                            link.click();
+                            saveDownloadMetadata('AUDIO');
+                          }}
+                          className={`p-2 rounded-full shrink-0 transition-all ${
+                            isOwn 
+                              ? "hover:bg-white/20 text-white/80 hover:text-white active:scale-90" 
+                              : "hover:bg-gray-100 text-gray-600 hover:text-gray-900 active:scale-90"
+                          }`}
+                          aria-label="Download audio"
+                        >
+                          <Download className="w-4 h-4" />
+                        </button>
+                      </div>
                     </div>
                   )}
                   {isDocumentAttachment && (
@@ -237,14 +490,16 @@ const MessageBubble = ({ message, isOwn, onEdit, onDelete }) => {
                       <a
                         href={downloadUrl || attachmentUrl}
                         download
+                        onClick={() => saveDownloadMetadata('DOCUMENT')}
                         className="flex items-center gap-2 truncate flex-1"
                       >
                         <FileText className="h-4 w-4" />
-                        <span className="truncate">{message?.attachmentName || message?.content || 'Open attachment'}</span>
+                        <span className="truncate">{message?.attachmentName || 'Document'}</span>
                       </a>
                       {downloadUrl && (
                         <a
                           href={downloadUrl}
+                          onClick={() => saveDownloadMetadata('DOCUMENT')}
                           className={`flex h-8 w-8 items-center justify-center rounded-full border transition ${isOwn ? "border-white/40 text-white hover:bg-white/20" : "border-gray-200 text-gray-700 hover:bg-gray-200"}`}
                           aria-label="Download attachment"
                         >
@@ -255,7 +510,8 @@ const MessageBubble = ({ message, isOwn, onEdit, onDelete }) => {
                   )}
                 </div>
               )}
-              {message?.content && (
+              {/* Show caption/text only if it's different from attachment name */}
+              {message?.content && message?.content !== message?.attachmentName && (
                 <div className="text-sm whitespace-pre-wrap break-words">{message?.content}</div>
               )}
               {message?.edited && (
