@@ -8,7 +8,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
-import java.time.LocalDateTime;
+import java.time.Instant;
 import java.util.List;
 
 @Service
@@ -21,12 +21,8 @@ public class ChatService {
 
     public void processMessage(ChatMessage message) {
         if (message.getTimestamp() == null) {
-            // Store timestamp with +5:30 offset for text message bubbles
-            if ("TEXT".equals(message.getMessageType()) || message.getMessageType() == null || message.getMessageType().isBlank()) {
-                message.setTimestamp(LocalDateTime.now().plusHours(5).plusMinutes(30));
-            } else {
-                message.setTimestamp(LocalDateTime.now());
-            }
+            // Store timestamp in UTC
+            message.setTimestamp(Instant.now());
         }
 
         if (message.getMessageType() == null || message.getMessageType().isBlank()) {
@@ -85,7 +81,8 @@ public class ChatService {
         ChatMessage message = new ChatMessage();
         message.setGroupId(groupId);
         message.setSenderId(senderId);
-        message.setTimestamp(LocalDateTime.now());
+        // Store timestamp in UTC
+        message.setTimestamp(Instant.now());
         message.setEdited(false);
         message.setClientMessageId(clientMessageId);
 

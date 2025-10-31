@@ -21,22 +21,26 @@ const getDateLabel = (timestamp) => {
 
   const msgDate = parseTimestamp(timestamp);
   if (!msgDate) return null;
-  const today = new Date();
-  const yesterday = new Date(today);
-  yesterday.setDate(yesterday.getDate() - 1);
   
-  // Reset time parts for comparison
-  const msgDay = new Date(msgDate.getFullYear(), msgDate.getMonth(), msgDate.getDate());
-  const todayDay = new Date(today.getFullYear(), today.getMonth(), today.getDate());
-  const yesterdayDay = new Date(yesterday.getFullYear(), yesterday.getMonth(), yesterday.getDate());
+  // Get current UTC time
+  const now = new Date();
+  const todayUTC = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
+  const yesterdayUTC = todayUTC - 24 * 60 * 60 * 1000;
   
-  if (msgDay.getTime() === todayDay.getTime()) {
+  // Get message date in UTC
+  const msgUTC = Date.UTC(msgDate.getUTCFullYear(), msgDate.getUTCMonth(), msgDate.getUTCDate());
+  
+  if (msgUTC === todayUTC) {
     return "Today";
-  } else if (msgDay.getTime() === yesterdayDay.getTime()) {
+  } else if (msgUTC === yesterdayUTC) {
     return "Yesterday";
   } else {
-    // Format as "Month Date" (e.g., "October 25")
-    return msgDate.toLocaleDateString('en-US', { month: 'long', day: 'numeric' });
+    // Format as "Month Date" using UTC (e.g., "October 25")
+    return msgDate.toLocaleDateString('en-US', { 
+      month: 'long', 
+      day: 'numeric',
+      timeZone: 'UTC'
+    });
   }
 };
 

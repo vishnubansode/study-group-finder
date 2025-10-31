@@ -66,13 +66,10 @@ const formatTime = (ts) => {
   try {
     if (ts === null || ts === undefined || ts === "") return "";
 
- 
     let date;
     if (typeof ts === "number") {
-      
       date = ts < 1e12 ? new Date(ts * 1000) : new Date(ts);
     } else if (/^\d+$/.test(String(ts))) {
-  
       const n = parseInt(ts, 10);
       date = n < 1e12 ? new Date(n * 1000) : new Date(n);
     } else {
@@ -81,11 +78,16 @@ const formatTime = (ts) => {
 
     if (isNaN(date.getTime())) return "";
 
-   
-    return date.toLocaleTimeString('en-IN', {
+    // Apply +5:30 offset for IST
+    const offsetMilliseconds = (5 * 60 + 30) * 60 * 1000;
+    const adjustedDate = new Date(date.getTime() + offsetMilliseconds);
+
+    // Format time in UTC to reflect the manual offset
+    return adjustedDate.toLocaleTimeString('en-US', {
       hour: 'numeric',
       minute: '2-digit',
       hour12: true,
+      timeZone: 'UTC'
     });
   } catch (e) {
     return "";
