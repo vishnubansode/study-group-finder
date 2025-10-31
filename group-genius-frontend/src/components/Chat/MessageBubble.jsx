@@ -298,7 +298,7 @@ const MessageBubble = ({ message, isOwn, onEdit, onDelete, onReply, onReact }) =
           )}
 
           {/* Message bubble */}
-          <div className="relative">
+          <div className="relative group">
             <div
               className={`px-3 py-2 rounded-lg ${
                 isOwn ? "bg-blue-500 text-white" : "bg-gray-200 text-black"
@@ -533,15 +533,17 @@ const MessageBubble = ({ message, isOwn, onEdit, onDelete, onReply, onReact }) =
               )}
             </div>
 
-            {/* Three-dot menu button: only show for text messages, positioned on the right with proper spacing */}
-            {hasMenuActions && (
+            {/* Three-dot menu button - hidden for text messages */}
+            {hasMenuActions && !isTextMessage && (
               <button
                 onClick={toggleMenu}
-                className={`absolute ${isOwn ? "right-2" : "left-2"} top-1/2 -translate-y-1/2 p-1.5 rounded-full transition-all opacity-0 group-hover:opacity-100 ${
-                  isOwn 
-                    ? "bg-white/20 text-white hover:bg-white/30" 
+                className={`absolute top-1/2 -translate-y-1/2 p-1.5 rounded-full transition-all ${
+                  isOwn ? "right-2" : "left-2"
+                } ${
+                  isOwn
+                    ? "bg-white/20 text-white hover:bg-white/30"
                     : "bg-black/20 text-black hover:bg-black/30"
-                }`}
+                } opacity-0 group-hover:opacity-100`}
                 aria-label="Message options"
               >
                 <MoreVertical className="w-4 h-4" />

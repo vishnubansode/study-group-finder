@@ -135,28 +135,29 @@ const MediaGallery = ({ groupId, onClose }) => {
     }`;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center p-2 sm:p-4 overflow-y-auto">
+    <div className="fixed inset-0 z-50 flex items-start justify-center p-2 sm:p-4 overflow-y-auto bg-black/50 backdrop-blur-sm">
       <div className="w-full max-w-6xl bg-white dark:bg-slate-900 rounded-lg shadow-lg overflow-hidden my-4">
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 p-3 sm:p-4 border-b dark:border-slate-700">
-          <div className="flex items-center gap-2 min-w-0 w-full sm:w-auto justify-between sm:justify-start">
-            <h3 className="text-lg font-semibold">Media</h3>
-            <div className="text-sm text-slate-500 hidden sm:block">{downloads.length} items</div>
-            <button onClick={onClose} className="sm:hidden p-1.5 rounded hover:bg-slate-100 dark:hover:bg-slate-800 shrink-0 ml-auto"><X className="w-4 h-4" /></button>
-          </div>
-          <div className="flex items-center gap-2 w-full sm:w-auto justify-center sm:justify-start">
-            <div className="flex items-center gap-1 flex-wrap justify-center sm:justify-start">
-              {tabs.map((tab) => (
-                 <button
-                   key={tab.id}
-                   onClick={() => setActiveTab(tab.id)}
-                   className={`${tabButtonClasses(tab.id)} text-xs sm:text-sm px-2 sm:px-3 whitespace-nowrap`}
-                 >
-                   {tab.label}
-                 </button>
-               ))}
-             </div>
-            <button onClick={onClose} className="hidden sm:flex ml-2 p-2 rounded hover:bg-slate-100 dark:hover:bg-slate-800 shrink-0"><X className="w-5 h-5" /></button>
-          </div>
+        <div className="flex items-center justify-between gap-2 p-3 sm:p-4 border-b dark:border-slate-700">
+          <h3 className="text-base sm:text-lg font-semibold">Media</h3>
+          <button 
+            onClick={onClose} 
+            className="p-1.5 sm:p-2 rounded-full hover:bg-slate-100 dark:hover:bg-slate-800 shrink-0 transition-colors"
+            aria-label="Close"
+          >
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+        
+        <div className="flex items-center gap-1 sm:gap-2 p-2 sm:p-3 border-b dark:border-slate-700 overflow-x-auto">
+          {tabs.map((tab) => (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              className={`${tabButtonClasses(tab.id)} text-xs sm:text-sm px-3 sm:px-4 py-2 whitespace-nowrap flex-shrink-0`}
+            >
+              {tab.label}
+            </button>
+          ))}
         </div>
 
         <div className="p-3 sm:p-4 max-h-[60vh] sm:max-h-[70vh] overflow-y-auto">
