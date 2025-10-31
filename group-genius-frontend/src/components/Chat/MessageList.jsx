@@ -1,10 +1,26 @@
 import React, { useEffect, useRef } from "react";
 import MessageBubble from "./MessageBubble";
 
+const parseTimestamp = (ts) => {
+  if (ts === null || ts === undefined || ts === "") return null;
+  let date = null;
+  if (typeof ts === 'number') {
+    date = ts < 1e12 ? new Date(ts * 1000) : new Date(ts);
+  } else if (/^\d+$/.test(String(ts))) {
+    const n = parseInt(ts, 10);
+    date = n < 1e12 ? new Date(n * 1000) : new Date(n);
+  } else {
+    date = new Date(ts);
+  }
+  if (!date || Number.isNaN(date.getTime())) return null;
+  return date;
+};
+
 const getDateLabel = (timestamp) => {
   if (!timestamp) return null;
-  
-  const msgDate = new Date(timestamp);
+
+  const msgDate = parseTimestamp(timestamp);
+  if (!msgDate) return null;
   const today = new Date();
   const yesterday = new Date(today);
   yesterday.setDate(yesterday.getDate() - 1);

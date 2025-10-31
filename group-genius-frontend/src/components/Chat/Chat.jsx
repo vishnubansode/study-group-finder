@@ -7,6 +7,7 @@ const MediaGallery = ({ groupId, onClose }) => {
   const [downloads, setDownloads] = useState([]);
   const [selectedMedia, setSelectedMedia] = useState(null);
   const [selectedMediaIndex, setSelectedMediaIndex] = useState(0);
+  const [replyTo, setReplyTo] = useState(null);
 
   useEffect(() => {
     loadDownloads();
@@ -134,6 +135,17 @@ const MediaGallery = ({ groupId, onClose }) => {
         : "text-slate-600 dark:text-slate-400 border-b-2 border-transparent hover:text-slate-900 dark:hover:text-slate-100"
     }`;
 
+  const handleReply = (message) => {
+    setReplyTo(message);
+    // Auto-focus input if needed
+    const inputElement = document.querySelector('[data-chat-input]');
+    if (inputElement) inputElement.focus();
+  };
+
+  const clearReply = () => {
+    setReplyTo(null);
+  };
+
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-center p-2 sm:p-4 overflow-y-auto">
       <div className="w-full max-w-6xl bg-white dark:bg-slate-900 rounded-lg shadow-lg overflow-hidden my-4">
@@ -235,7 +247,7 @@ const MediaGallery = ({ groupId, onClose }) => {
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="font-medium truncate">{item.name}</p>
-                      <div className="hidden sm:flex items-center gap-1 sm:gap-2 text-xs text-gray-500 mt-0.5">
+                      <div className="flex items-center gap-1 sm:gap-2 text-xs text-gray-500 mt-0.5 hidden sm:flex">
                         <span>{formatFileSize(item.size)}</span>
                         <span>•</span>
                         <span>{formatDate(item.downloadedAt)}</span>

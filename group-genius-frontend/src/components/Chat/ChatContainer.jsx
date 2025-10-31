@@ -37,11 +37,21 @@ const ChatContainer = forwardRef(({ groupId, username, userId, initialMessages =
           destination: `/ws/app/chat/${groupId}`,
           body: JSON.stringify(chatMessage),
         });
+        // Optimistically add the message to the UI so sender sees it immediately
+        try {
+          setMessages((prev) => ([...prev, { ...chatMessage, pending: true }]));
+        } catch (e) {
+          // ignore optimistic update failures
+        }
+        // Debug log outgoing message
+        // eslint-disable-next-line no-console
+        console.debug('[WS SEND]', { groupId, chatMessage });
       } catch (e) {
         console.error("Send failed", e);
       }
     }
   }));
+
 
   const handleEditMessage = (message) => {
     const newContent = prompt("Edit message:", message.content);
@@ -126,6 +136,8 @@ const ChatContainer = forwardRef(({ groupId, username, userId, initialMessages =
           if (!message.body) return;
           try {
             const payload = JSON.parse(message.body);
+            // eslint-disable-next-line no-console
+            console.debug('[WS RECV]', { groupId, payload });
             const normalized = {
               ...payload,
               sender: payload.sender ?? (payload.senderId && userId && payload.senderId === userId ? username : payload.sender || ""),
@@ -158,7 +170,18 @@ const ChatContainer = forwardRef(({ groupId, username, userId, initialMessages =
           if (!message.body) return;
           try {
             const payload = JSON.parse(message.body);
-            setMessages((prev) => prev.filter((m) => m.id !== payload.id));
+            // eslint-disable-next-line no-console
+            console.debug('[WS DELETE]', { groupId, payload });
+            setMessages((prev) => {
+              if (payload.id) {
+                return prev.filter((m) => m.id !== payload.id);
+              }
+              if (payload.clientMessageId) {
+                return prev.filter((m) => m.clientMessageId !== payload.clientMessageId);
+              }
+              // Unknown payload shape - do not modify messages
+              return prev;
+            });
           } catch (err) {
             console.error("Invalid delete payload", err);
           }

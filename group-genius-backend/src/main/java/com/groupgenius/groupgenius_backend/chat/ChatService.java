@@ -21,7 +21,12 @@ public class ChatService {
 
     public void processMessage(ChatMessage message) {
         if (message.getTimestamp() == null) {
-            message.setTimestamp(LocalDateTime.now());
+            // Store timestamp with +5:30 offset for text message bubbles
+            if ("TEXT".equals(message.getMessageType()) || message.getMessageType() == null || message.getMessageType().isBlank()) {
+                message.setTimestamp(LocalDateTime.now().plusHours(5).plusMinutes(30));
+            } else {
+                message.setTimestamp(LocalDateTime.now());
+            }
         }
 
         if (message.getMessageType() == null || message.getMessageType().isBlank()) {

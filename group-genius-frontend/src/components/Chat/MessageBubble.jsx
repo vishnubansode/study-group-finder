@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Pencil, Trash2, MoreVertical, Download, FileText, Music, Mic } from "lucide-react";
+import { Pencil, Trash2, MoreVertical, Download, FileText, Music, Mic, Reply, Smile } from "lucide-react";
 
 const API_ROOT = (import.meta?.env?.VITE_API_BASE_URL ?? "http://localhost:8080").replace(/\/$/, "");
 
@@ -92,7 +92,7 @@ const formatTime = (ts) => {
   }
 };
 
-const MessageBubble = ({ message, isOwn, onEdit, onDelete }) => {
+const MessageBubble = ({ message, isOwn, onEdit, onDelete, onReply, onReact }) => {
   const [showMenu, setShowMenu] = useState(false);
   const [audioProgress, setAudioProgress] = useState(0);
   const [audioDuration, setAudioDuration] = useState(0);
@@ -134,11 +134,13 @@ const MessageBubble = ({ message, isOwn, onEdit, onDelete }) => {
 
   const canEdit = isOwn && typeof onEdit === "function";
   const canDelete = isOwn && typeof onDelete === "function";
-  const hasMenuActions = canEdit || canDelete;
+  const canReply = !isOwn && typeof onReply === "function";
+  const canReact = typeof onReact === "function";
+  const hasMenuActions = canEdit || canDelete || canReply || canReact;
   const isTextMessage = attachmentType === "TEXT";
 
   const toggleMenu = (e) => {
-    if (!hasMenuActions || !isTextMessage) return;
+    if (!hasMenuActions) return;
     e.stopPropagation();
     setShowMenu((prev) => !prev);
   };
@@ -151,6 +153,16 @@ const MessageBubble = ({ message, isOwn, onEdit, onDelete }) => {
   const handleDelete = () => {
     setShowMenu(false);
     if (canDelete && onDelete) onDelete(message);
+  };
+
+  const handleReply = () => {
+    setShowMenu(false);
+    if (canReply && onReply) onReply(message);
+  };
+
+  const handleReact = () => {
+    setShowMenu(false);
+    if (canReact && onReact) onReact(message);
   };
 
   const handlePlayPause = () => {
@@ -288,7 +300,7 @@ const MessageBubble = ({ message, isOwn, onEdit, onDelete }) => {
             <div
               className={`px-3 py-2 rounded-lg ${
                 isOwn ? "bg-blue-500 text-white" : "bg-gray-200 text-black"
-              } ${hasAttachment ? "space-y-2" : ""} ${hasMenuActions && isTextMessage ? "pr-10" : ""}`}
+              } ${hasAttachment ? "space-y-2" : ""}`}
             >
               {hasAttachment && (
                 <div
@@ -520,13 +532,13 @@ const MessageBubble = ({ message, isOwn, onEdit, onDelete }) => {
             </div>
 
             {/* Three-dot menu button: only show for text messages, positioned on the right with proper spacing */}
-            {hasMenuActions && isTextMessage && (
+            {hasMenuActions && (
               <button
                 onClick={toggleMenu}
-                className={`absolute right-2 top-1/2 -translate-y-1/2 p-1.5 rounded-full transition-all ${
+                className={`absolute ${isOwn ? "right-2" : "left-2"} top-1/2 -translate-y-1/2 p-1.5 rounded-full transition-all opacity-0 group-hover:opacity-100 ${
                   isOwn 
-                    ? "hover:bg-blue-400/30 text-white/90 hover:text-white" 
-                    : "hover:bg-gray-300/80 text-gray-600 hover:text-gray-800"
+                    ? "bg-white/20 text-white hover:bg-white/30" 
+                    : "bg-black/20 text-black hover:bg-black/30"
                 }`}
                 aria-label="Message options"
               >
@@ -534,33 +546,51 @@ const MessageBubble = ({ message, isOwn, onEdit, onDelete }) => {
               </button>
             )}
 
-            {/* Dropdown menu */}
-            {showMenu && (
-              <div
-                ref={menuRef}
-                className="absolute right-0 top-full mt-1 bg-white rounded-lg shadow-xl border border-gray-200 py-1 z-50 min-w-[160px]"
-              >
-                {canEdit && (
+             {/* Dropdown menu */}
+             {showMenu && (
+               <div
+                 ref={menuRef}
+                 className={`absolute ${isOwn ? "right-0" : "left-0"} top-full mt-1 bg-white rounded-lg shadow-xl border border-gray-200 py-1 z-50 min-w-[180px]`}
+               >
+                 {canReply && (
                   <button
                     className="w-full px-4 py-2 text-left text-sm hover:bg-gray-100 flex items-center gap-2"
-                    onClick={handleEdit}
+                    onClick={handleReply}
                   >
-                    <Pencil className="w-4 h-4" />
-                    Edit Message
+                    <Reply className="w-4 h-4" />
+                    Reply
                   </button>
                 )}
-                {canDelete && (
+                {canReact && (
                   <button
-                    className="w-full px-4 py-2 text-left text-sm hover:bg-gray-100 text-red-600 flex items-center gap-2"
-                    onClick={handleDelete}
+                    className="w-full px-4 py-2 text-left text-sm hover:bg-gray-100 flex items-center gap-2"
+                    onClick={handleReact}
                   >
-                    <Trash2 className="w-4 h-4" />
-                    Delete Message
+                    <Smile className="w-4 h-4" />
+                    React
                   </button>
                 )}
-              </div>
-            )}
-          </div>
+                 {canEdit && (
+                   <button
+                     className="w-full px-4 py-2 text-left text-sm hover:bg-gray-100 flex items-center gap-2"
+                     onClick={handleEdit}
+                   >
+                     <Pencil className="w-4 h-4" />
+                     Edit Message
+                   </button>
+                 )}
+                 {canDelete && (
+                   <button
+                     className="w-full px-4 py-2 text-left text-sm hover:bg-gray-100 text-red-600 flex items-center gap-2"
+                     onClick={handleDelete}
+                   >
+                     <Trash2 className="w-4 h-4" />
+                     Delete Message
+                   </button>
+                 )}
+               </div>
+             )}
+           </div>
           
           {/* Timestamp below the bubble */}
           <div className={`text-[10px] text-muted-foreground mt-1 ${isOwn ? "text-right" : "text-left"}`}>
