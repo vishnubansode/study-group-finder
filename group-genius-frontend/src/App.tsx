@@ -6,6 +6,9 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { Navigation } from "@/components/layout/Navigation";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { AuthProvider, useAuth } from '@/contexts/AuthContext';
+import { MessagingWidget } from "@/components/common/MessagingWidget";
+import { useState } from "react";
+
 import Index from "./pages/Index";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
@@ -39,6 +42,7 @@ const App = () => (
 
 const AppShell = () => {
   const { user, isLoading } = useAuth();
+  const [widgetPosition, setWidgetPosition] = useState({ x: 20, y: 20 }); // Widget initial position
 
   if (isLoading) {
     return (
@@ -49,7 +53,7 @@ const AppShell = () => {
   }
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background relative">
       <Navigation />
       <div className="flex">
         <Sidebar />
@@ -71,6 +75,14 @@ const AppShell = () => {
             <Route path="/change-password" element={<ProtectedRoute><ChangePassword /></ProtectedRoute>} />
             <Route path="*" element={<NotFound />} />
           </Routes>
+
+          {/* ✅ Movable Messaging Widget (visible only after login) */}
+          {user && (
+            <MessagingWidget
+              position={widgetPosition}
+              onPositionChange={setWidgetPosition}
+            />
+          )}
         </main>
       </div>
     </div>
@@ -80,28 +92,16 @@ const AppShell = () => {
 const ProtectedRoute = ({ children }: { children: JSX.Element }) => {
   const { user, isLoading } = useAuth();
 
-  if (isLoading) {
-    return null;
-  }
-
-  if (!user) {
-    return <Navigate to="/login" replace />;
-  }
-
+  if (isLoading) return null;
+  if (!user) return <Navigate to="/login" replace />;
   return children;
 };
 
 const GuestRoute = ({ children }: { children: JSX.Element }) => {
   const { user, isLoading } = useAuth();
 
-  if (isLoading) {
-    return null;
-  }
-
-  if (user) {
-    return <Navigate to={`/dashboard/${user.id}`} replace />;
-  }
-
+  if (isLoading) return null;
+  if (user) return <Navigate to={`/dashboard/${user.id}`} replace />;
   return children;
 };
 
