@@ -36,11 +36,15 @@ interface ChatSession {
 interface MessagingWidgetProps {
   position?: { x: number; y: number };
   onPositionChange?: (position: { x: number; y: number }) => void;
+  anchor?: 'bottom-left' | 'top-left';
+  onOpenChange?: (isOpen: boolean) => void;
 }
 
 export const MessagingWidget: React.FC<MessagingWidgetProps> = ({
   position = { x: 20, y: 20 },
-  onPositionChange
+  onPositionChange,
+  anchor = 'top-left',
+  onOpenChange
 }) => {
   const { user } = useAuth();
   const [isOpen, setIsOpen] = useState(false);
@@ -59,6 +63,7 @@ export const MessagingWidget: React.FC<MessagingWidgetProps> = ({
   const floatingButtonRef = useRef<HTMLDivElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const [isMobile, setIsMobile] = useState<boolean>(false);
 
   // Pre-defined responses for common queries
   const responseMap: { [key: string]: string } = {
@@ -241,18 +246,24 @@ export const MessagingWidget: React.FC<MessagingWidgetProps> = ({
   useEffect(() => {
     const handleMouseMove = (e: MouseEvent) => {
       if (!isDragging || !onPositionChange) return;
-
       const newX = e.clientX - dragOffset.x;
-      const newY = e.clientY - dragOffset.y;
+      const newTop = e.clientY - dragOffset.y;
 
       // Calculate bounds based on current state
       const currentWidth = isOpen ? (showSidebar ? 800 : 400) : 56;
       const currentHeight = isOpen ? (isMinimized ? 60 : 500) : 56;
 
       const boundedX = Math.max(10, Math.min(window.innerWidth - currentWidth - 10, newX));
-      const boundedY = Math.max(10, Math.min(window.innerHeight - currentHeight - 10, newY));
+      const boundedTop = Math.max(10, Math.min(window.innerHeight - currentHeight - 10, newTop));
 
-      onPositionChange({ x: boundedX, y: boundedY });
+      if (anchor === 'bottom-left') {
+        // Convert top coordinate to bottom offset. Keep a safe minimum so the typing area doesn't get hidden
+        const minBottom = 80; // reserve space above bottom nav / taskbar
+        const boundedBottom = Math.max(minBottom, window.innerHeight - boundedTop - currentHeight);
+        onPositionChange({ x: boundedX, y: boundedBottom });
+      } else {
+        onPositionChange({ x: boundedX, y: boundedTop });
+      }
     };
 
     const handleMouseUp = () => {
@@ -273,6 +284,14 @@ export const MessagingWidget: React.FC<MessagingWidgetProps> = ({
       document.body.style.cursor = '';
     };
   }, [isDragging, dragOffset, isOpen, isMinimized, showSidebar, onPositionChange]);
+
+  // Track mobile viewport so we can expand the widget to fill available space on small screens
+  useEffect(() => {
+    const checkMobile = () => setIsMobile(window.innerWidth < 1024);
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
 
   // Find best response for user message
   const findBestResponse = (userMessage: string): string => {
@@ -396,15 +415,29 @@ export const MessagingWidget: React.FC<MessagingWidgetProps> = ({
         <div
           ref={floatingButtonRef}
           className="fixed z-50 cursor-move transition-all duration-200 hover:scale-110"
-          style={{ 
-            left: `${position.x}px`, 
-            top: `${position.y}px`,
-            filter: 'drop-shadow(0 8px 25px rgba(99, 102, 241, 0.3))'
-          }}
+          style={(() => {
+            // Hide floating button on mobile when widget is open state would be true; since we only render when !isOpen,
+            // also hide on mobile small screens so it doesn't overlap the pinned input when the widget is open.
+            if (isMobile && isOpen) return { display: 'none' } as React.CSSProperties;
+            return anchor === 'bottom-left' ? {
+              left: `${position.x}px`,
+              bottom: `${position.y}px`,
+              filter: 'drop-shadow(0 8px 25px rgba(99, 102, 241, 0.3))',
+              transition: isDragging ? 'none' : undefined
+            } : {
+              left: `${position.x}px`,
+              top: `${position.y}px`,
+              filter: 'drop-shadow(0 8px 25px rgba(99, 102, 241, 0.3))',
+              transition: isDragging ? 'none' : undefined
+            } as React.CSSProperties;
+          })()}
           onMouseDown={handleFloatingButtonMouseDown}
         >
           <Button
-            onClick={() => setIsOpen(true)}
+            onClick={() => {
+              setIsOpen(true);
+              onOpenChange?.(true);
+            }}
             className="rounded-full w-14 h-14 bg-gradient-to-br from-primary to-secondary hover:from-primary/90 hover:to-secondary/90 shadow-elegant transition-all duration-300"
             size="icon"
           >
@@ -418,12 +451,44 @@ export const MessagingWidget: React.FC<MessagingWidgetProps> = ({
         <div
           ref={widgetRef}
           className="fixed z-50 transition-all duration-300 ease-out flex bg-background rounded-lg overflow-hidden border border-border shadow-2xl"
-          style={{
-            left: `${position.x}px`,
-            top: `${position.y}px`,
-            width: showSidebar ? '800px' : '400px',
-            height: isMinimized ? '60px' : '500px',
-          }}
+          style={(() => {
+            // Mobile open: use full width and nearly-full height under top nav
+            if (isMobile && isOpen) {
+              // On mobile we want the widget to use the full available height under the top nav.
+              // Snap to bottom (no gap) and remove bottom rounding so it sits flush with viewport bottom.
+              const topNavHeight = 56; // approximate top nav height in px
+              return {
+                left: '0px',
+                right: '0px',
+                bottom: '0px',
+                width: '100vw',
+                maxWidth: '100vw',
+                height: `calc(100vh - ${topNavHeight}px)`,
+                transition: isDragging ? 'none' : undefined,
+                borderRadius: '12px 12px 0 0',
+                margin: '0',
+                overflow: 'hidden'
+              } as React.CSSProperties;
+            }
+
+            if (anchor === 'bottom-left') {
+              return {
+                left: `${position.x}px`,
+                bottom: `${position.y}px`,
+                width: showSidebar ? '800px' : '400px',
+                height: isMinimized ? '60px' : '500px',
+                transition: isDragging ? 'none' : undefined
+              } as React.CSSProperties;
+            }
+
+            return {
+              left: `${position.x}px`,
+              top: `${position.y}px`,
+              width: showSidebar ? '800px' : '400px',
+              height: isMinimized ? '60px' : '500px',
+              transition: isDragging ? 'none' : undefined
+            } as React.CSSProperties;
+          })()}
         >
           {/* Sidebar - Chat History */}
           {showSidebar && (
@@ -507,7 +572,7 @@ export const MessagingWidget: React.FC<MessagingWidgetProps> = ({
           )}
 
           {/* Main Chat Area */}
-          <div className="flex-1 flex flex-col bg-background">
+          <div className="flex-1 min-h-0 flex flex-col bg-background">
             {/* Header - Draggable Area */}
             <div 
               className={cn(
@@ -563,7 +628,10 @@ export const MessagingWidget: React.FC<MessagingWidgetProps> = ({
                 <Button
                   variant="ghost"
                   size="icon"
-                  onClick={() => setIsOpen(false)}
+                  onClick={() => {
+                    setIsOpen(false);
+                    onOpenChange?.(false);
+                  }}
                   className="h-8 w-8 hover:bg-destructive/10 hover:text-destructive"
                   title="Close"
                 >
@@ -572,11 +640,29 @@ export const MessagingWidget: React.FC<MessagingWidgetProps> = ({
               </div>
             </div>
 
+            {isLoading && (
+              <div className="px-4 py-2 border-b border-border text-sm text-muted-foreground flex items-center gap-2">
+                <div className="w-2 h-2 bg-muted-foreground rounded-full animate-bounce" />
+                <span>Typing…</span>
+              </div>
+            )}
+
             {!isMinimized && (
               <>
                 {/* Messages Area */}
-                <div className="flex-1 overflow-hidden">
-                  <ScrollArea className="h-full p-4">
+                <div className="flex-1 min-h-0 overflow-hidden">
+                  <ScrollArea
+                    className={isMobile && isOpen ? "h-full px-3 pt-3" : "h-full p-4"}
+                    style={(() => {
+                      if (isMobile && isOpen) {
+                        return { paddingBottom: 'calc(96px + env(safe-area-inset-bottom, 0px))' } as React.CSSProperties;
+                      }
+                      if (!isMobile && anchor === 'bottom-left' && !isMinimized) {
+                        return { paddingBottom: '90px' } as React.CSSProperties;
+                      }
+                      return undefined;
+                    })()}
+                  >
                     <div className="space-y-4">
                       {messages.map((message) => (
                         <div
@@ -642,15 +728,36 @@ export const MessagingWidget: React.FC<MessagingWidgetProps> = ({
                 </div>
 
                 {/* Input Area */}
-                <div className="p-4 border-t border-border bg-background/80">
-                  <div className="flex gap-2">
+                <div
+                  className={cn(
+                    "shrink-0",
+                    isMobile && isOpen ? "p-0 border-0 bg-transparent" : "p-4 border-t border-border bg-background"
+                  )}
+                  style={isMobile && isOpen ? ({
+                    position: 'sticky',
+                    bottom: 0,
+                    zIndex: 60,
+                    left: 0,
+                    right: 0,
+                    padding: '0 12px 12px',
+                    background: 'transparent',
+                    pointerEvents: 'none'
+                  } as React.CSSProperties) : undefined}
+                >
+                  <div className={cn(
+                    "flex gap-2",
+                    isMobile && isOpen ? "pointer-events-auto w-full max-w-none rounded-xl bg-card border border-border shadow-md p-2" : ""
+                  )}>
                     <Input
                       ref={inputRef}
                       value={inputValue}
                       onChange={(e) => setInputValue(e.target.value)}
                       onKeyDown={handleKeyPress}
                       placeholder="Ask about groups, courses, or help..."
-                      className="flex-1 bg-background border-border focus:border-primary transition-colors"
+                      className={cn(
+                        "flex-1 border-border focus:border-primary transition-colors",
+                        isMobile && isOpen ? "bg-transparent" : "bg-background"
+                      )}
                       disabled={isLoading}
                     />
                     <Button 

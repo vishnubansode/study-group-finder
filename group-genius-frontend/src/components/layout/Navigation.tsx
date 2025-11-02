@@ -151,7 +151,7 @@ export function Navigation() {
             <span className="text-xl font-bold text-foreground">GroupGenius</span>
           </Link>
           
-          <div className="flex items-center space-x-2">
+    <div className="flex-1 flex items-center justify-end space-x-2">
             <Button variant="ghost" size="icon" className="relative">
               <Bell className="w-5 h-5" />
               <div className="absolute -top-1 -right-1 w-2 h-2 bg-accent rounded-full" />
@@ -199,28 +199,8 @@ export function Navigation() {
         )}
       </nav>
 
-      {/* Bottom Navigation for Mobile */}
-      <div className="lg:hidden fixed bottom-0 left-0 right-0 bg-card border-t border-border z-50">
-        <div className="flex items-center justify-around py-2">
-          {menuItems.slice(0, 5).map((item) => {
-            const Icon = item.icon;
-            return (
-              <Link
-                key={item.name}
-                to={item.href}
-                className={`flex flex-col items-center space-y-1 px-3 py-2 rounded-lg transition-colors ${
-                  isActive(item.href)
-                    ? 'text-primary'
-                    : 'text-muted-foreground hover:text-foreground'
-                }`}
-              >
-                <Icon className="w-5 h-5" />
-                <span className="text-xs font-medium">{item.name}</span>
-              </Link>
-            );
-          })}
-        </div>
-      </div>
+      {/* Bottom Navigation for Mobile (hidden when hideBottomNav=true) */}
+      {/* Bottom navigation removed — mobile menu (burger) is used instead */}
     </>
   );
 }

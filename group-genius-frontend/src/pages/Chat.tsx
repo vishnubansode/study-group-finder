@@ -322,9 +322,9 @@ export default function Chat() {
               )}
             </div>
             
-            {/* Floating Message Input Widget - Fixed at bottom of chat card */}
-            <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-white via-white to-transparent pt-4 pb-4 px-4">
-              <div className="bg-white rounded-xl shadow-lg border border-gray-200 p-3">
+            {/* Floating Message Input Widget - Fixed at bottom of chat card (no extra bottom gap) */}
+            <div className="absolute bottom-0 left-0 right-0 bg-white pt-2 pb-0 px-2 md:px-4">
+              <div className="bg-white rounded-xl shadow border border-gray-200 p-2 md:p-3">
                 <MessageInput
                   onSend={handleSendMessage}
                   onUpload={handleUploadAttachment}

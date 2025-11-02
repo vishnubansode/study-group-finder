@@ -7,7 +7,7 @@ import { Navigation } from "@/components/layout/Navigation";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { AuthProvider, useAuth } from '@/contexts/AuthContext';
 import { MessagingWidget } from "@/components/common/MessagingWidget";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
 import Index from "./pages/Index";
 import Login from "./pages/Login";
@@ -42,7 +42,20 @@ const App = () => (
 
 const AppShell = () => {
   const { user, isLoading } = useAuth();
-  const [widgetPosition, setWidgetPosition] = useState({ x: 20, y: 20 }); // Widget initial position
+  // position.y is interpreted as bottom offset when anchor='bottom-left'
+  // Use a larger default bottom offset so the widget (and its typing area) sits above any bottom nav/taskbar
+  const [widgetPosition, setWidgetPosition] = useState({ x: 20, y: 80 }); // x: left offset, y: bottom offset
+
+  // Ensure widget is anchored to bottom-left on mount and stays at the same bottom offset on resize.
+  useEffect(() => {
+    const setBottomLeft = () => {
+      setWidgetPosition({ x: 20, y: 80 });
+    };
+
+    setBottomLeft();
+    window.addEventListener('resize', setBottomLeft);
+    return () => window.removeEventListener('resize', setBottomLeft);
+  }, []);
 
   if (isLoading) {
     return (
@@ -54,7 +67,7 @@ const AppShell = () => {
 
   return (
     <div className="min-h-screen bg-background relative">
-      <Navigation />
+  <Navigation />
       <div className="flex">
         <Sidebar />
         <main className={`flex-1 ${user ? 'lg:ml-64' : ''}`}>
@@ -76,13 +89,14 @@ const AppShell = () => {
             <Route path="*" element={<NotFound />} />
           </Routes>
 
-          {/* ✅ Movable Messaging Widget (visible only after login) */}
+          {/* ✅ Movable Messaging Widget (visible only after login)
           {user && (
             <MessagingWidget
               position={widgetPosition}
               onPositionChange={setWidgetPosition}
+              anchor="bottom-left"
             />
-          )}
+          )} */}
         </main>
       </div>
     </div>
