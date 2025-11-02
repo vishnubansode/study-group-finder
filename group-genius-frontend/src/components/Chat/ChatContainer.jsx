@@ -10,10 +10,11 @@ const WS_URL = (import.meta?.env?.VITE_WS_URL)
 const ChatContainer = forwardRef(({ groupId, username, userId, initialMessages = [], onConnectionChange }, ref) => {
   const [messages, setMessages] = useState([]);
   const [connected, setConnected] = useState(false);
+  const [typingUsers, setTypingUsers] = useState(new Map()); // Map<userId, {username, timeoutId}>
   const clientRef = useRef(null);
   const subRef = useRef(null);
 
-  // Expose sendMessage function to parent component via ref
+  // Expose sendMessage and handleTyping functions to parent component via ref
   useImperativeHandle(ref, () => ({
     sendMessage: (text) => {
       const client = clientRef.current;
@@ -48,6 +49,29 @@ const ChatContainer = forwardRef(({ groupId, username, userId, initialMessages =
         console.debug('[WS SEND]', { groupId, chatMessage });
       } catch (e) {
         console.error("Send failed", e);
+      }
+    },
+    handleTyping: (isTyping) => {
+      const client = clientRef.current;
+      console.log('[ChatContainer.handleTyping]', { isTyping, hasClient: !!client, connected, groupId, userId, username });
+      if (!client || !connected) {
+        console.log('[ChatContainer.handleTyping] Not ready to send');
+        return;
+      }
+
+      try {
+        const payload = {
+          userId,
+          username,
+          isTyping,
+        };
+        console.log('[WS TYPING SEND]', { destination: `/ws/app/chat/${groupId}/typing`, payload });
+        client.publish({
+          destination: `/ws/app/chat/${groupId}/typing`,
+          body: JSON.stringify(payload),
+        });
+      } catch (e) {
+        console.error("Typing indicator failed", e);
       }
     }
   }));
@@ -110,6 +134,7 @@ const ChatContainer = forwardRef(({ groupId, username, userId, initialMessages =
     ...m,
     sender: m.sender ?? (m.senderId && userId && m.senderId === userId ? username : m.sender || ""),
   }));
+  console.log('[ChatContainer] Setting initial messages:', norm.length, norm);
   setMessages(norm);
 
     // create a new STOMP client for this group
@@ -186,6 +211,58 @@ const ChatContainer = forwardRef(({ groupId, username, userId, initialMessages =
             console.error("Invalid delete payload", err);
           }
         });
+
+        // Subscribe to typing indicator events
+        client.subscribe(`/ws/group/${groupId}/typing`, (message) => {
+          if (!message.body) return;
+          try {
+            const payload = JSON.parse(message.body);
+            console.log('[WS TYPING]', { groupId, payload, currentUserId: userId });
+            const { userId: typingUserId, username: typingUsername, isTyping } = payload;
+            
+            // Ignore typing events from current user
+            if (typingUserId === userId) {
+              console.log('[WS TYPING] Ignoring own typing event');
+              return;
+            }
+            
+            console.log('[WS TYPING] Processing typing event:', { typingUserId, typingUsername, isTyping });
+
+            setTypingUsers((prev) => {
+              const newMap = new Map(prev);
+              
+              if (isTyping) {
+                // Clear existing timeout for this user if any
+                const existing = newMap.get(typingUserId);
+                if (existing?.timeoutId) {
+                  clearTimeout(existing.timeoutId);
+                }
+                
+                // Set new timeout to auto-remove typing indicator after 3 seconds
+                const timeoutId = setTimeout(() => {
+                  setTypingUsers((current) => {
+                    const updated = new Map(current);
+                    updated.delete(typingUserId);
+                    return updated;
+                  });
+                }, 3000);
+                
+                newMap.set(typingUserId, { username: typingUsername, timeoutId });
+              } else {
+                // User stopped typing - clear timeout and remove from map
+                const existing = newMap.get(typingUserId);
+                if (existing?.timeoutId) {
+                  clearTimeout(existing.timeoutId);
+                }
+                newMap.delete(typingUserId);
+              }
+              
+              return newMap;
+            });
+          } catch (err) {
+            console.error("Invalid typing indicator payload", err);
+          }
+        });
       } catch (e) {
         console.error("Subscribe failed", e);
       }
@@ -222,6 +299,16 @@ const ChatContainer = forwardRef(({ groupId, username, userId, initialMessages =
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [groupId]);
 
+  // Get typing indicator text
+  const typingIndicatorText = React.useMemo(() => {
+    const typingUsernames = Array.from(typingUsers.values()).map(u => u.username);
+    console.log('[ChatContainer] Typing users:', typingUsers.size, typingUsernames);
+    if (typingUsernames.length === 0) return null;
+    if (typingUsernames.length === 1) return `${typingUsernames[0]} is typing...`;
+    if (typingUsernames.length === 2) return `${typingUsernames[0]} and ${typingUsernames[1]} are typing...`;
+    return `${typingUsernames[0]} and ${typingUsernames.length - 1} others are typing...`;
+  }, [typingUsers]);
+
   return (
     <div className="flex flex-col h-full bg-gray-50">
       <MessageList 
@@ -230,6 +317,7 @@ const ChatContainer = forwardRef(({ groupId, username, userId, initialMessages =
         userId={userId}
         onEdit={handleEditMessage}
         onDelete={handleDeleteMessage}
+        typingIndicator={typingIndicatorText}
       />
     </div>
   );

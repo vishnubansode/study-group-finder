@@ -1,17 +1,66 @@
-import React, { useRef, useState } from "react";
+import React, { useRef, useState, useEffect, useCallback } from "react";
 import { Loader2, Paperclip, Send } from "lucide-react";
 
 const ACCEPTED_TYPES = "image/*,video/*,audio/*,.pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,.txt,.zip,.rar,.7z";
 
-const MessageInput = ({ onSend, onUpload, disabled = false, isUploading = false }) => {
+const MessageInput = ({ onSend, onUpload, onTyping, disabled = false, isUploading = false }) => {
   const [text, setText] = useState("");
   const [isSending, setIsSending] = useState(false);
   const fileInputRef = useRef(null);
+  const typingTimeoutRef = useRef(null);
+
+  // Notify typing stopped when user stops typing for 2 seconds
+  const notifyTypingStopped = useCallback(() => {
+    console.log('[MessageInput] Notifying typing stopped');
+    if (typeof onTyping === "function") {
+      onTyping(false);
+    }
+  }, [onTyping]);
+
+  // Handle text change and emit typing indicator
+  const handleTextChange = useCallback((e) => {
+    const newText = e.target.value;
+    setText(newText);
+
+    // Notify that user is typing
+    if (typeof onTyping === "function" && newText.trim()) {
+      console.log('[MessageInput] Notifying typing started');
+      onTyping(true);
+    }
+
+    // Clear existing timeout
+    if (typingTimeoutRef.current) {
+      clearTimeout(typingTimeoutRef.current);
+    }
+
+    // Set new timeout to stop typing indicator after 2 seconds of inactivity
+    if (newText.trim()) {
+      typingTimeoutRef.current = setTimeout(notifyTypingStopped, 2000);
+    } else {
+      // If text is empty, immediately stop typing indicator
+      notifyTypingStopped();
+    }
+  }, [onTyping, notifyTypingStopped]);
+
+  // Clean up timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (typingTimeoutRef.current) {
+        clearTimeout(typingTimeoutRef.current);
+      }
+    };
+  }, []);
 
   const handleSend = async (e) => {
     e.preventDefault();
     const trimmed = text.trim();
     if (!trimmed || typeof onSend !== "function") return;
+
+    // Clear typing timeout and notify typing stopped
+    if (typingTimeoutRef.current) {
+      clearTimeout(typingTimeoutRef.current);
+    }
+    notifyTypingStopped();
 
     try {
       setIsSending(true);
@@ -73,7 +122,7 @@ const MessageInput = ({ onSend, onUpload, disabled = false, isUploading = false 
         type="text"
         placeholder="Type a message or add a caption..."
         value={text}
-        onChange={(e) => setText(e.target.value)}
+        onChange={handleTextChange}
       />
       <button
         type="submit"

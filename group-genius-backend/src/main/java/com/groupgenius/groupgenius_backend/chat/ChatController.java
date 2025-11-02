@@ -32,4 +32,9 @@ public class ChatController {
         Long messageId = ((Number) payload.get("messageId")).longValue();
         chatService.deleteMessage(messageId, groupId);
     }
+
+    @MessageMapping("/chat/{groupId}/typing")
+    public void userTyping(@DestinationVariable Long groupId, @Payload Map<String, Object> payload) {
+        chatService.broadcastTypingIndicator(groupId, payload);
+    }
 }

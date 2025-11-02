@@ -57,7 +57,30 @@ export default function Chat() {
           return isOwner || isApproved;
         });
 
-        setGroups(joinedOnly);
+        // Fetch last message for each group to populate previews
+        const groupsWithPreviews = await Promise.all(
+          joinedOnly.map(async (g: any) => {
+            try {
+              const history = await chatAPI.getHistory(token, g.id);
+              if (history && history.length > 0) {
+                const lastMsg = history[history.length - 1];
+                const preview = lastMsg.content 
+                  ? (lastMsg.content.length > 50 ? lastMsg.content.substring(0, 50) + '...' : lastMsg.content)
+                  : (lastMsg.attachmentName || 'Attachment');
+                return {
+                  ...g,
+                  lastMessagePreview: preview,
+                };
+              }
+              return g;
+            } catch (err) {
+              console.error('Failed to load preview for group', g.id, err);
+              return g;
+            }
+          })
+        );
+
+        setGroups(groupsWithPreviews);
       } catch (err) {
         console.error('Failed to load groups', err);
         setGroups([]);
@@ -85,6 +108,7 @@ export default function Chat() {
       setIsLoadingHistory(true);
       const token = tokenService.getToken();
       const history = token ? await chatAPI.getHistory(token, groupId) : [];
+      console.log('[Chat] Loaded history for group', groupId, ':', history?.length || 0, history);
       setInitialMessages(history || []);
       setSelectedGroupId(groupId);
       localStorage.setItem('sgf:lastChatGroupId', String(groupId));
@@ -122,6 +146,22 @@ export default function Chat() {
     }
     return false;
   }, [isConnected, toast]);
+
+  const handleTyping = useCallback((isTyping: boolean) => {
+    console.log('[Chat] handleTyping called:', { isTyping, isConnected });
+    if (!isConnected) {
+      console.log('[Chat] Not connected, ignoring typing event');
+      return;
+    }
+
+    const sender = chatContainerRef.current;
+    if (sender && typeof sender.handleTyping === 'function') {
+      console.log('[Chat] Calling ChatContainer.handleTyping');
+      sender.handleTyping(isTyping);
+    } else {
+      console.log('[Chat] ChatContainer.handleTyping not available');
+    }
+  }, [isConnected]);
 
   const handleUploadAttachment = useCallback(async (file: File, caption: string) => {
     if (!selectedGroupId) {
@@ -199,7 +239,13 @@ export default function Chat() {
                           <Avatar className="w-10 h-10"><AvatarFallback>{g.name?.[0]}</AvatarFallback></Avatar>
                           <div className="flex-1 min-w-0">
                             <div className="font-semibold truncate">{g.name}</div>
-                            <div className="text-xs text-muted-foreground truncate">{g.lastMessagePreview || 'No messages yet'}</div>
+                            <div className="text-xs text-muted-foreground truncate">
+                              {g.lastMessagePreview
+                                ? g.lastMessagePreview
+                                : (g.unreadCount > 0
+                                    ? `${g.unreadCount} unread ${g.unreadCount === 1 ? 'message' : 'messages'}`
+                                    : 'No messages yet')}
+                            </div>
                           </div>
                           {g.unreadCount > 0 && (
                             <div className="text-xs bg-red-600 text-white rounded-full px-2">{g.unreadCount}</div>
@@ -282,6 +328,7 @@ export default function Chat() {
                 <MessageInput
                   onSend={handleSendMessage}
                   onUpload={handleUploadAttachment}
+                  onTyping={handleTyping}
                   disabled={!isConnected}
                   isUploading={isUploading}
                 />

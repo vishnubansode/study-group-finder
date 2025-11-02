@@ -28,7 +28,7 @@ public class ChatService {
         if (message.getMessageType() == null || message.getMessageType().isBlank()) {
             message.setMessageType("TEXT");
         }
-        
+
         // Enrich message with sender metadata from User entity
         if (message.getSenderId() != null) {
             userRepository.findById(message.getSenderId()).ifPresent(user -> {
@@ -37,7 +37,7 @@ public class ChatService {
                 message.setSenderProfileImageUrl(user.getProfileImageUrl());
             });
         }
-        
+
         // Persist server-side and obtain entity with generated identifier
         ChatMessage saved = chatMessageRepository.save(message);
 
@@ -50,7 +50,7 @@ public class ChatService {
 
     public List<ChatMessage> getHistory(Long groupId) {
         List<ChatMessage> history = chatMessageRepository.findByGroupIdOrderByTimestampAsc(groupId);
-        
+
         // Enrich each historical message with sender metadata
         history.forEach(msg -> {
             if (msg.getSenderId() != null) {
@@ -61,15 +61,15 @@ public class ChatService {
                 });
             }
         });
-        
+
         return history;
     }
 
     public ChatMessage createAttachmentMessage(Long groupId,
-                                               Long senderId,
-                                               String caption,
-                                               MultipartFile file,
-                                               String clientMessageId) throws IOException {
+            Long senderId,
+            String caption,
+            MultipartFile file,
+            String clientMessageId) throws IOException {
         if (file == null || file.isEmpty()) {
             throw new IllegalArgumentException("File must not be empty");
         }
@@ -113,10 +113,10 @@ public class ChatService {
         saved.setSender(message.getSender());
         saved.setSenderPhone(message.getSenderPhone());
         saved.setSenderProfileImageUrl(message.getSenderProfileImageUrl());
-    saved.setAttachmentUrl(message.getAttachmentUrl());
-    saved.setAttachmentName(message.getAttachmentName());
-    saved.setAttachmentType(message.getAttachmentType());
-    saved.setAttachmentSize(message.getAttachmentSize());
+        saved.setAttachmentUrl(message.getAttachmentUrl());
+        saved.setAttachmentName(message.getAttachmentName());
+        saved.setAttachmentType(message.getAttachmentType());
+        saved.setAttachmentSize(message.getAttachmentSize());
         saved.setClientMessageId(clientMessageId);
 
         // Broadcast attachment message to subscribers
@@ -142,10 +142,12 @@ public class ChatService {
         String filename = file.getOriginalFilename();
         if (filename != null) {
             String lower = filename.toLowerCase();
-            if (lower.endsWith(".jpg") || lower.endsWith(".jpeg") || lower.endsWith(".png") || lower.endsWith(".gif") || lower.endsWith(".webp")) {
+            if (lower.endsWith(".jpg") || lower.endsWith(".jpeg") || lower.endsWith(".png") || lower.endsWith(".gif")
+                    || lower.endsWith(".webp")) {
                 return "IMAGE";
             }
-            if (lower.endsWith(".mp4") || lower.endsWith(".mov") || lower.endsWith(".avi") || lower.endsWith(".mkv") || lower.endsWith(".webm")) {
+            if (lower.endsWith(".mp4") || lower.endsWith(".mov") || lower.endsWith(".avi") || lower.endsWith(".mkv")
+                    || lower.endsWith(".webm")) {
                 return "VIDEO";
             }
             if (lower.endsWith(".mp3") || lower.endsWith(".wav") || lower.endsWith(".aac")) {
@@ -188,5 +190,11 @@ public class ChatService {
             deleteEvent.setContent("[DELETED]");
             messagingTemplate.convertAndSend("/ws/group/" + groupId + "/delete", deleteEvent);
         });
+    }
+
+    public void broadcastTypingIndicator(Long groupId, java.util.Map<String, Object> payload) {
+        // Broadcast typing indicator to all subscribers of the group
+        // Payload should contain: { userId, username, isTyping }
+        messagingTemplate.convertAndSend("/ws/group/" + groupId + "/typing", payload);
     }
 }
