@@ -36,8 +36,8 @@ export function CourseCard({
   const [showDetails, setShowDetails] = useState(false);
   
   return (
-    <Card className="hover:shadow-lg transition-all duration-200 group">
-      <CardHeader className="pb-3">
+    <Card className="hover:shadow-lg transition-all duration-200 group h-full flex flex-col">
+      <CardHeader className="pb-3 min-h-[92px]">
         <div className="flex items-start justify-between">
           <div className="flex items-start space-x-3 flex-1">
             <div className="w-12 h-12 bg-gradient-to-br from-blue-100 to-purple-100 rounded-lg flex items-center justify-center flex-shrink-0">
@@ -54,7 +54,7 @@ export function CourseCard({
                   </Badge>
                 )}
               </div>
-              <CardTitle className="text-lg leading-tight mb-1">
+              <CardTitle className="text-lg leading-tight mb-1 line-clamp-2">
                 {course.courseName}
               </CardTitle>
             </div>
@@ -84,7 +84,7 @@ export function CourseCard({
         )}
       </CardHeader>
 
-      <CardContent className="space-y-4">
+  <CardContent className="space-y-4 mt-auto">
         {/* Action Buttons */}
         <div className="flex gap-2 pt-2 border-t border-gray-200">
           {variant === 'catalog' ? (

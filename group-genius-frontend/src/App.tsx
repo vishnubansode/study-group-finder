@@ -88,15 +88,13 @@ const AppShell = () => {
             <Route path="/change-password" element={<ProtectedRoute><ChangePassword /></ProtectedRoute>} />
             <Route path="*" element={<NotFound />} />
           </Routes>
-
-          {/* ✅ Movable Messaging Widget (visible only after login)
           {user && (
             <MessagingWidget
               position={widgetPosition}
               onPositionChange={setWidgetPosition}
               anchor="bottom-left"
             />
-          )} */}
+          )}
         </main>
       </div>
     </div>

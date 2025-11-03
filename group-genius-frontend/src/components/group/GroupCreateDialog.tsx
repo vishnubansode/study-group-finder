@@ -88,12 +88,15 @@ export function GroupCreateDialog({ courseOptions, onCreate }: GroupCreateDialog
         </Button>
       </DialogTrigger>
 
-      <DialogContent className="sm:max-w-lg">
-        <DialogHeader>
-          <DialogTitle>Create a new group</DialogTitle>
+      <DialogContent className="max-w-[95vw] sm:max-w-lg max-h-[90vh] overflow-y-auto p-4 sm:p-6">
+        <DialogHeader className="space-y-2">
+          <DialogTitle className="text-lg sm:text-xl flex items-center gap-2">
+            <Plus className="w-5 h-5 text-primary" />
+            Create a New Group
+          </DialogTitle>
         </DialogHeader>
 
-        <div className="space-y-4">
+        <div className="space-y-4 py-2">
           <div className="space-y-2">
             <label className="text-sm font-medium">Name</label>
             <Input
@@ -232,9 +235,12 @@ export function GroupCreateDialog({ courseOptions, onCreate }: GroupCreateDialog
           )}
         </div>
 
-        <DialogFooter className="gap-2">
-          <Button variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
-          <Button onClick={handleSubmit} disabled={!isValid}>Create</Button>
+        <DialogFooter className="flex flex-col-reverse sm:flex-row gap-2 sm:gap-2 mt-4">
+          <Button variant="outline" onClick={() => setOpen(false)} className="w-full sm:w-auto">Cancel</Button>
+          <Button onClick={handleSubmit} disabled={!isValid} className="w-full sm:w-auto">
+            <Plus className="w-4 h-4 mr-2" />
+            Create Group
+          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

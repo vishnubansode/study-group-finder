@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Users, Globe, Lock, Key } from 'lucide-react';
+import { Users, Globe, Lock, Key, Calendar } from 'lucide-react';
 
 export interface GroupCardProps {
   name: string;
@@ -55,49 +55,111 @@ export default function GroupCard({
     onRequest?.();
     setShowRequestDialog(false);
   };
+
   return (
-    <Card className="academic-card hover-lift">
-      <CardHeader>
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <CardTitle className="text-lg">{name}</CardTitle>
+    <Card className="group h-full flex flex-col overflow-hidden hover:shadow-2xl transition-all duration-300 border-0 bg-white">
+      {/* Colored Header Bar with Privacy Status */}
+      <div className={`relative h-2 ${privacy === 'private' ? 'bg-gradient-to-r from-amber-400 to-orange-500' : 'bg-gradient-to-r from-emerald-400 to-teal-500'}`}>
+        <div className="absolute -bottom-px left-0 right-0 h-px bg-gradient-to-r from-transparent via-white to-transparent opacity-50" />
+      </div>
+
+      <CardHeader className="pb-3 pt-5 px-6">
+        {/* Title and Privacy Badge Row */}
+        <div className="flex items-start justify-between gap-3 mb-3">
+          <CardTitle className="text-lg sm:text-xl font-bold leading-tight line-clamp-2 flex-1">
+            {name}
+          </CardTitle>
+          <Badge 
+            variant="outline" 
+            className={`shrink-0 ${
+              privacy === 'private' 
+                ? 'border-amber-300 text-amber-700 bg-amber-50' 
+                : 'border-emerald-300 text-emerald-700 bg-emerald-50'
+            }`}
+          >
             {privacy === 'private' ? (
-              <Badge variant="secondary" className="flex items-center gap-1">
-                <Lock className="w-3 h-3" /> Private
-              </Badge>
+              <><Lock className="w-3 h-3 mr-1" />Private</>
             ) : (
-              <Badge variant="secondary" className="flex items-center gap-1">
-                <Globe className="w-3 h-3" /> Public
-              </Badge>
+              <><Globe className="w-3 h-3 mr-1" />Public</>
             )}
-          </div>
-          <div className="flex items-center gap-2 text-sm text-muted-foreground">
-            <Users className="w-4 h-4" />
-            <span>
-              {members ?? 0}
-              {maxMembers ? ` / ${maxMembers}` : ''}
-            </span>
+          </Badge>
+        </div>
+
+        {/* Course Info */}
+        <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5 text-sm text-muted-foreground bg-slate-100 px-3 py-1.5 rounded-md">
+            <Calendar className="w-3.5 h-3.5 shrink-0" />
+            <span className="font-medium truncate">{course}</span>
           </div>
         </div>
-        <p className="text-sm text-muted-foreground mt-2">{course}</p>
       </CardHeader>
-      <CardContent className="space-y-4">
-        <p className="text-sm text-muted-foreground">{description}</p>
-        <div className="flex justify-end gap-2">
+
+      <CardContent className="flex flex-col flex-1 px-6 pb-6">
+        {/* Description */}
+        <p className="text-sm text-muted-foreground leading-relaxed line-clamp-3 mb-4">
+          {description}
+        </p>
+
+        {/* Divider */}
+        <div className="h-px bg-gradient-to-r from-transparent via-slate-200 to-transparent my-3" />
+
+        {/* Members Info Card */}
+        <div className="bg-slate-50 rounded-lg p-3 mb-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <div className="p-2 bg-primary/10 rounded-full">
+                <Users className="w-4 h-4 text-primary" />
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground font-medium">Members</p>
+                <p className="text-sm font-bold text-foreground">
+                  {members ?? 0}{maxMembers ? ` / ${maxMembers}` : ''}
+                </p>
+              </div>
+            </div>
+            {maxMembers && (
+              <div className="text-right">
+                <p className="text-xs text-muted-foreground">Capacity</p>
+                <p className="text-sm font-bold text-primary">
+                  {Math.round(((members ?? 0) / maxMembers) * 100)}%
+                </p>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Action Buttons */}
+        <div className="mt-auto">
           {privacy === 'public' ? (
-            <Button size="sm" variant="outline" onClick={handleJoinClick} disabled={joinDisabled}>
-              Join
+            <Button 
+              size="lg"
+              className="w-full font-semibold text-base shadow-md hover:shadow-lg transition-all group-hover:scale-[1.02]" 
+              onClick={handleJoinClick} 
+              disabled={joinDisabled}
+            >
+              Join Group
             </Button>
           ) : (
-            <>
-              <Button size="sm" variant="outline" onClick={handleJoinClick} disabled={joinDisabled}>
-                <Key className="w-4 h-4 mr-1" />
+            <div className="space-y-2">
+              <Button 
+                size="lg"
+                onClick={handleJoinClick} 
+                disabled={joinDisabled}
+                className="w-full font-semibold text-base shadow-md hover:shadow-lg transition-all"
+              >
+                <Key className="w-4 h-4 mr-2" />
                 Join with Password
               </Button>
-              <Button size="sm" variant="secondary" onClick={handleRequestClick} disabled={joinDisabled}>
+              <Button 
+                size="lg"
+                variant="outline"
+                onClick={handleRequestClick} 
+                disabled={joinDisabled}
+                className="w-full font-semibold text-base border-2 hover:bg-slate-50"
+              >
                 Request to Join
               </Button>
-            </>
+            </div>
           )}
         </div>
       </CardContent>

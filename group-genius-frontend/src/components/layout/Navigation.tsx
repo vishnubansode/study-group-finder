@@ -67,7 +67,8 @@ export function Navigation() {
 
   if (!user) {
     return (
-      <nav className="flex items-center justify-between px-6 py-4 bg-card border-b border-border">
+      <>
+      <nav className="fixed top-0 left-0 right-0 z-50 flex items-center justify-between px-6 py-4 bg-card/95 supports-[backdrop-filter]:bg-card/80 backdrop-blur border-b border-border">
         <Link to="/" className="flex items-center space-x-2">
           <div className="w-8 h-8 bg-gradient-academic rounded-lg flex items-center justify-center">
             <BookOpen className="w-5 h-5 text-white" />
@@ -84,13 +85,16 @@ export function Navigation() {
           </Button>
         </div>
       </nav>
+      {/* Spacer to offset fixed header height */}
+      <div className="h-14 lg:h-16" aria-hidden />
+      </>
     );
   }
 
   return (
     <>
       {/* Desktop Navigation */}
-      <nav className="hidden lg:flex items-center justify-between px-6 py-4 bg-card border-b border-border">
+      <nav className="hidden lg:flex fixed top-0 left-0 right-0 z-50 items-center justify-between px-6 py-4 bg-card/95 supports-[backdrop-filter]:bg-card/80 backdrop-blur border-b border-border">
         <div className="flex items-center space-x-8">
           <Link to="/" className="flex items-center space-x-2">
             <div className="w-8 h-8 bg-gradient-academic rounded-lg flex items-center justify-center">
@@ -142,7 +146,7 @@ export function Navigation() {
       </nav>
 
       {/* Mobile Navigation */}
-      <nav className="lg:hidden bg-card border-b border-border">
+      <nav className="lg:hidden fixed top-0 left-0 right-0 z-50 bg-card/95 supports-[backdrop-filter]:bg-card/80 backdrop-blur border-b border-border">
         <div className="flex items-center justify-between px-4 py-3">
           <Link to="/" className="flex items-center space-x-2">
             <div className="w-8 h-8 bg-gradient-academic rounded-lg flex items-center justify-center">
@@ -198,6 +202,9 @@ export function Navigation() {
           </div>
         )}
       </nav>
+
+      {/* Spacer to offset fixed header height */}
+      <div className="h-14 lg:h-16" aria-hidden />
 
       {/* Bottom Navigation for Mobile (hidden when hideBottomNav=true) */}
       {/* Bottom navigation removed — mobile menu (burger) is used instead */}

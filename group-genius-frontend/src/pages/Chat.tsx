@@ -26,6 +26,31 @@ export default function Chat() {
   const [isUploading, setIsUploading] = useState(false);
   const [showMediaGallery, setShowMediaGallery] = useState(false);
   const { toast } = useToast();
+  const contentRef = useRef<HTMLDivElement | null>(null);
+  const [composerStyle, setComposerStyle] = useState<React.CSSProperties | null>(null);
+
+  // Keep the bottom composer fixed to viewport but constrained to chat content width
+  useEffect(() => {
+    const update = () => {
+      const el = contentRef.current;
+      if (!el) return;
+      const rect = el.getBoundingClientRect();
+      const padding = window.innerWidth >= 768 ? 16 : 8; // md:px-4 | px-2 gutters
+      const left = Math.max(0, rect.left + padding);
+      const width = Math.max(0, rect.width - padding * 2);
+      setComposerStyle({ position: 'fixed', left, width, bottom: 0 });
+    };
+    update();
+    window.addEventListener('resize', update);
+    window.addEventListener('scroll', update, { passive: true });
+    const ro = (typeof ResizeObserver !== 'undefined') ? new ResizeObserver(update) : null;
+    if (ro && contentRef.current) ro.observe(contentRef.current);
+    return () => {
+      window.removeEventListener('resize', update);
+      window.removeEventListener('scroll', update);
+      if (ro && contentRef.current) ro.unobserve(contentRef.current);
+    };
+  }, []);
 
   useEffect(() => {
     const loadGroups = async () => {
@@ -205,7 +230,7 @@ export default function Chat() {
     <div className="w-full px-4 md:px-6 py-4">
       {/* When no group selected, show the full-page groups list */}
       {!selectedGroupId && ( 
-        <Card className="h-[85vh] flex flex-col">
+        <Card className="min-h-[70vh] md:h-[85vh] flex flex-col">
           <CardHeader>
             <div className="flex items-center justify-between">
               <CardTitle className="flex items-center gap-2"><Users className="w-4 h-4" /> Groups</CardTitle>
@@ -269,7 +294,7 @@ export default function Chat() {
 
       {/* When a group is selected, show the full-page chat view */}
       {selectedGroupId && (
-        <Card className="h-[85vh] flex flex-col relative">
+        <Card className="min-h-[85vh] md:min-h-[92vh] flex flex-col relative">
           <CardHeader>
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
@@ -306,8 +331,11 @@ export default function Chat() {
               </div>
             </div>
           </CardHeader>
-          <CardContent className="p-0 flex-1 relative overflow-hidden">
-            <div className="h-full pb-24 md:pb-28 overflow-hidden">
+          <CardContent ref={contentRef} className="p-0 flex-1 min-h-0 relative overflow-hidden">
+            <div
+              className="h-full overflow-hidden"
+              style={{ paddingBottom: 'calc(64px + env(safe-area-inset-bottom, 0px))' }}
+            >
               {isLoadingHistory ? (
                 <div className="h-full flex items-center justify-center">Loading messages...</div>
               ) : (
@@ -321,10 +349,17 @@ export default function Chat() {
                 />
               )}
             </div>
-            
-            {/* Floating Message Input Widget - Fixed at bottom of chat card (no extra bottom gap) */}
-            <div className="absolute bottom-0 left-0 right-0 bg-white pt-2 pb-0 px-2 md:px-4">
-              <div className="bg-white rounded-xl shadow border border-gray-200 p-2 md:p-3">
+
+            {/* Fixed full-width composer at bottom on all breakpoints */}
+            <div
+              className="z-10"
+              style={{
+                ...(composerStyle ?? {}),
+                pointerEvents: 'none',
+                paddingBottom: 'env(safe-area-inset-bottom, 0px)'
+              }}
+            >
+              <div className="pointer-events-auto w-full bg-white border-t border-gray-200 p-2 md:p-3">
                 <MessageInput
                   onSend={handleSendMessage}
                   onUpload={handleUploadAttachment}

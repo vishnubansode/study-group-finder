@@ -23,12 +23,13 @@ import {
   Filter,
   Eye,
   EyeOff,
-
+  Key,
   Crown,
   User,
   Trash,
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
+import GroupCard from '@/components/group/GroupCard';
 import { tokenService } from '@/services/api';
 import { groupAPI } from '@/lib/api/groupApi';
 import GroupCreateDialog, { GroupCreateValues } from '@/components/group/GroupCreateDialog';
@@ -38,6 +39,8 @@ import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip
 export default function Groups() {
   const { user } = useAuth();
   const { toast } = useToast();
+  // Mobile: collapse filters behind a button on very small screens
+  const [filtersOpen, setFiltersOpen] = useState(false);
   
   // Pending (UI) filter inputs - update immediately as the user interacts
   const [pendingSearchQuery, setPendingSearchQuery] = useState('');
@@ -620,18 +623,18 @@ export default function Groups() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/30 to-indigo-50/40 pb-24 lg:pb-8">
-      <div className="bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 text-white px-6 py-12">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/30 to-indigo-50/40 pb-24 lg:pb-8 overflow-x-hidden">
+      <div className="bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 text-white px-4 sm:px-6 py-8 sm:py-12">
         <div className="max-w-7xl mx-auto">
-          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
+          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 sm:gap-6">
             <div>
-              <div className="flex items-center gap-3 mb-4">
-                <div className="p-3 bg-white/20 rounded-lg backdrop-blur-sm">
-                  <Users className="w-8 h-8" />
+              <div className="flex items-center gap-2.5 sm:gap-3 mb-3 sm:mb-4">
+                <div className="p-2.5 sm:p-3 bg-white/20 rounded-lg backdrop-blur-sm">
+                  <Users className="w-6 h-6 sm:w-8 sm:h-8" />
                 </div>
-                <h1 className="text-4xl md:text-5xl font-extrabold tracking-tight">Study Groups</h1>
+                <h1 className="text-3xl sm:text-4xl md:text-5xl font-extrabold tracking-tight">Study Groups</h1>
               </div>
-              <p className="text-xl text-blue-100 max-w-3xl leading-relaxed">
+              <p className="text-base sm:text-xl text-blue-100 max-w-3xl leading-relaxed">
                 Discover and join study groups that match your academic interests. Collaborate, learn, and succeed together.
               </p>
             </div>
@@ -675,11 +678,18 @@ export default function Groups() {
         </div>
       </div>
 
-      <div className="max-w-6xl mx-auto px-6 py-8">
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
+        {/* Mobile Filters Toggle */}
+        <div className="md:hidden mb-4">
+          <Button variant="outline" className="w-full justify-between" onClick={() => setFiltersOpen(v => !v)}>
+            <span className="flex items-center gap-2"><Filter className="w-4 h-4" /> Filters</span>
+            <span className="text-xs text-muted-foreground">{filtersOpen ? 'Hide' : 'Show'}</span>
+          </Button>
+        </div>
         {/* Modern Search & Filter Section */}
-        <div className="bg-white/50 backdrop-blur-sm border border-border rounded-xl shadow-sm mb-8 overflow-hidden">
+        <div className={`bg-white/50 backdrop-blur-sm border border-border rounded-xl shadow-sm mb-6 sm:mb-8 overflow-hidden ${filtersOpen ? 'block' : 'hidden'} md:block`}>
           {/* Search Bar */}
-          <div className="bg-gradient-to-r from-primary/5 to-primary/10 p-6 border-b">
+          <div className="bg-gradient-to-r from-primary/5 to-primary/10 p-4 sm:p-6 border-b">
             <div className="relative max-w-2xl">
               <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground w-5 h-5" />
               <Input
@@ -692,8 +702,8 @@ export default function Groups() {
           </div>
 
           {/* Filter Controls */}
-          <div className="p-6">
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <div className="p-4 sm:p-6">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
               
               {/* Basic Filters */}
               <div className="space-y-4">
@@ -750,7 +760,7 @@ export default function Groups() {
                     <Users className="w-4 h-4" />
                     Group Size
                   </div>
-                  <div className="flex gap-3 items-end">
+                  <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-end">
                     <div className="flex-1">
                       <label className="block text-xs font-medium text-muted-foreground mb-1">Filter Type</label>
                       <Select value={pendingMemberFilterType} onValueChange={setPendingMemberFilterType}>
@@ -766,7 +776,7 @@ export default function Groups() {
                       </Select>
                     </div>
                     {pendingMemberFilterType !== 'ANY' && (
-                      <div className={pendingMemberFilterType === 'BETWEEN' ? 'flex gap-2' : ''}>
+                      <div className={pendingMemberFilterType === 'BETWEEN' ? 'flex flex-col sm:flex-row gap-2 w-full sm:w-auto' : 'w-full sm:w-auto'}>
                         <div>
                           <label className="block text-xs font-medium text-muted-foreground mb-1">
                             {pendingMemberFilterType === 'BETWEEN' ? 'Min' : 'Count'}
@@ -777,7 +787,7 @@ export default function Groups() {
                             value={pendingMemberValue1}
                             onChange={(e) => setPendingMemberValue1(e.target.value)}
                             placeholder="0"
-                            className="h-9 w-20"
+                            className="h-9 w-full sm:w-24"
                           />
                         </div>
                         {pendingMemberFilterType === 'BETWEEN' && (
@@ -789,7 +799,7 @@ export default function Groups() {
                               value={pendingMemberValue2}
                               onChange={(e) => setPendingMemberValue2(e.target.value)}
                               placeholder="100"
-                              className="h-9 w-20"
+                              className="h-9 w-full sm:w-24"
                             />
                           </div>
                         )}
@@ -804,7 +814,7 @@ export default function Groups() {
                     <CalendarIcon className="w-4 h-4" />
                     Activity Date
                   </div>
-                  <div className="flex gap-3 items-end">
+                  <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-end">
                     <div className="flex-1">
                       <label className="block text-xs font-medium text-muted-foreground mb-1">Filter Type</label>
                       <Select value={pendingDateFilterType} onValueChange={setPendingDateFilterType}>
@@ -820,7 +830,7 @@ export default function Groups() {
                       </Select>
                     </div>
                     {pendingDateFilterType !== 'ANY' && (
-                      <div className={pendingDateFilterType === 'BETWEEN' ? 'flex gap-2' : ''}>
+                      <div className={pendingDateFilterType === 'BETWEEN' ? 'flex flex-col sm:flex-row gap-2 w-full sm:w-auto' : 'w-full sm:w-auto'}>
                         <div>
                           <label className="block text-xs font-medium text-muted-foreground mb-1">
                             {pendingDateFilterType === 'BETWEEN' ? 'From' : 'Date'}
@@ -829,7 +839,7 @@ export default function Groups() {
                             type="date"
                             value={pendingDateValue1}
                             onChange={(e) => setPendingDateValue1(e.target.value)}
-                            className="h-9 w-36"
+                            className="h-9 w-full sm:w-44"
                           />
                         </div>
                         {pendingDateFilterType === 'BETWEEN' && (
@@ -839,7 +849,7 @@ export default function Groups() {
                               type="date"
                               value={pendingDateValue2}
                               onChange={(e) => setPendingDateValue2(e.target.value)}
-                              className="h-9 w-36"
+                              className="h-9 w-full sm:w-44"
                             />
                           </div>
                         )}
@@ -944,71 +954,111 @@ export default function Groups() {
             {/* My Groups Section */}
             {myGroups.length > 0 && (
               <div>
-                <div className="flex items-center gap-3 mb-6">
-                  <h2 className="text-xl font-semibold text-foreground">My Groups</h2>
+                <div className="flex items-center gap-3 mb-4 sm:mb-6">
+                  <h2 className="text-lg sm:text-xl font-semibold text-foreground">My Groups</h2>
                   <Badge variant="secondary">{myGroups.length}</Badge>
                 </div>
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4 sm:gap-6">
                   {myGroups.map((group) => (
-                    <Card key={group.groupId} className="academic-card hover-lift border-primary/20">
-                      <CardHeader>
-                        <div className="flex items-start justify-between">
-                          <div className="flex-1">
-                            <div className="flex items-center space-x-2 mb-2">
-                              <CardTitle className="text-lg">{group.groupName}</CardTitle>
+                    <Card key={group.groupId} className="group h-full flex flex-col overflow-hidden hover:shadow-2xl transition-all duration-300 border-0 bg-white">
+                      {/* Colored Header Bar */}
+                      <div className={`relative h-2 ${group.privacyType === 'PRIVATE' ? 'bg-gradient-to-r from-amber-400 to-orange-500' : 'bg-gradient-to-r from-emerald-400 to-teal-500'}`}>
+                        <div className="absolute -bottom-px left-0 right-0 h-px bg-gradient-to-r from-transparent via-white to-transparent opacity-50" />
+                      </div>
+
+                      <CardHeader className="pb-3 pt-5 px-6">
+                        {/* Title Row */}
+                        <div className="flex items-start justify-between gap-3 mb-3">
+                          <CardTitle className="text-lg sm:text-xl font-bold leading-tight line-clamp-2 flex-1">
+                            {group.groupName}
+                          </CardTitle>
+                          <div className="flex items-center gap-2 shrink-0">
+                            <Badge variant="outline" className="border-purple-300 text-purple-700 bg-purple-50">
+                              <Crown className="w-3 h-3 mr-1" />Owner
+                            </Badge>
+                            <Badge 
+                              variant="outline" 
+                              className={`${
+                                group.privacyType === 'PRIVATE' 
+                                  ? 'border-amber-300 text-amber-700 bg-amber-50' 
+                                  : 'border-emerald-300 text-emerald-700 bg-emerald-50'
+                              }`}
+                            >
                               {group.privacyType === 'PRIVATE' ? (
-                                <Lock className="w-4 h-4 text-muted-foreground" />
+                                <><Lock className="w-3 h-3 mr-1" />Private</>
                               ) : (
-                                <Globe className="w-4 h-4 text-muted-foreground" />
+                                <><Globe className="w-3 h-3 mr-1" />Public</>
                               )}
-                              <Badge variant="outline" className="text-xs">Owner</Badge>
-                            </div>
-                            {group.courseName && (
-                              <p className="text-sm text-muted-foreground mb-2">{group.courseName}</p>
-                            )}
+                            </Badge>
                           </div>
-                          {/* owner-only edit removed per request */}
+                        </div>
+
+                        {/* Course & Date Info */}
+                        <div className="flex flex-wrap items-center gap-3 text-sm">
+                          {group.courseName && (
+                            <div className="flex items-center gap-1.5 text-muted-foreground bg-slate-100 px-3 py-1.5 rounded-md">
+                              <CalendarIcon className="w-3.5 h-3.5 shrink-0" />
+                              <span className="font-medium truncate">{group.courseName}</span>
+                            </div>
+                          )}
+                          {group.createdAt && (
+                            <span className="flex items-center gap-1.5 text-muted-foreground">
+                              <Clock className="w-3.5 h-3.5" />
+                              {new Date(group.createdAt).toLocaleDateString()}
+                            </span>
+                          )}
                         </div>
                       </CardHeader>
 
-                      <CardContent className="space-y-4">
-                        <p className="text-sm text-muted-foreground line-clamp-3">
+                      <CardContent className="flex flex-col flex-1 px-6 pb-6">
+                        {/* Description */}
+                        <p className="text-sm text-muted-foreground leading-relaxed line-clamp-3 mb-4">
                           {group.description || 'This study group has no description yet.'}
                         </p>
 
-                        <div className="flex items-center justify-between pt-4 border-t border-border">
-                          <div className="flex items-center space-x-4 text-sm text-muted-foreground">
-                            <Badge variant={group.privacyType === 'PUBLIC' ? 'default' : 'secondary'}>
-                              {group.privacyType}
-                            </Badge>
-                            {group.createdAt && (
-                              <span className="flex items-center gap-1">
-                                <Clock className="w-3 h-3" />
-                                {new Date(group.createdAt).toLocaleDateString()}
-                              </span>
-                            )}
-                          </div>
+                        {/* Divider */}
+                        <div className="h-px bg-gradient-to-r from-transparent via-slate-200 to-transparent my-3" />
 
-                          <div className="relative inline-block">
-                            <Button 
-                              size="sm" 
-                              variant="default" 
-                              onClick={() => handleManageGroup(group)}
-                              disabled={isLoadingMembers && managingGroupId === group.groupId}
-                            >
-                              {isLoadingMembers && managingGroupId === group.groupId ? (
-                                <Loader2 className="w-4 h-4 animate-spin" />
-                              ) : (
-                                'Manage'
-                              )}
-                            </Button>
-                            <span className="absolute -top-2 -right-2 w-5 h-5 flex items-center justify-center rounded-full bg-primary text-white text-[10px] font-medium">
-                              {group.memberCount ?? 0}
-                            </span>
+                        {/* Members Info Card */}
+                        <div className="bg-slate-50 rounded-lg p-3 mb-4">
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                              <div className="p-2 bg-primary/10 rounded-full">
+                                <Users className="w-4 h-4 text-primary" />
+                              </div>
+                              <div>
+                                <p className="text-xs text-muted-foreground font-medium">Members</p>
+                                <p className="text-sm font-bold text-foreground">
+                                  {group.memberCount ?? 0}
+                                </p>
+                              </div>
+                            </div>
                           </div>
+                        </div>
+
+                        {/* Action Buttons */}
+                        <div className="mt-auto space-y-2">
+                          <Button 
+                            size="lg"
+                            onClick={() => handleManageGroup(group)}
+                            disabled={isLoadingMembers && managingGroupId === group.groupId}
+                            className="w-full font-semibold text-base shadow-md hover:shadow-lg transition-all"
+                          >
+                            {isLoadingMembers && managingGroupId === group.groupId ? (
+                              <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                            ) : (
+                              <Users className="w-4 h-4 mr-2" />
+                            )}
+                            Manage Members
+                          </Button>
                           {group.createdBy !== user?.id && (
-                            <Button size="sm" variant="destructive" onClick={() => openLeaveDialog(group.groupId, group.groupName)} className="ml-2">
-                              Exit
+                            <Button 
+                              size="lg"
+                              variant="destructive"
+                              onClick={() => openLeaveDialog(group.groupId, group.groupName)}
+                              className="w-full font-semibold text-base"
+                            >
+                              Exit Group
                             </Button>
                           )}
                         </div>
@@ -1022,11 +1072,11 @@ export default function Groups() {
             {/* Available Groups Section */}
             {availableGroups.length > 0 && (
               <div>
-                <div className="flex items-center gap-3 mb-6">
-                  <h2 className="text-xl font-semibold text-foreground">Available Groups</h2>
+                <div className="flex items-center gap-3 mb-4 sm:mb-6">
+                  <h2 className="text-lg sm:text-xl font-semibold text-foreground">Available Groups</h2>
                   <Badge variant="secondary">{availableGroups.length}</Badge>
                 </div>
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4 sm:gap-6">
                   {availableGroups.map((group) => {
                     const membershipStatus = group.membershipStatus ?? 'NOT_MEMBER';
                     const isJoined = membershipStatus === 'APPROVED';
@@ -1070,74 +1120,118 @@ export default function Groups() {
                     }
 
                     return (
-                      <Card key={group.groupId} className="academic-card hover-lift">
-                        <CardHeader>
-                          <div className="flex items-start justify-between">
-                            <div className="flex-1">
-                              <div className="flex items-center space-x-2 mb-2">
-                                <CardTitle className="text-lg">{group.groupName}</CardTitle>
+                      <Card key={group.groupId} className="group h-full flex flex-col overflow-hidden hover:shadow-2xl transition-all duration-300 border-0 bg-white">
+                        {/* Colored Header Bar */}
+                        <div className={`relative h-2 ${isPrivate ? 'bg-gradient-to-r from-amber-400 to-orange-500' : 'bg-gradient-to-r from-emerald-400 to-teal-500'}`}>
+                          <div className="absolute -bottom-px left-0 right-0 h-px bg-gradient-to-r from-transparent via-white to-transparent opacity-50" />
+                        </div>
+
+                        <CardHeader className="pb-3 pt-5 px-6">
+                          {/* Title and Status Row */}
+                          <div className="flex items-start justify-between gap-3 mb-3">
+                            <CardTitle className="text-lg sm:text-xl font-bold leading-tight line-clamp-2 flex-1">
+                              {group.groupName}
+                            </CardTitle>
+                            <div className="flex flex-col gap-2 shrink-0">
+                              <Badge 
+                                variant="outline" 
+                                className={`${
+                                  isPrivate 
+                                    ? 'border-amber-300 text-amber-700 bg-amber-50' 
+                                    : 'border-emerald-300 text-emerald-700 bg-emerald-50'
+                                }`}
+                              >
                                 {isPrivate ? (
-                                  <Lock className="w-4 h-4 text-muted-foreground" />
+                                  <><Lock className="w-3 h-3 mr-1" />Private</>
                                 ) : (
-                                  <Globe className="w-4 h-4 text-muted-foreground" />
+                                  <><Globe className="w-3 h-3 mr-1" />Public</>
                                 )}
-                              </div>
-                              {group.courseName && (
-                                <p className="text-sm text-muted-foreground mb-2">{group.courseName}</p>
-                              )}
-                            </div>
-                            {/* Show Exit at top-right for joined available groups */}
-                            {isJoined && (
-                              <div className="ml-4">
-                                <Button size="sm" variant="destructive" onClick={() => openLeaveDialog(group.groupId, group.groupName)} aria-label="Exit group">
+                              </Badge>
+                              {isJoined && (
+                                <Button 
+                                  size="sm" 
+                                  variant="destructive" 
+                                  onClick={() => openLeaveDialog(group.groupId, group.groupName)}
+                                  className="text-xs px-2 py-1 h-auto"
+                                >
                                   Exit
                                 </Button>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Course & Date Info */}
+                          <div className="flex flex-wrap items-center gap-3 text-sm">
+                            {group.courseName && (
+                              <div className="flex items-center gap-1.5 text-muted-foreground bg-slate-100 px-3 py-1.5 rounded-md">
+                                <CalendarIcon className="w-3.5 h-3.5 shrink-0" />
+                                <span className="font-medium truncate">{group.courseName}</span>
                               </div>
+                            )}
+                            {group.createdAt && (
+                              <span className="flex items-center gap-1.5 text-muted-foreground">
+                                <Clock className="w-3.5 h-3.5" />
+                                {new Date(group.createdAt).toLocaleDateString()}
+                              </span>
                             )}
                           </div>
                         </CardHeader>
 
-                        <CardContent className="space-y-4">
-                          <p className="text-sm text-muted-foreground line-clamp-3">
+                        <CardContent className="flex flex-col flex-1 px-6 pb-6">
+                          {/* Description */}
+                          <p className="text-sm text-muted-foreground leading-relaxed line-clamp-3 mb-4">
                             {group.description || 'This study group has no description yet.'}
                           </p>
 
-                          <div className="flex items-center justify-between pt-4 border-t border-border">
-                            <div className="flex items-center space-x-4 text-sm text-muted-foreground">
-                              <Badge variant={isPrivate ? 'secondary' : 'default'}>
-                                {group.privacyType}
-                              </Badge>
-                              {group.createdAt && (
-                                <span className="flex items-center gap-1">
-                                  <Clock className="w-3 h-3" />
-                                  {new Date(group.createdAt).toLocaleDateString()}
-                                </span>
-                              )}
-                            </div>
+                          {/* Divider */}
+                          <div className="h-px bg-gradient-to-r from-transparent via-slate-200 to-transparent my-3" />
 
-                            <div className="flex items-center gap-2">
-                              <div className="relative inline-block">
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  onClick={() => handleManageGroup(group)}
-                                >
-                                  Members
-                                </Button>
-                                <span className="absolute -top-2 -right-2 w-5 h-5 flex items-center justify-center rounded-full bg-primary text-white text-[10px] font-medium">
-                                  {group.memberCount ?? 0}
-                                </span>
+                          {/* Members Info Card */}
+                          <div className="bg-slate-50 rounded-lg p-3 mb-4">
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-2">
+                                <div className="p-2 bg-primary/10 rounded-full">
+                                  <Users className="w-4 h-4 text-primary" />
+                                </div>
+                                <div>
+                                  <p className="text-xs text-muted-foreground font-medium">Members</p>
+                                  <p className="text-sm font-bold text-foreground">
+                                    {group.memberCount ?? 0}
+                                  </p>
+                                </div>
                               </div>
                               <Button
                                 size="sm"
-                                variant={isPrivate ? 'outline' : 'default'}
-                                onClick={() => handleJoinGroup(group)}
-                                disabled={buttonDisabled}
+                                variant="ghost"
+                                onClick={() => handleManageGroup(group)}
+                                className="text-xs"
                               >
-                                {buttonContent}
+                                View
                               </Button>
-                              {/* bottom Exit removed for joined available groups (moved to header) */}
                             </div>
+                          </div>
+
+                          {/* Action Buttons */}
+                          <div className="mt-auto space-y-2">
+                            <Button 
+                              size="lg"
+                              variant={isJoined ? 'secondary' : isPending ? 'secondary' : 'default'}
+                              onClick={() => handleJoinGroup(group)}
+                              disabled={buttonDisabled}
+                              className="w-full font-semibold text-base shadow-md hover:shadow-lg transition-all"
+                            >
+                              {isRequesting ? (
+                                <><Loader2 className="w-4 h-4 animate-spin mr-2" />Processing...</>
+                              ) : isJoined ? (
+                                <><UserCheck className="w-4 h-4 mr-2" />Joined</>
+                              ) : isPending ? (
+                                <><UserPlus className="w-4 h-4 mr-2" />Request Pending</>
+                              ) : isPrivate ? (
+                                <><UserPlus className="w-4 h-4 mr-2" />Request to Join</>
+                              ) : (
+                                <><UserCheck className="w-4 h-4 mr-2" />Join Group</>
+                              )}
+                            </Button>
                           </div>
                         </CardContent>
                       </Card>
@@ -1164,10 +1258,10 @@ export default function Groups() {
 
       {/* Members Management Dialog */}
   <Dialog open={isMembersDialogOpen} onOpenChange={handleMembersDialogOpenChange}>
-        <DialogContent className="sm:max-w-2xl max-h-[80vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Manage Group Members</DialogTitle>
-            <DialogDescription>
+        <DialogContent className="max-w-[95vw] sm:max-w-2xl max-h-[90vh] sm:max-h-[85vh] overflow-y-auto p-4 sm:p-6">
+          <DialogHeader className="space-y-2">
+            <DialogTitle className="text-xl sm:text-2xl">Manage Group Members</DialogTitle>
+            <DialogDescription className="text-sm sm:text-base">
               View and manage members of your group. Approve pending requests or remove existing members.
             </DialogDescription>
           </DialogHeader>
@@ -1189,23 +1283,24 @@ export default function Groups() {
                         return 0;
                       })
                       .map((member) => (
-                        <div key={member.groupMemberId} className={`flex items-center justify-between p-3 border rounded-lg ${member.role === 'ADMIN' ? 'border-l-4 border-l-blue-600' : 'border-l-4 border-l-purple-600'}`}>
-                          <div className="flex items-center space-x-3">
-                            <div className="w-8 h-8 bg-primary/10 rounded-full flex items-center justify-center">
-                              <Users className="w-4 h-4 text-primary" />
+                        <div key={member.groupMemberId} className={`flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-3 sm:p-4 border rounded-lg ${member.role === 'ADMIN' ? 'border-l-4 border-l-blue-600' : 'border-l-4 border-l-purple-600'}`}>
+                          <div className="flex items-center space-x-3 min-w-0 flex-1">
+                            <div className="w-10 h-10 sm:w-8 sm:h-8 bg-primary/10 rounded-full flex items-center justify-center shrink-0">
+                              <Users className="w-5 h-5 sm:w-4 sm:h-4 text-primary" />
                             </div>
-                            <div>
-                              <p className="font-medium">{member.userName || `User ${member.userId}`}{member.userId === user?.id ? ' (you)' : ''}</p>
-                              <div className="flex items-center space-x-2 text-sm text-muted-foreground">
+                            <div className="min-w-0 flex-1">
+                              <p className="font-medium text-sm sm:text-base truncate">{member.userName || `User ${member.userId}`}{member.userId === user?.id ? ' (you)' : ''}</p>
+                              <div className="flex flex-wrap items-center gap-2 text-xs sm:text-sm text-muted-foreground mt-1">
                                 {/* Role pill */}
-                                <span className={`inline-flex items-center gap-2 px-3 py-1 rounded-full shadow-sm text-white font-medium ${member.role === 'ADMIN' ? 'bg-[#1E40AF]' : 'bg-[#6B21A8]'}`}>
-                                  {member.role === 'ADMIN' ? <Crown className="w-4 h-4" /> : <User className="w-4 h-4" />}
-                                  <span className="text-sm">{member.role === 'ADMIN' ? 'Admin' : 'Member'}</span>
+                                <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 sm:px-3 sm:py-1 rounded-full shadow-sm text-white font-medium text-xs ${member.role === 'ADMIN' ? 'bg-[#1E40AF]' : 'bg-[#6B21A8]'}`}>
+                                  {member.role === 'ADMIN' ? <Crown className="w-3 h-3 sm:w-4 sm:h-4" /> : <User className="w-3 h-3 sm:w-4 sm:h-4" />}
+                                  <span>{member.role === 'ADMIN' ? 'Admin' : 'Member'}</span>
                                 </span>
                                 {member.joinedAt && (
                                   <span className="flex items-center gap-1">
                                     <Clock className="w-3 h-3" />
-                                    {new Date(member.joinedAt).toLocaleDateString()}
+                                    <span className="hidden sm:inline">{new Date(member.joinedAt).toLocaleDateString()}</span>
+                                    <span className="sm:hidden">{new Date(member.joinedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>
                                   </span>
                                 )}
                               </div>
@@ -1213,7 +1308,7 @@ export default function Groups() {
                           </div>
 
                               {isAdminForManagingGroup ? (
-                            <div className="flex items-center space-x-2">
+                            <div className="flex items-center gap-2 sm:space-x-2 flex-wrap sm:flex-nowrap">
                               {/* Inline promote/demote buttons for convenience (admins only, not for self) */}
                               {member.userId !== user?.id && (
                                 <div className="flex items-center gap-2">
@@ -1374,85 +1469,111 @@ export default function Groups() {
 
       {/* Join with password dialog for private groups */}
       <Dialog open={passwordDialogOpen} onOpenChange={(open) => { setPasswordDialogOpen(open); if (!open) { setPasswordForGroupId(null); setJoinPassword(''); } }}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>Enter Group Password</DialogTitle>
-            <DialogDescription>
-              This group requires a password. Enter the password to join immediately, or your request will be sent for approval.
+        <DialogContent className="max-w-[95vw] sm:max-w-md p-4 sm:p-6">
+          <DialogHeader className="space-y-2">
+            <DialogTitle className="text-lg sm:text-xl flex items-center gap-2">
+              <Lock className="w-5 h-5 text-amber-600" />
+              Enter Group Password
+            </DialogTitle>
+            <DialogDescription className="text-sm">
+              This group requires a password. Enter the password to join immediately.
             </DialogDescription>
           </DialogHeader>
 
-          <div className="space-y-4">
-            <Label>Group Password</Label>
-            <div className="relative">
-              <Input
-                type={passwordVisible ? 'text' : 'password'}
-                value={joinPassword}
-                onChange={(e) => { setJoinPassword(e.target.value); setPasswordStatus('idle'); setPasswordStatusMessage(''); }}
-              />
-              <button
-                type="button"
-                className="absolute right-2 top-2 text-gray-500"
-                onClick={() => setPasswordVisible((v) => !v)}
-                aria-label={passwordVisible ? 'Hide password' : 'Show password'}
-              >
-                {passwordVisible ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-              </button>
+          <div className="space-y-4 py-2">
+            <div className="space-y-2">
+              <Label className="text-sm font-medium">Group Password</Label>
+              <div className="relative">
+                <Input
+                  type={passwordVisible ? 'text' : 'password'}
+                  value={joinPassword}
+                  onChange={(e) => { setJoinPassword(e.target.value); setPasswordStatus('idle'); setPasswordStatusMessage(''); }}
+                  placeholder="Enter password"
+                  className="pr-10"
+                />
+                <button
+                  type="button"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                  onClick={() => setPasswordVisible((v) => !v)}
+                  aria-label={passwordVisible ? 'Hide password' : 'Show password'}
+                >
+                  {passwordVisible ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
             </div>
 
             {passwordStatus !== 'idle' && (
-              <div className={`text-sm mt-1 ${passwordStatus === 'error' ? 'text-red-600' : 'text-green-600'}`}>
-                {passwordStatusMessage}
+              <div className={`flex items-start gap-2 p-3 rounded-lg text-sm ${passwordStatus === 'error' ? 'bg-red-50 text-red-700 border border-red-200' : 'bg-green-50 text-green-700 border border-green-200'}`}>
+                {passwordStatus === 'error' ? <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" /> : <UserCheck className="w-4 h-4 mt-0.5 shrink-0" />}
+                <span>{passwordStatusMessage}</span>
               </div>
             )}
           </div>
 
-          <DialogFooter className="flex justify-end">
-            <Button variant="outline" onClick={() => { setPasswordDialogOpen(false); setPasswordForGroupId(null); setJoinPassword(''); }}>Cancel</Button>
-            <Button className="ml-2" onClick={() => submitPasswordJoin()}>Submit</Button>
+          <DialogFooter className="flex flex-col-reverse sm:flex-row gap-2 sm:gap-0">
+            <Button variant="outline" onClick={() => { setPasswordDialogOpen(false); setPasswordForGroupId(null); setJoinPassword(''); }} className="w-full sm:w-auto">Cancel</Button>
+            <Button onClick={() => submitPasswordJoin()} disabled={!joinPassword.trim()} className="w-full sm:w-auto sm:ml-2">
+              <Key className="w-4 h-4 mr-2" />
+              Submit Password
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
       {/* Join choice dialog for private groups: request or enter password */}
       <Dialog open={joinChoiceDialogOpen} onOpenChange={(open) => { setJoinChoiceDialogOpen(open); if (!open) { setJoinChoiceGroupId(null); } }}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>Private Group</DialogTitle>
-            <DialogDescription>
+        <DialogContent className="max-w-[95vw] sm:max-w-md p-4 sm:p-6">
+          <DialogHeader className="space-y-2">
+            <DialogTitle className="text-lg sm:text-xl flex items-center gap-2">
+              <Lock className="w-5 h-5 text-amber-600" />
+              Private Group
+            </DialogTitle>
+            <DialogDescription className="text-sm leading-relaxed">
               This is a private group. You can either request to join (owner approval required) or enter the group password (if you have it) to join immediately.
             </DialogDescription>
           </DialogHeader>
 
-          <DialogFooter className="flex justify-end gap-2">
-            <Button variant="outline" onClick={() => { if (joinChoiceGroupId) sendRequestJoin(joinChoiceGroupId); }}>Request to Join</Button>
-            <Button onClick={() => { setJoinChoiceDialogOpen(false); setPasswordForGroupId(joinChoiceGroupId); setJoinPassword(''); setPasswordDialogOpen(true); }}>Enter Password</Button>
+          <DialogFooter className="flex flex-col-reverse sm:flex-row gap-2 sm:gap-2 mt-4">
+            <Button variant="outline" onClick={() => { if (joinChoiceGroupId) sendRequestJoin(joinChoiceGroupId); }} className="w-full sm:w-auto">
+              <UserPlus className="w-4 h-4 mr-2" />
+              Request to Join
+            </Button>
+            <Button onClick={() => { setJoinChoiceDialogOpen(false); setPasswordForGroupId(joinChoiceGroupId); setJoinPassword(''); setPasswordDialogOpen(true); }} className="w-full sm:w-auto">
+              <Key className="w-4 h-4 mr-2" />
+              Enter Password
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
       {/* Leave confirmation dialog */}
       <Dialog open={leaveConfirmOpen} onOpenChange={(open) => { if (!open) { closeLeaveDialog(); } setLeaveConfirmOpen(open); }}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>Leave Group</DialogTitle>
-            <DialogDescription>
+        <DialogContent className="max-w-[95vw] sm:max-w-md p-4 sm:p-6">
+          <DialogHeader className="space-y-2">
+            <DialogTitle className="text-lg sm:text-xl flex items-center gap-2">
+              <AlertCircle className="w-5 h-5 text-red-600" />
+              Leave Group
+            </DialogTitle>
+            <DialogDescription className="text-sm leading-relaxed">
               Are you sure you want to leave {leaveTargetGroupName ? `"${leaveTargetGroupName}"` : 'this group'}? You can rejoin later if needed.
             </DialogDescription>
           </DialogHeader>
-          <DialogFooter className="flex justify-end gap-2">
-            <Button variant="outline" onClick={() => closeLeaveDialog()}>Cancel</Button>
-            <Button variant="destructive" onClick={() => confirmLeave()}>Leave</Button>
+          <DialogFooter className="flex flex-col-reverse sm:flex-row gap-2 sm:gap-2 mt-4">
+            <Button variant="outline" onClick={() => closeLeaveDialog()} className="w-full sm:w-auto">Cancel</Button>
+            <Button variant="destructive" onClick={() => confirmLeave()} className="w-full sm:w-auto">
+              <Trash className="w-4 h-4 mr-2" />
+              Leave Group
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
       {/* Generic confirmation dialog */}
       <Dialog open={confirmModal.open === true} onOpenChange={(open) => { if (!open) setConfirmModal({ open: false }); }}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>{confirmModal.title || 'Confirm'}</DialogTitle>
-            <DialogDescription>{confirmModal.message || 'Are you sure?'}</DialogDescription>
+        <DialogContent className="max-w-[95vw] sm:max-w-md p-4 sm:p-6">
+          <DialogHeader className="space-y-2">
+            <DialogTitle className="text-lg sm:text-xl">{confirmModal.title || 'Confirm'}</DialogTitle>
+            <DialogDescription className="text-sm leading-relaxed">{confirmModal.message || 'Are you sure?'}</DialogDescription>
           </DialogHeader>
           <DialogFooter className="flex justify-end gap-2">
             <Button variant="outline" onClick={() => setConfirmModal({ open: false })}>Cancel</Button>

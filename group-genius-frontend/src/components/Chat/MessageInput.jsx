@@ -104,7 +104,7 @@ const MessageInput = ({ onSend, onUpload, onTyping, disabled = false, isUploadin
       <button
         type="button"
         onClick={handleFileButtonClick}
-        className="flex h-10 w-10 items-center justify-center rounded-full bg-gray-100 text-gray-600 hover:bg-gray-200 transition disabled:opacity-50"
+        className="flex h-12 w-12 md:h-10 md:w-10 items-center justify-center rounded-full bg-gray-100 text-gray-600 hover:bg-gray-200 transition disabled:opacity-50"
         disabled={busy}
         aria-label="Attach file"
       >
@@ -118,7 +118,7 @@ const MessageInput = ({ onSend, onUpload, onTyping, disabled = false, isUploadin
         onChange={handleFileChange}
       />
       <input
-        className="flex-1 rounded-full border border-gray-200 px-4 py-2 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
+        className="flex-1 h-12 md:h-10 rounded-full border border-gray-200 px-4 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
         type="text"
         placeholder="Type a message or add a caption..."
         value={text}
@@ -126,7 +126,7 @@ const MessageInput = ({ onSend, onUpload, onTyping, disabled = false, isUploadin
       />
       <button
         type="submit"
-        className="flex h-10 items-center gap-2 rounded-full bg-blue-500 px-4 text-white transition hover:bg-blue-600 disabled:opacity-60"
+        className="flex h-12 md:h-10 items-center gap-2 rounded-full bg-blue-500 px-5 md:px-4 text-white transition hover:bg-blue-600 disabled:opacity-60"
         disabled={busy || !text.trim()}
       >
         {isSending && !isUploading ? (

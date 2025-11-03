@@ -507,7 +507,7 @@ export default function Courses() {
         {activeTab === 'enrolled' ? (
           <div>
             {enrolledCourses.length > 0 ? (
-              <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
+              <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-6">
                 {enrolledCourses.map((course) => (
                   <CourseCard
                     key={course.id}
@@ -542,7 +542,7 @@ export default function Courses() {
           <div>
             {availableCourses.length > 0 ? (
               <>
-                <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
+                <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-6">
                   {availableCourses.map((course) => (
                     <CourseCard
                       key={course.id}
