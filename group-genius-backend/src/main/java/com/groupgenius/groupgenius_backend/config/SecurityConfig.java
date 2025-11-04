@@ -39,7 +39,11 @@ public class SecurityConfig {
                         .requestMatchers("/api/contact").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/courses/**").permitAll()
                         .requestMatchers("/api/files/**").permitAll()
+                        .requestMatchers("/api/course-management/**").permitAll()
                         .requestMatchers("/error").permitAll()
+
+                        // Groups endpoints - require authentication
+                        .requestMatchers("/api/groups/**").authenticated()
 
                         // User course management endpoints - require authentication
                         .requestMatchers("/api/user/**").authenticated()

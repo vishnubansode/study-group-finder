@@ -3,7 +3,7 @@
 -- DROP TABLE IF EXISTS courses;
 -- DROP TABLE IF EXISTS users;
 
-CREATE TABLE users (
+CREATE TABLE IF NOT EXISTS users (
   id bigint NOT NULL AUTO_INCREMENT,
   bio varchar(255) DEFAULT NULL,
   current_year varchar(255) DEFAULT NULL,
@@ -20,16 +20,16 @@ CREATE TABLE users (
   UNIQUE KEY UK6dotkott2kjsp8vw4d0m25fb7 (email)
 ) ENGINE=InnoDB AUTO_INCREMENT=2 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
-CREATE TABLE courses (
+CREATE TABLE IF NOT EXISTS courses (
   id bigint NOT NULL AUTO_INCREMENT,
   course_code varchar(20) NOT NULL,
   course_name varchar(100) NOT NULL,
   description varchar(500) DEFAULT NULL,
   PRIMARY KEY (id),
   UNIQUE KEY UKp02ts69sh53ptd62m3c67v0 (course_code)
-) ENGINE=InnoDB AUTO_INCREMENT=25 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=1 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
-CREATE TABLE user_courses (
+CREATE TABLE IF NOT EXISTS user_courses (
   user_id bigint NOT NULL,
   course_id bigint NOT NULL,
   PRIMARY KEY (user_id,course_id),

@@ -71,7 +71,21 @@ public class AuthService {
         User user = userRepository.findByEmail(request.getEmail())
                 .orElseThrow(() -> new IllegalArgumentException("Invalid email or password"));
 
-        if (!passwordEncoder.matches(request.getPassword(), user.getPassword())) {
+        // Handle missing or blank stored password gracefully
+        String storedPasswordHash = user.getPassword();
+        if (storedPasswordHash == null || storedPasswordHash.isBlank()) {
+            throw new IllegalArgumentException("Invalid email or password");
+        }
+
+        boolean passwordMatches;
+        try {
+            passwordMatches = passwordEncoder.matches(request.getPassword(), storedPasswordHash);
+        } catch (IllegalArgumentException ex) {
+            // e.g., encoded password is invalid format
+            throw new IllegalArgumentException("Invalid email or password");
+        }
+
+        if (!passwordMatches) {
             throw new IllegalArgumentException("Invalid email or password");
         }
 
