@@ -2,6 +2,9 @@ import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Dialog, DialogContent } from '@/components/ui/dialog';
+import EventForm, { EventFormData } from '@/components/group/EventForm';
+import { useToast } from '@/components/ui/use-toast';
 import { 
   Calendar as CalendarIcon, 
   Plus, 
@@ -106,6 +109,9 @@ export default function Calendar() {
   const [selectedDate, setSelectedDate] = useState(currentDate);
   const [viewMode, setViewMode] = useState<'month' | 'week'>('month');
   const [currentViewDate, setCurrentViewDate] = useState(new Date(currentYear, currentMonth, 1));
+  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const { toast } = useToast();
 
   const getDaysInMonth = (date: Date) => {
     const year = date.getFullYear();
@@ -166,6 +172,37 @@ export default function Calendar() {
     .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
     .slice(0, 5);
 
+  const handleCreateEvent = async (data: EventFormData) => {
+    setIsLoading(true);
+    try {
+      // TODO: Replace with actual API call
+      // await createStudySession(data);
+      
+      console.log('Creating event:', data);
+      
+      // Simulate API call
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      toast({
+        title: "Session Created!",
+        description: `"${data.title}" has been scheduled successfully.`,
+      });
+      
+      setIsCreateDialogOpen(false);
+      
+      // TODO: Refresh events list after creation
+      // await fetchEvents();
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to create session. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-background pb-24 lg:pb-8">
       {/* Header */}
@@ -179,7 +216,10 @@ export default function Calendar() {
               </p>
             </div>
             <div className="flex flex-col sm:flex-row gap-3">
-              <Button className="btn-hero">
+              <Button 
+                className="btn-hero"
+                onClick={() => setIsCreateDialogOpen(true)}
+              >
                 <Plus className="w-5 h-5 mr-2" />
                 Create Event
               </Button>
@@ -399,7 +439,11 @@ export default function Calendar() {
                 <CardTitle>Quick Actions</CardTitle>
               </CardHeader>
               <CardContent className="space-y-3">
-                <Button className="w-full btn-academic" size="sm">
+                <Button 
+                  className="w-full btn-academic" 
+                  size="sm"
+                  onClick={() => setIsCreateDialogOpen(true)}
+                >
                   <Plus className="w-4 h-4 mr-2" />
                   Create Study Session
                 </Button>
@@ -416,6 +460,19 @@ export default function Calendar() {
           </div>
         </div>
       </div>
+
+      {/* Create Event Dialog */}
+      <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <EventForm
+            onSubmit={handleCreateEvent}
+            onCancel={() => setIsCreateDialogOpen(false)}
+            isLoading={isLoading}
+            submitLabel="Create Session"
+            cancelLabel="Cancel"
+          />
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
