@@ -309,7 +309,7 @@ export default function Courses() {
 
   if (!user) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/30 to-indigo-50/40 flex items-center justify-center">
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/30 to-indigo-50/40 pb-24 lg:pb-8 flex items-center justify-center overflow-x-hidden">
         <Card className="w-full max-w-md">
           <CardContent className="pt-6 text-center">
             <BookOpen className="w-16 h-16 text-gray-400 mx-auto mb-4" />
@@ -325,17 +325,17 @@ export default function Courses() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/30 to-indigo-50/40 pb-24 lg:pb-8">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/30 to-indigo-50/40 pb-24 lg:pb-8 overflow-x-hidden">
       {/* Header */}
-      <div className="bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 text-white px-6 py-12">
+      <div className="bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 text-white px-4 sm:px-6 py-8 sm:py-12">
         <div className="max-w-7xl mx-auto">
-          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
+          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 sm:gap-6">
             <div>
               <div className="flex items-center gap-3 mb-4">
                 <div className="p-3 bg-white/20 rounded-lg backdrop-blur-sm">
                   <BookOpen className="w-8 h-8" />
                 </div>
-                <h1 className="text-4xl md:text-5xl font-extrabold tracking-tight">
+                <h1 className="text-3xl sm:text-4xl md:text-5xl font-extrabold tracking-tight">
                   My Courses
                 </h1>
               </div>
