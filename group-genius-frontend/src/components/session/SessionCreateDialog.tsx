@@ -34,8 +34,8 @@ export function SessionCreateDialog({ onCreated }: Props) {
       setLoadingGroups(true);
       try {
         const token = localStorage.getItem('token');
-        // fetch groups where user is a member (use searchGroups with userId)
-        const res = await groupAPI.searchGroups(token, { userId: user.id, size: 100 });
+        // fetch groups where user is a member (use searchGroups with userId and filterByMembership=true)
+        const res = await groupAPI.searchGroups(token, { userId: user.id, size: 100, filterByMembership: true });
         setGroups(Array.isArray(res) ? res : []);
         if (Array.isArray(res) && res.length > 0) {
           setValues((v) => (v.groupId ? v : { ...v, groupId: res[0].groupId || res[0].id }));

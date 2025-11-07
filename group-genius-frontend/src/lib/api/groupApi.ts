@@ -13,6 +13,7 @@ export const groupAPI = {
     if (params?.size) queryParams.append('size', params.size.toString());
     if (params?.sort) queryParams.append('sort', params.sort);
     if (params?.userId) queryParams.append('userId', params.userId.toString());
+    if (params?.filterByMembership !== undefined) queryParams.append('filterByMembership', params.filterByMembership.toString());
 
     const url = `${API_BASE_URL}/groups${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
     

@@ -135,7 +135,8 @@ export default function Groups() {
         name: nameParam,
         page: 0,
         size: 50,
-        userId: user.id,
+        userId: user?.id, // Pass userId to get membership status for each group
+        filterByMembership: false, // Don't filter - show all groups
       });
       
       // Handle paginated response

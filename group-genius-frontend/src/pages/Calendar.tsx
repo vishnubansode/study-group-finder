@@ -13,7 +13,8 @@ import {
   AlertCircle,
   BookOpen,
   Video,
-  Coffee
+  Coffee,
+  RefreshCw
 } from 'lucide-react';
 import SessionCreateDialog from '@/components/session/SessionCreateDialog';
 import SessionEditDialog from '@/components/session/SessionEditDialog';
@@ -50,6 +51,7 @@ export default function Calendar() {
   const { user } = useAuth();
   const [sessionsState, setSessionsState] = useState<any[]>(DEFAULT_SESSIONS);
   const [loadingSessions, setLoadingSessions] = useState(false);
+  const [lastRefresh, setLastRefresh] = useState<Date>(new Date());
 
   const getDaysInMonth = (date: Date) => {
     const year = date.getFullYear();
@@ -111,36 +113,45 @@ export default function Calendar() {
     .slice(0, 5);
 
   // Load sessions for groups the user belongs to
-  useEffect(() => {
-    let mounted = true;
-    const load = async () => {
-      if (!user) return;
-      setLoadingSessions(true);
-      try {
-        const token = localStorage.getItem('token');
-        const groups = await groupAPI.searchGroups(token, { userId: user.id, size: 100 });
-        const arr = Array.isArray(groups) ? groups : (groups?.content ?? []);
-        const groupIds = arr.map((g: any) => g.groupId ?? g.id);
-        const pagePromises = groupIds.map((gid: number) => sessionAPI.getSessionsByGroup(gid, 0, 100));
-        const pages = await Promise.all(pagePromises);
-        // pages may be Page objects or arrays
-        const allSessions: any[] = [];
-        pages.forEach((p: any, idx: number) => {
-          const items = Array.isArray(p) ? p : (Array.isArray(p.content) ? p.content : (p.items ?? []));
-          items.forEach((it: any) => {
-            const mapped = mapDtoToUi(it);
-            allSessions.push(mapped);
-          });
+  const loadSessions = async () => {
+    if (!user) return;
+    setLoadingSessions(true);
+    try {
+      const token = localStorage.getItem('token');
+      const groups = await groupAPI.searchGroups(token, { userId: user.id, size: 100, filterByMembership: true });
+      const arr = Array.isArray(groups) ? groups : (groups?.content ?? []);
+      const groupIds = arr.map((g: any) => g.groupId ?? g.id);
+      const pagePromises = groupIds.map((gid: number) => sessionAPI.getSessionsByGroup(gid, 0, 100));
+      const pages = await Promise.all(pagePromises);
+      // pages may be Page objects or arrays
+      const allSessions: any[] = [];
+      pages.forEach((p: any, idx: number) => {
+        const items = Array.isArray(p) ? p : (Array.isArray(p.content) ? p.content : (p.items ?? []));
+        items.forEach((it: any) => {
+          const mapped = mapDtoToUi(it);
+          allSessions.push(mapped);
         });
-        if (mounted) setSessionsState(allSessions);
-      } catch (e) {
-        console.error('Failed to load sessions', e);
-      } finally {
-        if (mounted) setLoadingSessions(false);
-      }
-    };
-    load();
-    return () => { mounted = false; };
+      });
+      setSessionsState(allSessions);
+      setLastRefresh(new Date());
+    } catch (e) {
+      console.error('Failed to load sessions', e);
+    } finally {
+      setLoadingSessions(false);
+    }
+  };
+
+  useEffect(() => {
+    loadSessions();
+  }, [user]);
+
+  // Auto-refresh sessions every 30 seconds to show newly created sessions by other users
+  useEffect(() => {
+    if (!user) return;
+    const interval = setInterval(() => {
+      loadSessions();
+    }, 30000); // 30 seconds
+    return () => clearInterval(interval);
   }, [user]);
 
   const mapDtoToUi = (dto: any) => {
@@ -171,6 +182,9 @@ export default function Calendar() {
     try {
       const mapped = mapDtoToUi(created);
       setSessionsState((s) => [mapped, ...s]);
+      setLastRefresh(new Date());
+      // Optionally reload to ensure consistency with backend
+      setTimeout(() => loadSessions(), 1000);
     } catch (e) { console.error(e); }
   };
 
@@ -178,21 +192,39 @@ export default function Calendar() {
     try {
       const mapped = mapDtoToUi(updated);
       setSessionsState((s) => s.map((x) => (x.id === mapped.id ? mapped : x)));
+      setLastRefresh(new Date());
     } catch (e) { console.error(e); }
   };
 
   const handleSessionDeleted = (id: number) => {
     setSessionsState((s) => s.filter((x) => x.id !== id));
+    setLastRefresh(new Date());
   };
 
   // Responsive breakpoint detection for mobile view
   const [isMobile, setIsMobile] = useState<boolean>(false);
+  const [timeAgo, setTimeAgo] = useState<string>('just now');
+
   useEffect(() => {
     const onResize = () => setIsMobile(window.innerWidth < 768);
     onResize();
     window.addEventListener('resize', onResize);
     return () => window.removeEventListener('resize', onResize);
   }, []);
+
+  // Update time ago display
+  useEffect(() => {
+    const updateTimeAgo = () => {
+      const seconds = Math.floor((new Date().getTime() - lastRefresh.getTime()) / 1000);
+      if (seconds < 10) setTimeAgo('just now');
+      else if (seconds < 60) setTimeAgo(`${seconds}s ago`);
+      else if (seconds < 3600) setTimeAgo(`${Math.floor(seconds / 60)}m ago`);
+      else setTimeAgo(`${Math.floor(seconds / 3600)}h ago`);
+    };
+    updateTimeAgo();
+    const interval = setInterval(updateTimeAgo, 5000); // Update every 5 seconds
+    return () => clearInterval(interval);
+  }, [lastRefresh]);
 
   // Helper: sessions grouped by date for mobile list
   const sessionsByDate = sessionsState.reduce((acc: Record<string, any[]>, s) => {
@@ -214,10 +246,22 @@ export default function Calendar() {
               </div>
               <div>
                 <h1 className="text-2xl font-bold text-foreground">Calendar</h1>
-                <p className="text-xs text-muted-foreground hidden sm:block">Manage your sessions</p>
+                <p className="text-xs text-muted-foreground hidden sm:block">
+                  {loadingSessions ? 'Syncing...' : `Updated ${timeAgo}`}
+                </p>
               </div>
             </div>
             <div className="flex items-center gap-2">
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => loadSessions()}
+                disabled={loadingSessions}
+                className="h-9 w-9"
+                title="Refresh sessions"
+              >
+                <RefreshCw className={`w-4 h-4 ${loadingSessions ? 'animate-spin' : ''}`} />
+              </Button>
               <React.Suspense fallback={<Button size="sm"><Plus className="w-4 h-4 sm:mr-2"/><span className="hidden sm:inline">New</span></Button>}>
                 <SessionCreateDialog onCreated={(created) => { handleSessionCreated(created); }} />
               </React.Suspense>
@@ -251,26 +295,6 @@ export default function Calendar() {
               className="h-10 w-10 rounded-xl hover:bg-primary hover:text-white transition-colors"
             >
               <ChevronRight className="w-5 h-5" />
-            </Button>
-          </div>
-          
-          <div className="flex items-center gap-2">
-            <Button
-              variant={viewMode === 'month' ? 'default' : 'outline'}
-              size="sm"
-              onClick={() => setViewMode('month')}
-              className="rounded-lg"
-            >
-              <CalendarIcon className="w-4 h-4 mr-2" />
-              Month
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setCurrentViewDate(new Date())}
-              className="rounded-lg"
-            >
-              Today
             </Button>
           </div>
         </div>
@@ -321,7 +345,9 @@ export default function Calendar() {
                                         <span>{session.time}</span>
                                       </div>
                                     </div>
-                                    <SessionEditDialog session={session} onSaved={(u) => { handleSessionUpdated(u); }} onDeleted={() => { handleSessionDeleted(session.id); }} />
+                                    {user?.id === session.createdById && (
+                                      <SessionEditDialog session={session} onSaved={(u) => { handleSessionUpdated(u); }} onDeleted={() => { handleSessionDeleted(session.id); }} />
+                                    )}
                                   </div>
                                 </div>
                               );
@@ -429,7 +455,9 @@ export default function Calendar() {
                                 <p className="text-sm font-medium truncate">{session.title}</p>
                                 <p className="text-xs text-muted-foreground">{session.time}</p>
                               </div>
-                              <SessionEditDialog session={session} onSaved={(u) => { handleSessionUpdated(u); }} onDeleted={() => { handleSessionDeleted(session.id); }} />
+                              {user?.id === session.createdById && (
+                                <SessionEditDialog session={session} onSaved={(u) => { handleSessionUpdated(u); }} onDeleted={() => { handleSessionDeleted(session.id); }} />
+                              )}
                             </div>
                           </div>
                         );
@@ -473,7 +501,9 @@ export default function Calendar() {
                                 {new Date(session.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
                               </p>
                             </div>
-                            <SessionEditDialog session={session} onSaved={(u) => { handleSessionUpdated(u); }} onDeleted={() => { handleSessionDeleted(session.id); }} />
+                            {user?.id === session.createdById && (
+                              <SessionEditDialog session={session} onSaved={(u) => { handleSessionUpdated(u); }} onDeleted={() => { handleSessionDeleted(session.id); }} />
+                            )}
                           </div>
                         </div>
                       );

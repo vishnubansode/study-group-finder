@@ -63,7 +63,7 @@ export default function Chat() {
           return;
         }
 
-        const res = await groupAPI.searchGroups(token, { userId: user.id });
+        const res = await groupAPI.searchGroups(token, { userId: user.id, filterByMembership: true });
         const normalized = Array.isArray(res)
           ? res.map((g: any) => ({
               id: g.groupId ?? g.id,

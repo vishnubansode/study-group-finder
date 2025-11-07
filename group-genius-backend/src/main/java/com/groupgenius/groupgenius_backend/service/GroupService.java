@@ -30,7 +30,9 @@ public class GroupService {
     private final CourseRepository courseRepository;
     private final GroupMemberService groupMemberService;
 
-    public GroupService(GroupRepository groupRepository, UserRepository userRepository, GroupMemberRepository groupMemberRepository, CourseRepository courseRepository, GroupMemberService groupMemberService) {
+    public GroupService(GroupRepository groupRepository, UserRepository userRepository,
+            GroupMemberRepository groupMemberRepository, CourseRepository courseRepository,
+            GroupMemberService groupMemberService) {
         this.groupRepository = groupRepository;
         this.userRepository = userRepository;
         this.groupMemberRepository = groupMemberRepository;
@@ -38,7 +40,8 @@ public class GroupService {
         this.groupMemberService = groupMemberService;
     }
 
-    public Page<GroupResponse> search(Long courseId, String privacy, String name, Long userId, Pageable pageable) {
+    public Page<GroupResponse> search(Long courseId, String privacy, String name, Long userId,
+            boolean filterByMembership, Pageable pageable) {
         User currentUser = null;
         if (userId != null) {
             currentUser = userRepository.findById(userId).orElse(null);
@@ -46,7 +49,10 @@ public class GroupService {
 
         final User resolvedUser = currentUser;
 
-        return groupRepository.findAll(GroupSpecifications.filter(courseId, privacy, name), pageable)
+        // Only filter by userId if filterByMembership is true
+        Long filterUserId = filterByMembership ? userId : null;
+
+        return groupRepository.findAll(GroupSpecifications.filter(courseId, privacy, name, filterUserId), pageable)
                 .map(group -> toDto(group, resolvedUser));
     }
 
@@ -59,7 +65,8 @@ public class GroupService {
         Group.GroupBuilder groupBuilder = Group.builder()
                 .groupName(req.getName())
                 .description(req.getDescription())
-                .privacyType(req.getPrivacy() == null ? Group.PrivacyType.PUBLIC : Group.PrivacyType.valueOf(req.getPrivacy()))
+                .privacyType(req.getPrivacy() == null ? Group.PrivacyType.PUBLIC
+                        : Group.PrivacyType.valueOf(req.getPrivacy()))
                 .createdBy(user.get());
 
         if (req.getCourseId() != null) {
@@ -67,7 +74,8 @@ public class GroupService {
         }
 
         // If a password was provided and group is private, store it
-        if (req.getPassword() != null && !req.getPassword().isBlank() && req.getPrivacy() != null && req.getPrivacy().equals("PRIVATE")) {
+        if (req.getPassword() != null && !req.getPassword().isBlank() && req.getPrivacy() != null
+                && req.getPrivacy().equals("PRIVATE")) {
             groupBuilder.groupPassword(req.getPassword());
         }
 
@@ -106,18 +114,18 @@ public class GroupService {
     @Transactional
     public void deleteGroup(Long groupId, Long adminId) {
         log.info("Attempting to delete group {} by admin {}", groupId, adminId);
-        
+
         Group group = groupRepository.findById(groupId)
                 .orElseThrow(() -> new IllegalArgumentException("Group not found"));
-        
+
         log.info("Found group: {}, created by: {}", group.getGroupName(), group.getCreatedBy().getId());
-        
+
         // Only the group creator (admin) can delete the group
         if (!group.getCreatedBy().getId().equals(adminId)) {
             log.warn("Delete group denied - adminId {} is not the creator ({})", adminId, group.getCreatedBy().getId());
             throw new IllegalArgumentException("Only the group creator can delete this group");
         }
-        
+
         log.info("Deleting group {} and all associated members", groupId);
         groupRepository.delete(group);
         log.info("Group {} successfully deleted", groupId);
@@ -158,4 +166,3 @@ public class GroupService {
                 .build();
     }
 }
-
