@@ -2,9 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Dialog, DialogContent } from '@/components/ui/dialog';
-import EventForm, { EventFormData } from '@/components/group/EventForm';
-import { useToast } from '@/components/ui/use-toast';
 import { 
   Calendar as CalendarIcon, 
   Plus, 
@@ -540,19 +537,6 @@ export default function Calendar() {
           )}
         </div>
       </div>
-
-      {/* Create Event Dialog */}
-      <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-          <EventForm
-            onSubmit={handleCreateEvent}
-            onCancel={() => setIsCreateDialogOpen(false)}
-            isLoading={isLoading}
-            submitLabel="Create Session"
-            cancelLabel="Cancel"
-          />
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }
