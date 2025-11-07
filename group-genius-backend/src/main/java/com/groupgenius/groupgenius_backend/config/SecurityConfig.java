@@ -45,6 +45,7 @@ public class SecurityConfig {
 
                         // User course management endpoints - require authentication
                         .requestMatchers("/api/user/**").authenticated()
+                        .requestMatchers("/api/sessions/**").authenticated()
 
                         // Any other request - require authentication
                         .anyRequest().authenticated()
