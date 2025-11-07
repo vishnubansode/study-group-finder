@@ -100,3 +100,21 @@ CREATE TABLE IF NOT EXISTS group_members (
     CONSTRAINT fk_chat_sender FOREIGN KEY (sender_id) REFERENCES users (id) ON DELETE SET NULL,
     CONSTRAINT fk_chat_reply FOREIGN KEY (reply_to_id) REFERENCES chat_messages (id) ON DELETE SET NULL
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+  -- Sessions table (linked to groups and users)
+  CREATE TABLE IF NOT EXISTS sessions (
+  id BIGINT NOT NULL AUTO_INCREMENT,
+  group_id BIGINT NOT NULL,
+  title VARCHAR(255) NOT NULL,
+  description VARCHAR(1000) DEFAULT NULL,
+  start_time DATETIME NOT NULL,
+  end_time DATETIME NOT NULL,
+  meeting_link VARCHAR(500) DEFAULT NULL,
+  created_by BIGINT NOT NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  KEY idx_sessions_group (group_id),
+  KEY idx_sessions_created_by (created_by),
+  CONSTRAINT fk_sessions_group FOREIGN KEY (group_id) REFERENCES `groups` (id) ON DELETE CASCADE,
+  CONSTRAINT fk_sessions_user FOREIGN KEY (created_by) REFERENCES users (id) ON DELETE CASCADE
+ ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
