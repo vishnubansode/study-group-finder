@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -15,79 +15,20 @@ import {
   Video,
   Coffee
 } from 'lucide-react';
+import SessionCreateDialog from '@/components/session/SessionCreateDialog';
+import SessionEditDialog from '@/components/session/SessionEditDialog';
+import { useAuth } from '@/contexts/AuthContext';
+import { groupAPI } from '@/lib/api/groupApi';
+import { sessionAPI } from '@/lib/api/sessionApi';
 
 const currentDate = new Date();
 const currentMonth = currentDate.getMonth();
 const currentYear = currentDate.getFullYear();
 
-const events = [
-  {
-    id: 1,
-    title: 'CS 101 Study Session',
-    type: 'study',
-    date: '2024-11-15',
-    time: '2:00 PM - 4:00 PM',
-    location: 'Library Room 204',
-    participants: 8,
-    course: 'CS 101',
-    description: 'Group study session for upcoming midterm exam'
-  },
-  {
-    id: 2,
-    title: 'Math Assignment Due',
-    type: 'deadline',
-    date: '2024-11-12',
-    time: '11:59 PM',
-    location: 'Online Submission',
-    course: 'MATH 201',
-    description: 'Integration Techniques Problem Set'
-  },
-  {
-    id: 3,
-    title: 'Physics Lab',
-    type: 'class',
-    date: '2024-11-13',
-    time: '3:00 PM - 5:00 PM',
-    location: 'Physics Building Lab 3',
-    course: 'PHYS 151',
-    description: 'Momentum and Collisions Experiment'
-  },
-  {
-    id: 4,
-    title: 'History Project Meeting',
-    type: 'meeting',
-    date: '2024-11-16',
-    time: '1:00 PM - 2:00 PM',
-    location: 'Student Center Room 301',
-    participants: 4,
-    course: 'HIST 120',
-    description: 'Final project planning and research division'
-  },
-  {
-    id: 5,
-    title: 'Virtual Study Group',
-    type: 'study',
-    date: '2024-11-18',
-    time: '7:00 PM - 9:00 PM',
-    location: 'Zoom Meeting',
-    participants: 12,
-    course: 'CS 101',
-    description: 'Online collaborative coding session'
-  },
-  {
-    id: 6,
-    title: 'Coffee & Study',
-    type: 'informal',
-    date: '2024-11-14',
-    time: '10:00 AM - 12:00 PM',
-    location: 'Campus Coffee Shop',
-    participants: 3,
-    course: 'MATH 201',
-    description: 'Casual study session over coffee'
-  }
-];
+// sessions will be loaded from backend for user's groups
+const DEFAULT_SESSIONS: any[] = [];
 
-const eventTypes = {
+const sessionTypes = {
   study: { color: 'bg-primary', icon: Users, label: 'Study Session' },
   deadline: { color: 'bg-destructive', icon: AlertCircle, label: 'Deadline' },
   class: { color: 'bg-accent', icon: BookOpen, label: 'Class' },
@@ -106,6 +47,9 @@ export default function Calendar() {
   const [selectedDate, setSelectedDate] = useState(currentDate);
   const [viewMode, setViewMode] = useState<'month' | 'week'>('month');
   const [currentViewDate, setCurrentViewDate] = useState(new Date(currentYear, currentMonth, 1));
+  const { user } = useAuth();
+  const [sessionsState, setSessionsState] = useState<any[]>(DEFAULT_SESSIONS);
+  const [loadingSessions, setLoadingSessions] = useState(false);
 
   const getDaysInMonth = (date: Date) => {
     const year = date.getFullYear();
@@ -139,14 +83,14 @@ export default function Calendar() {
     });
   };
 
-  const getEventsForDate = (date: string) => {
-    return events.filter(event => event.date === date);
+  const getSessionsForDate = (date: string) => {
+    return sessionsState.filter(session => session.date === date);
   };
 
-  const getEventsForDay = (day: number | null) => {
+  const getSessionsForDay = (day: number | null) => {
     if (!day) return [];
     const dateString = `${currentViewDate.getFullYear()}-${String(currentViewDate.getMonth() + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-    return getEventsForDate(dateString);
+    return getSessionsForDate(dateString);
   };
 
   const navigateMonth = (direction: 'prev' | 'next') => {
@@ -160,260 +104,407 @@ export default function Calendar() {
   };
 
   const today = new Date().toISOString().split('T')[0];
-  const todayEvents = getEventsForDate(today);
-  const upcomingEvents = events
-    .filter(event => new Date(event.date) >= new Date())
+  const todaySessions = getSessionsForDate(today);
+  const upcomingSessions = sessionsState
+    .filter(session => new Date(session.date) >= new Date())
     .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
     .slice(0, 5);
 
+  // Load sessions for groups the user belongs to
+  useEffect(() => {
+    let mounted = true;
+    const load = async () => {
+      if (!user) return;
+      setLoadingSessions(true);
+      try {
+        const token = localStorage.getItem('token');
+        const groups = await groupAPI.searchGroups(token, { userId: user.id, size: 100 });
+        const arr = Array.isArray(groups) ? groups : (groups?.content ?? []);
+        const groupIds = arr.map((g: any) => g.groupId ?? g.id);
+        const pagePromises = groupIds.map((gid: number) => sessionAPI.getSessionsByGroup(gid, 0, 100));
+        const pages = await Promise.all(pagePromises);
+        // pages may be Page objects or arrays
+        const allSessions: any[] = [];
+        pages.forEach((p: any, idx: number) => {
+          const items = Array.isArray(p) ? p : (Array.isArray(p.content) ? p.content : (p.items ?? []));
+          items.forEach((it: any) => {
+            const mapped = mapDtoToUi(it);
+            allSessions.push(mapped);
+          });
+        });
+        if (mounted) setSessionsState(allSessions);
+      } catch (e) {
+        console.error('Failed to load sessions', e);
+      } finally {
+        if (mounted) setLoadingSessions(false);
+      }
+    };
+    load();
+    return () => { mounted = false; };
+  }, [user]);
+
+  const mapDtoToUi = (dto: any) => {
+    // dto: SessionResponseDTO
+    const start = dto.startTime || dto.start || null;
+    const end = dto.endTime || dto.end || null;
+    const startDate = start ? new Date(start) : null;
+    const date = startDate ? startDate.toISOString().split('T')[0] : (dto.date ?? '');
+    const time = startDate ? `${startDate.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}${end ? ' - ' + (new Date(end)).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}) : ''}` : '';
+    return {
+      id: dto.id,
+      title: dto.title,
+      date,
+      time,
+      startTime: start,
+      endTime: end,
+      description: dto.description,
+      meetingLink: dto.meetingLink,
+      groupId: dto.groupId,
+      createdById: dto.createdById,
+      createdByName: dto.createdByName,
+      raw: dto,
+      type: 'study'
+    };
+  };
+
+  const handleSessionCreated = (created: any) => {
+    try {
+      const mapped = mapDtoToUi(created);
+      setSessionsState((s) => [mapped, ...s]);
+    } catch (e) { console.error(e); }
+  };
+
+  const handleSessionUpdated = (updated: any) => {
+    try {
+      const mapped = mapDtoToUi(updated);
+      setSessionsState((s) => s.map((x) => (x.id === mapped.id ? mapped : x)));
+    } catch (e) { console.error(e); }
+  };
+
+  const handleSessionDeleted = (id: number) => {
+    setSessionsState((s) => s.filter((x) => x.id !== id));
+  };
+
+  // Responsive breakpoint detection for mobile view
+  const [isMobile, setIsMobile] = useState<boolean>(false);
+  useEffect(() => {
+    const onResize = () => setIsMobile(window.innerWidth < 768);
+    onResize();
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
+
+  // Helper: sessions grouped by date for mobile list
+  const sessionsByDate = sessionsState.reduce((acc: Record<string, any[]>, s) => {
+    if (!s.date) return acc;
+    acc[s.date] = acc[s.date] || [];
+    acc[s.date].push(s);
+    return acc;
+  }, {} as Record<string, any[]>);
+
   return (
-    <div className="min-h-screen bg-background pb-24 lg:pb-8">
-      {/* Header */}
-      <div className="bg-gradient-secondary px-6 py-12">
-        <div className="max-w-6xl mx-auto">
-          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
-            <div>
-              <h1 className="heading-hero mb-4">Academic Calendar</h1>
-              <p className="text-xl text-muted-foreground max-w-2xl">
-                Stay organized with your study sessions, deadlines, and group meetings all in one place.
-              </p>
+    <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/10">
+      {/* Compact Modern Header */}
+      <div className="sticky top-0 z-10 bg-background/95 backdrop-blur-sm border-b border-border shadow-sm">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4">
+          <div className="flex items-center justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-gradient-to-br from-primary to-primary/70 rounded-xl flex items-center justify-center shadow-lg">
+                <CalendarIcon className="w-6 h-6 text-white" />
+              </div>
+              <div>
+                <h1 className="text-2xl font-bold text-foreground">Calendar</h1>
+                <p className="text-xs text-muted-foreground hidden sm:block">Manage your sessions</p>
+              </div>
             </div>
-            <div className="flex flex-col sm:flex-row gap-3">
-              <Button className="btn-hero">
-                <Plus className="w-5 h-5 mr-2" />
-                Create Event
-              </Button>
-              <Button variant="outline" size="lg" className="px-8 py-4">
-                <CalendarIcon className="w-5 h-5 mr-2" />
-                Import Calendar
-              </Button>
+            <div className="flex items-center gap-2">
+              <React.Suspense fallback={<Button size="sm"><Plus className="w-4 h-4 sm:mr-2"/><span className="hidden sm:inline">New</span></Button>}>
+                <SessionCreateDialog onCreated={(created) => { handleSessionCreated(created); }} />
+              </React.Suspense>
             </div>
           </div>
         </div>
       </div>
 
-      <div className="max-w-7xl mx-auto px-6 py-8">
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
-          {/* Main Calendar */}
-          <div className="lg:col-span-3">
-            <Card className="academic-card">
-              <CardHeader>
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-4">
-                    <div className="flex items-center space-x-2">
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => navigateMonth('prev')}
-                      >
-                        <ChevronLeft className="w-4 h-4" />
-                      </Button>
-                      <h2 className="text-xl font-semibold text-foreground">
-                        {monthNames[currentViewDate.getMonth()]} {currentViewDate.getFullYear()}
-                      </h2>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => navigateMonth('next')}
-                      >
-                        <ChevronRight className="w-4 h-4" />
-                      </Button>
-                    </div>
-                  </div>
-                  
-                  <div className="flex items-center space-x-2">
-                    <Button
-                      variant={viewMode === 'month' ? 'default' : 'ghost'}
-                      size="sm"
-                      onClick={() => setViewMode('month')}
-                      className={viewMode === 'month' ? 'btn-academic' : ''}
-                    >
-                      Month
-                    </Button>
-                    <Button
-                      variant={viewMode === 'week' ? 'default' : 'ghost'}
-                      size="sm"
-                      onClick={() => setViewMode('week')}
-                      className={viewMode === 'week' ? 'btn-academic' : ''}
-                    >
-                      Week
-                    </Button>
-                    <Button variant="outline" size="sm">
-                      Today
-                    </Button>
-                  </div>
-                </div>
-              </CardHeader>
-              
-              <CardContent>
-                {/* Calendar Grid */}
-                <div className="grid grid-cols-7 gap-1">
-                  {/* Day Headers */}
-                  {dayNames.map((day) => (
-                    <div key={day} className="p-3 text-center text-sm font-medium text-muted-foreground border-b border-border">
-                      {day}
-                    </div>
-                  ))}
-                  
-                  {/* Calendar Days */}
-                  {getDaysInMonth(currentViewDate).map((day, index) => {
-                    const dayEvents = getEventsForDay(day);
-                    const isToday = day && 
-                      currentViewDate.getMonth() === currentDate.getMonth() &&
-                      currentViewDate.getFullYear() === currentDate.getFullYear() &&
-                      day === currentDate.getDate();
-                    
-                    return (
-                      <div
-                        key={index}
-                        className={`min-h-[100px] p-2 border border-border hover:bg-muted/50 transition-colors ${
-                          !day ? 'bg-muted/20' : ''
-                        } ${isToday ? 'bg-primary/10 border-primary' : ''}`}
-                      >
-                        {day && (
-                          <>
-                            <div className={`text-sm font-medium mb-1 ${
-                              isToday ? 'text-primary' : 'text-foreground'
-                            }`}>
-                              {day}
-                            </div>
-                            <div className="space-y-1">
-                              {dayEvents.slice(0, 2).map((event) => {
-                                const eventType = eventTypes[event.type as keyof typeof eventTypes];
-                                return (
-                                  <div
-                                    key={event.id}
-                                    className={`text-xs p-1 rounded text-white truncate ${eventType.color}`}
-                                    title={event.title}
-                                  >
-                                    {event.title}
-                                  </div>
-                                );
-                              })}
-                              {dayEvents.length > 2 && (
-                                <div className="text-xs text-muted-foreground">
-                                  +{dayEvents.length - 2} more
-                                </div>
-                              )}
-                            </div>
-                          </>
-                        )}
+      {/* Main Content */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6">
+        {/* Month Navigation & View Selector */}
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6">
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={() => navigateMonth('prev')}
+              className="h-10 w-10 rounded-xl hover:bg-primary hover:text-white transition-colors"
+            >
+              <ChevronLeft className="w-5 h-5" />
+            </Button>
+            <div className="px-4 py-2 bg-card rounded-xl border border-border shadow-sm">
+              <h2 className="text-lg font-semibold text-foreground whitespace-nowrap">
+                {monthNames[currentViewDate.getMonth()]} {currentViewDate.getFullYear()}
+              </h2>
+            </div>
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={() => navigateMonth('next')}
+              className="h-10 w-10 rounded-xl hover:bg-primary hover:text-white transition-colors"
+            >
+              <ChevronRight className="w-5 h-5" />
+            </Button>
+          </div>
+          
+          <div className="flex items-center gap-2">
+            <Button
+              variant={viewMode === 'month' ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => setViewMode('month')}
+              className="rounded-lg"
+            >
+              <CalendarIcon className="w-4 h-4 mr-2" />
+              Month
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setCurrentViewDate(new Date())}
+              className="rounded-lg"
+            >
+              Today
+            </Button>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 xl:grid-cols-12 gap-6">
+          {/* Main Calendar Area */}
+          <div className="xl:col-span-9">
+            <Card className="border border-border/50 shadow-lg rounded-2xl overflow-hidden">
+              <CardContent className="p-0">
+                {/* Mobile: List View | Desktop: Grid View */}
+                {isMobile ? (
+                  <div className="p-4 space-y-3">
+                    {Object.keys(sessionsByDate).length === 0 ? (
+                      <div className="text-center py-12">
+                        <div className="w-16 h-16 bg-muted rounded-2xl flex items-center justify-center mx-auto mb-4">
+                          <CalendarIcon className="w-8 h-8 text-muted-foreground" />
+                        </div>
+                        <p className="text-sm text-muted-foreground">No sessions scheduled</p>
                       </div>
-                    );
-                  })}
-                </div>
+                    ) : (
+                      Object.entries(sessionsByDate)
+                        .sort((a,b) => new Date(a[0]).getTime() - new Date(b[0]).getTime())
+                        .map(([date, items]: [string, any[]]) => (
+                          <div key={date} className="space-y-2">
+                            <div className="flex items-center gap-2 px-2">
+                              <div className="h-px flex-1 bg-border" />
+                              <p className="text-xs font-medium text-muted-foreground">
+                                {new Date(date).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}
+                              </p>
+                              <div className="h-px flex-1 bg-border" />
+                            </div>
+                            {items.map((session) => {
+                              const sessionType = sessionTypes[session.type as keyof typeof sessionTypes];
+                              const Icon = sessionType.icon;
+                              return (
+                                <div
+                                  key={session.id}
+                                  className="group relative bg-gradient-to-br from-card to-card/50 rounded-xl border border-border/50 p-3 shadow-sm hover:shadow-md transition-all duration-200"
+                                >
+                                  <div className="flex items-start gap-3">
+                                    <div className={`${sessionType.color} w-12 h-12 rounded-xl flex items-center justify-center shadow-sm flex-shrink-0`}>
+                                      <Icon className="w-6 h-6 text-white" />
+                                    </div>
+                                    <div className="flex-1 min-w-0">
+                                      <h3 className="font-semibold text-sm text-foreground mb-1 truncate">{session.title}</h3>
+                                      <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                                        <Clock className="w-3 h-3" />
+                                        <span>{session.time}</span>
+                                      </div>
+                                    </div>
+                                    <SessionEditDialog session={session} onSaved={(u) => { handleSessionUpdated(u); }} onDeleted={() => { handleSessionDeleted(session.id); }} />
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        ))
+                    )}
+                  </div>
+                ) : (
+                  <div className="p-6">
+                    <div className="grid grid-cols-7 gap-3">
+                      {/* Day Headers */}
+                      {dayNames.map((day) => (
+                        <div key={day} className="text-center py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                          {day.substring(0, 3)}
+                        </div>
+                      ))}
+                      
+                      {/* Calendar Days */}
+                      {getDaysInMonth(currentViewDate).map((day, index) => {
+                        const daySessions = getSessionsForDay(day);
+                        const isToday = day && 
+                          currentViewDate.getMonth() === currentDate.getMonth() &&
+                          currentViewDate.getFullYear() === currentDate.getFullYear() &&
+                          day === currentDate.getDate();
+                        
+                        return (
+                          <div
+                            key={index}
+                            className={`min-h-[110px] p-3 rounded-xl transition-all duration-200 ${
+                              !day 
+                                ? 'bg-transparent' 
+                                : isToday 
+                                ? 'bg-gradient-to-br from-primary/10 to-primary/5 border-2 border-primary/40 shadow-md ring-2 ring-primary/20' 
+                                : 'bg-card/50 border border-border/40 hover:border-border hover:shadow-md hover:bg-card'
+                            }`}
+                          >
+                            {day && (
+                              <>
+                                <div className={`text-sm font-semibold mb-2 flex items-center justify-between ${
+                                  isToday ? 'text-primary' : 'text-foreground/80'
+                                }`}>
+                                  <span>{day}</span>
+                                  {isToday && (
+                                    <div className="w-2 h-2 bg-primary rounded-full animate-pulse" />
+                                  )}
+                                </div>
+                                <div className="space-y-1.5">
+                                  {daySessions.slice(0, 3).map((session) => {
+                                    const sessionType = sessionTypes[session.type as keyof typeof sessionTypes];
+                                    return (
+                                      <div
+                                        key={session.id}
+                                        className={`text-xs px-2 py-1.5 rounded-lg text-white truncate cursor-pointer transition-all hover:scale-105 hover:shadow-md ${sessionType.color}`}
+                                        title={`${session.title} - ${session.time}`}
+                                      >
+                                        {session.title}
+                                      </div>
+                                    );
+                                  })}
+                                  {daySessions.length > 3 && (
+                                    <div className="text-xs text-muted-foreground font-medium text-center pt-1">
+                                      +{daySessions.length - 3}
+                                    </div>
+                                  )}
+                                </div>
+                              </>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
               </CardContent>
             </Card>
           </div>
 
-          {/* Sidebar */}
-          <div className="space-y-6">
-            {/* Today's Events */}
-            <Card className="academic-card">
-              <CardHeader>
-                <CardTitle>Today's Events</CardTitle>
-              </CardHeader>
-              <CardContent>
-                {todayEvents.length > 0 ? (
-                  <div className="space-y-3">
-                    {todayEvents.map((event) => {
-                      const eventType = eventTypes[event.type as keyof typeof eventTypes];
-                      const Icon = eventType.icon;
-                      return (
-                        <div key={event.id} className="flex items-start space-x-3 p-3 rounded-lg hover:bg-muted transition-colors">
-                          <div className={`w-8 h-8 ${eventType.color} rounded-lg flex items-center justify-center`}>
-                            <Icon className="w-4 h-4 text-white" />
+          {/* Sidebar - Hidden on mobile */}
+          {!isMobile && (
+            <div className="xl:col-span-3 space-y-4">
+              {/* Today's Sessions */}
+              <Card className="border border-border/50 shadow-lg rounded-2xl overflow-hidden">
+                <CardHeader className="bg-gradient-to-br from-card to-muted/20 border-b border-border/50 pb-4">
+                  <div className="flex items-center gap-2">
+                    <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
+                      <Clock className="w-4 h-4 text-white" />
+                    </div>
+                    <CardTitle className="text-base">Today's Sessions</CardTitle>
+                  </div>
+                </CardHeader>
+                <CardContent className="p-4">
+                  {todaySessions.length > 0 ? (
+                    <div className="space-y-2">
+                      {todaySessions.slice(0, 4).map((session) => {
+                        const sessionType = sessionTypes[session.type as keyof typeof sessionTypes];
+                        const Icon = sessionType.icon;
+                        return (
+                          <div key={session.id} className="group p-3 rounded-xl bg-gradient-to-br from-card to-muted/10 border border-border/40 hover:border-border hover:shadow-md transition-all">
+                            <div className="flex items-center gap-3">
+                              <div className={`${sessionType.color} w-10 h-10 rounded-lg flex items-center justify-center shadow-sm flex-shrink-0`}>
+                                <Icon className="w-5 h-5 text-white" />
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <p className="text-sm font-medium truncate">{session.title}</p>
+                                <p className="text-xs text-muted-foreground">{session.time}</p>
+                              </div>
+                              <SessionEditDialog session={session} onSaved={(u) => { handleSessionUpdated(u); }} onDeleted={() => { handleSessionDeleted(session.id); }} />
+                            </div>
                           </div>
-                          <div className="flex-1 min-w-0">
-                            <p className="text-sm font-medium text-foreground truncate">{event.title}</p>
-                            <p className="text-xs text-muted-foreground">{event.time}</p>
-                            <p className="text-xs text-muted-foreground">{event.location}</p>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <div className="text-center py-8">
+                      <div className="w-12 h-12 bg-muted rounded-xl flex items-center justify-center mx-auto mb-3">
+                        <Clock className="w-6 h-6 text-muted-foreground" />
+                      </div>
+                      <p className="text-xs text-muted-foreground">No sessions today</p>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+
+              {/* Upcoming Sessions */}
+              <Card className="border border-border/50 shadow-lg rounded-2xl overflow-hidden">
+                <CardHeader className="bg-gradient-to-br from-card to-muted/20 border-b border-border/50 pb-4">
+                  <div className="flex items-center gap-2">
+                    <div className="w-8 h-8 bg-secondary rounded-lg flex items-center justify-center">
+                      <CalendarIcon className="w-4 h-4 text-secondary-foreground" />
+                    </div>
+                    <CardTitle className="text-base">Upcoming</CardTitle>
+                  </div>
+                </CardHeader>
+                <CardContent className="p-4">
+                  <div className="space-y-2">
+                    {upcomingSessions.slice(0, 5).map((session) => {
+                      const sessionType = sessionTypes[session.type as keyof typeof sessionTypes];
+                      const Icon = sessionType.icon;
+                      return (
+                        <div key={session.id} className="group p-3 rounded-xl bg-gradient-to-br from-card to-muted/10 border border-border/40 hover:border-border hover:shadow-md transition-all">
+                          <div className="flex items-center gap-3">
+                            <div className={`${sessionType.color} w-10 h-10 rounded-lg flex items-center justify-center shadow-sm flex-shrink-0`}>
+                              <Icon className="w-5 h-5 text-white" />
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm font-medium truncate">{session.title}</p>
+                              <p className="text-xs text-muted-foreground">
+                                {new Date(session.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                              </p>
+                            </div>
+                            <SessionEditDialog session={session} onSaved={(u) => { handleSessionUpdated(u); }} onDeleted={() => { handleSessionDeleted(session.id); }} />
                           </div>
                         </div>
                       );
                     })}
                   </div>
-                ) : (
-                  <p className="text-sm text-muted-foreground">No events scheduled for today</p>
-                )}
-              </CardContent>
-            </Card>
+                </CardContent>
+              </Card>
 
-            {/* Upcoming Events */}
-            <Card className="academic-card">
-              <CardHeader>
-                <CardTitle>Upcoming Events</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-3">
-                  {upcomingEvents.map((event) => {
-                    const eventType = eventTypes[event.type as keyof typeof eventTypes];
-                    const Icon = eventType.icon;
-                    return (
-                      <div key={event.id} className="flex items-start space-x-3 p-3 rounded-lg hover:bg-muted transition-colors">
-                        <div className={`w-8 h-8 ${eventType.color} rounded-lg flex items-center justify-center`}>
-                          <Icon className="w-4 h-4 text-white" />
+              {/* Session Types Legend */}
+              <Card className="border border-border/50 shadow-lg rounded-2xl overflow-hidden">
+                <CardHeader className="bg-gradient-to-br from-card to-muted/20 border-b border-border/50 pb-4">
+                  <CardTitle className="text-sm">Session Types</CardTitle>
+                </CardHeader>
+                <CardContent className="p-4">
+                  <div className="grid gap-2">
+                    {Object.entries(sessionTypes).map(([key, type]) => {
+                      const Icon = type.icon;
+                      return (
+                        <div key={key} className="flex items-center gap-3 p-2 rounded-lg hover:bg-muted/50 transition-colors">
+                          <div className={`w-8 h-8 ${type.color} rounded-lg flex items-center justify-center shadow-sm`}>
+                            <Icon className="w-4 h-4 text-white" />
+                          </div>
+                          <span className="text-sm text-foreground">{type.label}</span>
                         </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium text-foreground truncate">{event.title}</p>
-                          <p className="text-xs text-muted-foreground">{formatDate(event.date)}</p>
-                          <p className="text-xs text-muted-foreground">{event.time}</p>
-                          {event.participants && (
-                            <div className="flex items-center space-x-1 mt-1">
-                              <Users className="w-3 h-3 text-muted-foreground" />
-                              <span className="text-xs text-muted-foreground">{event.participants} participants</span>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Event Legend */}
-            <Card className="academic-card">
-              <CardHeader>
-                <CardTitle>Event Types</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-2">
-                  {Object.entries(eventTypes).map(([key, type]) => {
-                    const Icon = type.icon;
-                    return (
-                      <div key={key} className="flex items-center space-x-3">
-                        <div className={`w-4 h-4 ${type.color} rounded`} />
-                        <Icon className="w-4 h-4 text-muted-foreground" />
-                        <span className="text-sm text-foreground">{type.label}</span>
-                      </div>
-                    );
-                  })}
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Quick Actions */}
-            <Card className="academic-card">
-              <CardHeader>
-                <CardTitle>Quick Actions</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <Button className="w-full btn-academic" size="sm">
-                  <Plus className="w-4 h-4 mr-2" />
-                  Create Study Session
-                </Button>
-                <Button variant="outline" className="w-full" size="sm">
-                  <Video className="w-4 h-4 mr-2" />
-                  Schedule Virtual Meeting
-                </Button>
-                <Button variant="outline" className="w-full" size="sm">
-                  <CalendarIcon className="w-4 h-4 mr-2" />
-                  Export Calendar
-                </Button>
-              </CardContent>
-            </Card>
-          </div>
+                      );
+                    })}
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          )}
         </div>
       </div>
     </div>
