@@ -40,4 +40,5 @@ export interface GroupSearchParams {
   size?: number;
   sort?: string;
   userId?: number;
+  filterByMembership?: boolean; // Whether to filter results to only groups user is a member of
 }

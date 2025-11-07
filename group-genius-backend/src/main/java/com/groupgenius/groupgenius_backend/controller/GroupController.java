@@ -30,11 +30,11 @@ public class GroupController {
             @RequestParam(required = false) Long courseId,
             @RequestParam(required = false) String privacy,
             @RequestParam(required = false) String name,
-        @RequestParam(required = false) Long userId,
+            @RequestParam(required = false) Long userId,
+            @RequestParam(required = false, defaultValue = "false") boolean filterByMembership,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size,
-            @RequestParam(defaultValue = "createdAt,desc") String sort
-    ) {
+            @RequestParam(defaultValue = "createdAt,desc") String sort) {
         try {
             Sort sortObj = Sort.by(Sort.Order.desc("createdAt"));
             try {
@@ -43,30 +43,37 @@ public class GroupController {
             } catch (Exception ignored) {
             }
             Pageable pageable = PageRequest.of(page, size, sortObj);
-            return ResponseEntity.ok(groupService.search(courseId, privacy, name, userId, pageable));
+            return ResponseEntity
+                    .ok(groupService.search(courseId, privacy, name, userId, filterByMembership, pageable));
         } catch (Exception ex) {
             log.error("Error while searching groups", ex);
-            return ResponseEntity.status(500).body(java.util.Map.of("timestamp", java.time.OffsetDateTime.now().toString(), "status", 500, "error", "Internal Server Error", "path", "/api/groups", "message", ex.getMessage()));
+            return ResponseEntity.status(500)
+                    .body(java.util.Map.of("timestamp", java.time.OffsetDateTime.now().toString(), "status", 500,
+                            "error", "Internal Server Error", "path", "/api/groups", "message", ex.getMessage()));
         }
     }
 
     @PostMapping
     public ResponseEntity<?> create(@RequestBody GroupCreateRequest req) {
         return groupService.create(req)
-                .map(resp -> ResponseEntity.ok(java.util.Map.of("success", true, "message", "Group created", "data", resp)))
-                .orElseGet(() -> ResponseEntity.badRequest().body(java.util.Map.of("success", false, "message", "Invalid courseId or createdBy", "data", null)));
+                .map(resp -> ResponseEntity
+                        .ok(java.util.Map.of("success", true, "message", "Group created", "data", resp)))
+                .orElseGet(() -> ResponseEntity.badRequest().body(
+                        java.util.Map.of("success", false, "message", "Invalid courseId or createdBy", "data", null)));
     }
 
     // Wrapper endpoints that reuse group membership service
     @PostMapping("/{groupId}/join")
-    public ResponseEntity<?> joinGroup(@PathVariable Long groupId, @RequestParam Long userId, @RequestParam(required = false) String password) {
+    public ResponseEntity<?> joinGroup(@PathVariable Long groupId, @RequestParam Long userId,
+            @RequestParam(required = false) String password) {
         groupMemberService.requestToJoin(userId, groupId, password);
         return ResponseEntity.ok(java.util.Map.of("success", true, "message", "Join processed"));
     }
 
     @PostMapping("/{groupId}/approve")
-    public ResponseEntity<?> approveMember(@PathVariable Long groupId, @RequestParam Long adminId, @RequestParam Long userId) {
-    groupMemberService.approveMember(adminId, userId, groupId);
+    public ResponseEntity<?> approveMember(@PathVariable Long groupId, @RequestParam Long adminId,
+            @RequestParam Long userId) {
+        groupMemberService.approveMember(adminId, userId, groupId);
         return ResponseEntity.ok(java.util.Map.of("success", true, "message", "Member approved"));
     }
 
@@ -77,7 +84,8 @@ public class GroupController {
     }
 
     @DeleteMapping("/{groupId}/remove-member")
-    public ResponseEntity<?> removeMember(@PathVariable Long groupId, @RequestParam Long adminId, @RequestParam Long userId) {
+    public ResponseEntity<?> removeMember(@PathVariable Long groupId, @RequestParam Long adminId,
+            @RequestParam Long userId) {
         groupMemberService.removeMember(adminId, userId, groupId);
         return ResponseEntity.ok(java.util.Map.of("success", true, "message", "Member removed"));
     }
@@ -94,7 +102,8 @@ public class GroupController {
             return ResponseEntity.badRequest().body(java.util.Map.of("success", false, "message", e.getMessage()));
         } catch (Exception e) {
             log.error("Error deleting group {} by admin {}", groupId, adminId, e);
-            return ResponseEntity.status(500).body(java.util.Map.of("success", false, "message", "Failed to delete group"));
+            return ResponseEntity.status(500)
+                    .body(java.util.Map.of("success", false, "message", "Failed to delete group"));
         }
     }
 }
