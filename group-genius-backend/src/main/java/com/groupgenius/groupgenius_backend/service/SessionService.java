@@ -25,13 +25,14 @@ public class SessionService {
     private final SessionRepository sessionRepository;
     private final GroupRepository groupRepository;
     private final UserRepository userRepository;
+    private final NotificationService notificationService;
 
-    public SessionService(SessionRepository sessionRepository,
-                          GroupRepository groupRepository,
-                          UserRepository userRepository) {
+
+    public SessionService(SessionRepository sessionRepository, GroupRepository groupRepository, UserRepository userRepository, NotificationService notificationService) {
         this.sessionRepository = sessionRepository;
         this.groupRepository = groupRepository;
         this.userRepository = userRepository;
+        this.notificationService = notificationService;
     }
 
 
@@ -60,6 +61,10 @@ public class SessionService {
                 .build();
 
         Session saved = sessionRepository.save(session);
+        // Notify all group members (except creator)
+        notificationService.notifyGroupMembersOnSessionEvent(saved,
+                "New session \"" + saved.getTitle() + "\" has been scheduled in your group \""
+                        + saved.getGroup().getGroupName() + "\".");
         return SessionMapper.toDTO(saved);
     }
 
@@ -84,6 +89,11 @@ public class SessionService {
         existing.setMeetingLink(requestDTO.getMeetingLink());
 
         Session updated = sessionRepository.save(existing);
+
+        // Notify all group members (except creator)
+        notificationService.notifyGroupMembersOnSessionEvent(updated,
+                "Session \"" + updated.getTitle() + "\" has been updated in group \""
+                        + updated.getGroup().getGroupName() + "\".");
         return SessionMapper.toDTO(updated);
     }
 

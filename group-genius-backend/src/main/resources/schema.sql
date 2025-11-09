@@ -118,3 +118,18 @@ CREATE TABLE IF NOT EXISTS group_members (
   CONSTRAINT fk_sessions_group FOREIGN KEY (group_id) REFERENCES `groups` (id) ON DELETE CASCADE,
   CONSTRAINT fk_sessions_user FOREIGN KEY (created_by) REFERENCES users (id) ON DELETE CASCADE
  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+ -- Notification table
+  CREATE TABLE IF NOT EXISTS notifications (
+  id BIGINT NOT NULL AUTO_INCREMENT,
+  user_id BIGINT NOT NULL,
+  session_id BIGINT DEFAULT NULL,
+  message VARCHAR(500) NOT NULL,
+  is_read BOOLEAN DEFAULT FALSE,   -- ✅ renamed from `read`
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  KEY idx_notifications_user (user_id),
+  KEY idx_notifications_session (session_id),
+  CONSTRAINT fk_notifications_user FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE,
+  CONSTRAINT fk_notifications_session FOREIGN KEY (session_id) REFERENCES sessions (id) ON DELETE CASCADE
+ ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
