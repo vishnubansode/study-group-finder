@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -16,7 +16,15 @@ import {
   AlertCircle,
   BookOpen,
   Video,
-  Coffee
+  Coffee,
+  Bell,
+  Mail,
+  CircleCheck,
+  ArrowRight,
+  Clock4,
+  UserPlus,
+  RefreshCw,
+  Trash2
 } from 'lucide-react';
 
 const currentDate = new Date();
@@ -105,12 +113,83 @@ const monthNames = [
 
 const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
+type NotificationStatus = 'read' | 'unread';
+type NotificationType = 'reminder' | 'invitation' | 'session-update';
+
+type Notification = {
+  id: number;
+  type: NotificationType;
+  message: string;
+  status: NotificationStatus;
+  timestamp: string;
+  channel: 'email' | 'in-app' | 'both';
+  session?: string;
+};
+
+const notificationTypeMeta: Record<NotificationType, { label: string; accent: string; icon: typeof Bell }> = {
+  reminder: { label: 'Reminder', accent: 'bg-primary/10 text-primary', icon: Clock4 },
+  invitation: { label: 'Invitation', accent: 'bg-secondary/10 text-secondary-foreground', icon: UserPlus },
+  'session-update': { label: 'Session Update', accent: 'bg-accent/10 text-accent-foreground', icon: RefreshCw }
+};
+
+const mockNotifications: Notification[] = [
+  {
+    id: 1,
+    type: 'reminder',
+    message: 'Study session "CS 101 Study Session" starts in 30 minutes.',
+    status: 'unread',
+    timestamp: 'Today • 1:30 PM',
+    channel: 'both',
+    session: 'CS 101 Study Session'
+  },
+  {
+    id: 2,
+    type: 'invitation',
+    message: 'You have been invited to join "Physics Lab Project Team".',
+    status: 'unread',
+    timestamp: 'Today • 9:12 AM',
+    channel: 'in-app',
+    session: 'Physics Lab Project Team'
+  },
+  {
+    id: 3,
+    type: 'session-update',
+    message: '"History Project Meeting" has been rescheduled to Nov 16, 1:00 PM.',
+    status: 'read',
+    timestamp: 'Yesterday • 8:05 PM',
+    channel: 'email',
+    session: 'History Project Meeting'
+  },
+  {
+    id: 4,
+    type: 'reminder',
+    message: 'Assignment deadline "Math Assignment Due" approaches in 24 hours.',
+    status: 'read',
+    timestamp: 'Yesterday • 7:45 PM',
+    channel: 'both',
+    session: 'Math Assignment Due'
+  },
+  {
+    id: 5,
+    type: 'invitation',
+    message: '"Virtual Study Group" host approved your request to join.',
+    status: 'unread',
+    timestamp: '2 days ago',
+    channel: 'email',
+    session: 'Virtual Study Group'
+  }
+];
+
 export default function Calendar() {
   const [selectedDate, setSelectedDate] = useState(currentDate);
   const [viewMode, setViewMode] = useState<'month' | 'week'>('month');
   const [currentViewDate, setCurrentViewDate] = useState(new Date(currentYear, currentMonth, 1));
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [notifications, setNotifications] = useState<Notification[]>(mockNotifications);
+  const [isNotificationPanelOpen, setIsNotificationPanelOpen] = useState(false);
+  const [activeNotificationFilter, setActiveNotificationFilter] = useState<'all' | NotificationType>('all');
+  const [showOnlyUnread, setShowOnlyUnread] = useState(false);
   const { toast } = useToast();
 
   const getDaysInMonth = (date: Date) => {
@@ -203,6 +282,54 @@ export default function Calendar() {
     }
   };
 
+  const unreadNotifications = useMemo(
+    () => notifications.filter((notification) => notification.status === 'unread'),
+    [notifications]
+  );
+
+  const filteredNotifications = useMemo(() => {
+    return notifications.filter((notification) => {
+      if (activeNotificationFilter !== 'all' && notification.type !== activeNotificationFilter) {
+        return false;
+      }
+      if (showOnlyUnread && notification.status !== 'unread') {
+        return false;
+      }
+      return true;
+    });
+  }, [notifications, activeNotificationFilter, showOnlyUnread]);
+
+  const handleNotificationStatusToggle = (id: number) => {
+    setNotifications((prev) =>
+      prev.map((notification) =>
+        notification.id === id
+          ? {
+              ...notification,
+              status: notification.status === 'unread' ? 'read' : 'unread'
+            }
+          : notification
+      )
+    );
+  };
+
+  const handleNotificationDelete = (id: number) => {
+    setNotifications((prev) => prev.filter((notification) => notification.id !== id));
+  };
+
+  const markAllAsRead = () => {
+    setNotifications((prev) =>
+      prev.map((notification) =>
+        notification.status === 'unread' ? { ...notification, status: 'read' } : notification
+      )
+    );
+  };
+
+  const resetAlerts = () => {
+    setNotifications(mockNotifications);
+    setActiveNotificationFilter('all');
+    setShowOnlyUnread(false);
+  };
+
   return (
     <div className="min-h-screen bg-background pb-24 lg:pb-8">
       {/* Header */}
@@ -215,7 +342,186 @@ export default function Calendar() {
                 Stay organized with your study sessions, deadlines, and group meetings all in one place.
               </p>
             </div>
-            <div className="flex flex-col sm:flex-row gap-3">
+            <div className="flex flex-col sm:flex-row gap-3 relative">
+              <div className="self-end sm:self-auto">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="relative h-11 w-11 rounded-full border border-border shadow-sm bg-background/80 hover:bg-background"
+                  onClick={() => setIsNotificationPanelOpen((prev) => !prev)}
+                >
+                  <Bell className="h-5 w-5 text-foreground" />
+                  {unreadNotifications.length > 0 && (
+                    <span className="absolute -top-1 -right-1 flex h-5 min-w-[1.25rem] items-center justify-center rounded-full bg-destructive px-1.5 text-xs font-semibold text-destructive-foreground shadow-sm">
+                      {unreadNotifications.length}
+                    </span>
+                  )}
+                </Button>
+                {isNotificationPanelOpen && (
+                  <div className="absolute right-0 sm:right-auto sm:left-0 mt-3 w-[24rem] sm:w-[26rem] rounded-2xl border border-border bg-popover shadow-xl ring-1 ring-black/5">
+                    <div className="flex items-center justify-between px-5 pt-5 pb-3">
+                      <div>
+                        <p className="text-sm font-semibold text-foreground">Notifications</p>
+                        <p className="text-xs text-muted-foreground">
+                          {unreadNotifications.length} unread • {notifications.length} total
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8"
+                          disabled={unreadNotifications.length === 0}
+                          onClick={markAllAsRead}
+                        >
+                          <CircleCheck className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8"
+                          onClick={resetAlerts}
+                          title="Restore sample alerts"
+                        >
+                          <RefreshCw className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+                    <div className="px-5 pb-3">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <Button
+                          size="sm"
+                          variant={activeNotificationFilter === 'all' ? 'default' : 'outline'}
+                          onClick={() => setActiveNotificationFilter('all')}
+                          className="rounded-full px-4 py-1 text-xs"
+                        >
+                          All
+                        </Button>
+                        {(Object.keys(notificationTypeMeta) as NotificationType[]).map((type) => {
+                          const meta = notificationTypeMeta[type];
+                          return (
+                            <Button
+                              key={type}
+                              size="sm"
+                              variant={activeNotificationFilter === type ? 'default' : 'outline'}
+                              onClick={() => setActiveNotificationFilter(type)}
+                              className="rounded-full px-4 py-1 text-xs"
+                            >
+                              {meta.label}
+                            </Button>
+                          );
+                        })}
+                        <Button
+                          size="sm"
+                          variant={showOnlyUnread ? 'default' : 'outline'}
+                          onClick={() => setShowOnlyUnread((prev) => !prev)}
+                          className="rounded-full px-3 py-1 text-xs"
+                        >
+                          {showOnlyUnread ? 'Showing Unread' : 'Unread Only'}
+                        </Button>
+                      </div>
+                    </div>
+                    <div className="max-h-[22rem] overflow-y-auto scrollbar-thin scrollbar-thumb-muted/40 scrollbar-track-transparent">
+                      {filteredNotifications.length === 0 ? (
+                        <div className="flex flex-col items-center justify-center px-5 py-10 text-center">
+                          <Bell className="h-10 w-10 text-muted-foreground/40 mb-3" />
+                          <p className="text-sm font-medium text-foreground">No notifications to show</p>
+                          <p className="text-xs text-muted-foreground">
+                            Adjust the filters or check back later.
+                          </p>
+                        </div>
+                      ) : (
+                        <div className="flex flex-col gap-2 px-4 pb-4">
+                          {filteredNotifications.map((notification) => {
+                            const meta = notificationTypeMeta[notification.type];
+                            const Icon = meta.icon;
+                            return (
+                              <div
+                                key={notification.id}
+                                className={`group rounded-xl border border-border/70 bg-card/30 p-4 transition hover:border-primary/60 hover:bg-card ${
+                                  notification.status === 'unread' ? 'ring-1 ring-primary/30' : ''
+                                }`}
+                              >
+                                <div className="flex items-start justify-between gap-3">
+                                  <div className="flex items-start gap-3">
+                                    <span className="flex h-9 w-9 items-center justify-center rounded-full bg-muted">
+                                      <Icon className="h-4 w-4 text-primary" />
+                                    </span>
+                                    <div className="space-y-1">
+                                      <div className="flex items-center gap-2">
+                                        <span className={`inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-semibold ${meta.accent}`}>
+                                          {meta.label}
+                                        </span>
+                                        <span className="text-[11px] uppercase text-muted-foreground tracking-wide">
+                                          {notification.channel === 'both'
+                                            ? 'In-app & Email'
+                                            : notification.channel === 'in-app'
+                                            ? 'In-app'
+                                            : 'Email'}
+                                        </span>
+                                      </div>
+                                      <p className="text-sm font-medium text-foreground">{notification.message}</p>
+                                      <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                                        <Clock className="h-3.5 w-3.5" />
+                                        <span>{notification.timestamp}</span>
+                                        {notification.session && (
+                                          <>
+                                            <span>•</span>
+                                            <span>{notification.session}</span>
+                                          </>
+                                        )}
+                                      </div>
+                                    </div>
+                                  </div>
+                                  <div className="flex flex-col items-end gap-2">
+                                    <Button
+                                      size="sm"
+                                      variant="ghost"
+                                      className="h-8 gap-1 px-2 text-xs"
+                                      onClick={() => handleNotificationStatusToggle(notification.id)}
+                                    >
+                                      <Mail className="h-3.5 w-3.5" />
+                                      {notification.status === 'unread' ? 'Mark read' : 'Mark unread'}
+                                    </Button>
+                                    <Button
+                                      size="icon"
+                                      variant="ghost"
+                                      className="h-8 w-8 text-muted-foreground/70 hover:text-destructive"
+                                      onClick={() => handleNotificationDelete(notification.id)}
+                                    >
+                                      <Trash2 className="h-4 w-4" />
+                                    </Button>
+                                  </div>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                    <div className="flex items-center justify-between border-t border-border/70 px-5 py-3">
+                      <div className="text-xs text-muted-foreground">
+                        Configure reminder timing and channels from settings.
+                      </div>
+                      <Button
+                        variant="link"
+                        size="sm"
+                        className="text-xs"
+                        onClick={() => {
+                          setIsNotificationPanelOpen(false);
+                          toast({
+                            title: 'Coming soon',
+                            description: 'Notification preferences will be customizable shortly.'
+                          });
+                        }}
+                      >
+                        Manage preferences
+                        <ArrowRight className="ml-1 h-3.5 w-3.5" />
+                      </Button>
+                    </div>
+                  </div>
+                )}
+              </div>
               <Button 
                 className="btn-hero"
                 onClick={() => setIsCreateDialogOpen(true)}
