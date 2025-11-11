@@ -45,8 +45,8 @@ export const sessionAPI = {
     return handleResponse(response);
   },
 
-  deleteSession: async (id: number) => {
-    const url = `${API_BASE_URL}/sessions/${id}`;
+  deleteSession: async (id: number, userId?: number) => {
+    const url = userId ? `${API_BASE_URL}/sessions/${id}/user/${userId}` : `${API_BASE_URL}/sessions/${id}`;
     const response = await fetch(url, {
       method: 'DELETE',
       headers: {
@@ -56,8 +56,8 @@ export const sessionAPI = {
     return handleResponse(response);
   },
 
-  getSessionsByGroup: async (groupId: number, page = 0, size = 50) => {
-    const url = `${API_BASE_URL}/sessions/group/${groupId}?page=${page}&size=${size}`;
+  getSessionsByGroup: async (groupId: number, page = 0, size = 50, userId?: number) => {
+    const url = userId ? `${API_BASE_URL}/sessions/group/${groupId}?page=${page}&size=${size}&userId=${userId}` : `${API_BASE_URL}/sessions/group/${groupId}?page=${page}&size=${size}`;
     const response = await fetch(url, {
       method: 'GET',
       headers: {

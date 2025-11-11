@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useAuth } from '@/contexts/AuthContext';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
@@ -13,6 +14,7 @@ interface Props {
 }
 
 export default function EventForm({ mode, initial, onSaved, onDeleted, onCancel }: Props) {
+  const { user } = useAuth();
   const [title, setTitle] = useState(initial?.title || '');
   const [description, setDescription] = useState(initial?.description || '');
   const [start, setStart] = useState(() => initial?.startTime ? toInputDateTime(initial.startTime) : '');
@@ -67,10 +69,11 @@ export default function EventForm({ mode, initial, onSaved, onDeleted, onCancel 
 
   const handleDelete = async () => {
     if (!initial?.id) return;
-    if (!confirm('Delete this session?')) return;
     setLoading(true);
     try {
-      await sessionAPI.deleteSession(initial.id);
+  // pass acting user id so the backend can validate permissions
+  const actingUserId = user?.id;
+  await sessionAPI.deleteSession(initial.id, actingUserId);
       onDeleted?.();
     } catch (err) {
       console.error(err);

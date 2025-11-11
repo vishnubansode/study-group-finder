@@ -102,6 +102,7 @@ CREATE TABLE IF NOT EXISTS group_members (
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
   -- Sessions table (linked to groups and users)
+  
   CREATE TABLE IF NOT EXISTS sessions (
   id BIGINT NOT NULL AUTO_INCREMENT,
   group_id BIGINT NOT NULL,
@@ -133,3 +134,35 @@ CREATE TABLE IF NOT EXISTS group_members (
   CONSTRAINT fk_notifications_user FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE,
   CONSTRAINT fk_notifications_session FOREIGN KEY (session_id) REFERENCES sessions (id) ON DELETE CASCADE
  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+  -- Invitations table: invitations are created when a session is proposed; users must accept to become participants
+  CREATE TABLE IF NOT EXISTS invitations (
+    id BIGINT NOT NULL AUTO_INCREMENT,
+    session_id BIGINT NOT NULL,
+    sender_id BIGINT NOT NULL,
+    recipient_id BIGINT NOT NULL,
+    status VARCHAR(20) NOT NULL DEFAULT 'PENDING', -- PENDING, ACCEPTED, DECLINED
+    channel VARCHAR(20) DEFAULT 'in-app',
+    message VARCHAR(500) DEFAULT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (id),
+    KEY idx_invitations_session (session_id),
+    KEY idx_invitations_recipient (recipient_id),
+    CONSTRAINT fk_invitations_session FOREIGN KEY (session_id) REFERENCES sessions (id) ON DELETE CASCADE,
+    CONSTRAINT fk_invitations_sender FOREIGN KEY (sender_id) REFERENCES users (id) ON DELETE SET NULL,
+    CONSTRAINT fk_invitations_recipient FOREIGN KEY (recipient_id) REFERENCES users (id) ON DELETE CASCADE
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+  -- Session participants: users who accepted invitations (or were added directly) become participants
+  CREATE TABLE IF NOT EXISTS session_participants (
+    id BIGINT NOT NULL AUTO_INCREMENT,
+    session_id BIGINT NOT NULL,
+    user_id BIGINT NOT NULL,
+    joined_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (id),
+    UNIQUE KEY uk_session_user (session_id, user_id),
+    KEY idx_session_participants_session (session_id),
+    KEY idx_session_participants_user (user_id),
+    CONSTRAINT fk_session_participants_session FOREIGN KEY (session_id) REFERENCES sessions (id) ON DELETE CASCADE,
+    CONSTRAINT fk_session_participants_user FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;

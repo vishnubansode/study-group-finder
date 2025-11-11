@@ -210,7 +210,7 @@ export default function Calendar() {
       const groups = await groupAPI.searchGroups(token, { userId: user.id, size: 100, filterByMembership: true });
       const arr = Array.isArray(groups) ? groups : (groups?.content ?? []);
       const groupIds = arr.map((g: any) => g.groupId ?? g.id);
-      const pagePromises = groupIds.map((gid: number) => sessionAPI.getSessionsByGroup(gid, 0, 100));
+  const pagePromises = groupIds.map((gid: number) => sessionAPI.getSessionsByGroup(gid, 0, 100, user.id));
       const pages = await Promise.all(pagePromises);
       // pages may be Page objects or arrays
       const allSessions: any[] = [];

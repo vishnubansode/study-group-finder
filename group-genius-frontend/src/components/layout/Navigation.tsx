@@ -15,7 +15,6 @@ import {
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useNotifications } from '@/contexts/NotificationsContext';
-import { invitationAPI } from '@/lib/api/invitationApi';
 
 const navigationItems = [
   { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
@@ -39,7 +38,8 @@ export function Navigation() {
     markAllAsRead,
     resetAlerts,
     toggleStatus,
-    deleteNotification
+    deleteNotification,
+    respondToInvitation
   } = useNotifications();
 
   const displayName = user ? `${user.firstName || ''} ${user.lastName || ''}`.trim() : '';
@@ -146,21 +146,21 @@ export function Navigation() {
               )}
             </Button>
             {isOpen && (
-              <div className="absolute right-0 mt-2 w-80 bg-card border border-border rounded-lg shadow-lg p-3 z-50">
-                <div className="flex items-center justify-between mb-2">
+              <div className="absolute right-0 mt-2 w-109 bg-card border border-border rounded-lg shadow-lg p-4 z-50">
+                <div className="flex items-center justify-between mb-3">
                   <strong>Notifications</strong>
                   <div className="flex items-center gap-2">
-                    <button className="text-xs text-muted-foreground" onClick={() => markAllAsRead()}>Mark all read</button>
-                    <button className="text-xs text-muted-foreground" onClick={() => resetAlerts()}>Reset</button>
+                    <button className="text-sm text-muted-foreground" onClick={() => markAllAsRead()}>Mark all read</button>
+                    <button className="text-sm text-muted-foreground" onClick={() => resetAlerts()}>Reset</button>
                   </div>
                 </div>
-                <div className="max-h-60 overflow-auto space-y-2">
+                <div className="max-h-96 overflow-auto space-y-3 px-1">
                   {filteredNotifications.length === 0 ? (
                     <div className="text-xs text-muted-foreground">No notifications</div>
                   ) : (
                     filteredNotifications.map((n) => (
-                      <div key={n.id} className={`p-2 rounded-md ${n.status === 'unread' ? 'bg-primary/5' : 'bg-transparent'}`}>
-                        <div className="flex items-start justify-between">
+                      <div key={n.id} className={`p-3 rounded-md ${n.status === 'unread' ? 'bg-primary/5' : 'bg-transparent'}`}>
+                        <div className="flex items-start justify-between gap-2">
                           <div className="min-w-0">
                             <div className="text-sm font-medium truncate">{n.message}</div>
                             <div className="text-xs text-muted-foreground">{n.timestamp}</div>
@@ -173,11 +173,9 @@ export function Navigation() {
                                     className="text-xs text-primary"
                                     onClick={async () => {
                                       try {
-                                        await invitationAPI.respondToInvitation(n.id, 'accept');
-                                        // remove notification locally
-                                        deleteNotification(n.id);
-                                        // notify other parts of the app to reload sessions
-                                        try { window.dispatchEvent(new CustomEvent('invitation:accepted', { detail: { sessionId: n.session } })); } catch {}
+                                        if (!n.invitation) throw new Error('No invitation id attached to notification');
+                                        await respondToInvitation(Number(n.invitation), 'accept', n.id);
+                                        // UX feedback - replace with Toaster later
                                         alert('Invitation accepted');
                                       } catch (err: any) {
                                         console.error('Failed to accept invitation', err);
@@ -191,8 +189,8 @@ export function Navigation() {
                                     className="text-xs text-destructive"
                                     onClick={async () => {
                                       try {
-                                        await invitationAPI.respondToInvitation(n.id, 'decline');
-                                        deleteNotification(n.id);
+                                        if (!n.invitation) throw new Error('No invitation id attached to notification');
+                                        await respondToInvitation(Number(n.invitation), 'decline', n.id);
                                         alert('Invitation declined');
                                       } catch (err: any) {
                                         console.error('Failed to decline invitation', err);

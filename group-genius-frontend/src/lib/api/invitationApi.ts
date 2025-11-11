@@ -8,14 +8,38 @@ const buildHeaders = () => {
 };
 
 export const invitationAPI = {
-  // Create invitations for a session. Backend must accept an array of userIds/emails and send emails/notifications.
-  // Assumption: POST /api/invitations/session/{sessionId} with body { inviteeIds: number[] }
-  createInvitationsForSession: async (sessionId: number, inviteeIds: number[]) => {
-    const url = `${API_BASE_URL}/invitations/session/${sessionId}`;
+  // Create invitations for a session (matches backend):
+  // POST /api/sessions/{sessionId}/invitations/sender/{senderId}
+  // body: { recipientIds: number[], message?: string }
+  createInvitationsForSession: async (
+    sessionId: number,
+    recipientIds: number[],
+    senderId?: number,
+    message?: string
+  ) => {
+    // Resolve senderId (prefer explicit param; fallback to localStorage user)
+    let sid = senderId;
+    if (!sid) {
+      try {
+        const raw = localStorage.getItem('user');
+        if (raw) sid = JSON.parse(raw).id;
+      } catch {
+        // ignore
+      }
+    }
+
+    if (!sid) {
+      throw new Error('Missing senderId for creating invitations');
+    }
+
+    const url = `${API_BASE_URL}/sessions/${sessionId}/invitations/sender/${sid}`;
+    const body: Record<string, unknown> = { recipientIds };
+    if (message) body.message = message;
+
     const response = await fetch(url, {
       method: 'POST',
       headers: buildHeaders(),
-      body: JSON.stringify({ inviteeIds }),
+      body: JSON.stringify(body),
     });
 
     if (!response.ok) {
@@ -27,9 +51,32 @@ export const invitationAPI = {
   }
   ,
   // Respond to a single invitation (accept or decline)
-  // Assumption: POST /api/invitations/{invitationId}/respond with body { action: 'accept' | 'decline' }
-  respondToInvitation: async (invitationId: number, action: 'accept' | 'decline') => {
-    const url = `${API_BASE_URL}/invitations/${invitationId}/respond`;
+  // Wrapper that resolves userId and calls the backend route that expects userId in the path.
+  respondToInvitation: async (
+    invitationId: number,
+    action: 'accept' | 'decline',
+    userId?: number
+  ) => {
+    let uid = userId;
+    if (!uid) {
+      try {
+        const raw = localStorage.getItem('user');
+        if (raw) uid = JSON.parse(raw).id;
+      } catch {
+        // ignore
+      }
+    }
+
+    if (!uid) {
+      throw new Error('Not authenticated');
+    }
+
+    return invitationAPI.respondToInvitationWithUser(invitationId, uid, action);
+  }
+  ,
+  // Respond to invitation with explicit userId in the path (backend expects /respond/user/{userId})
+  respondToInvitationWithUser: async (invitationId: number, userId: number, action: 'accept' | 'decline') => {
+    const url = `${API_BASE_URL}/invitations/${invitationId}/respond/user/${userId}`;
     const response = await fetch(url, {
       method: 'POST',
       headers: buildHeaders(),
@@ -39,7 +86,21 @@ export const invitationAPI = {
       const text = await response.text().catch(() => '');
       throw new Error(text || `Failed to respond to invitation (${response.status})`);
     }
-    return response.json();
+
+    // Try to parse JSON when present; if parsing fails (server returned plain text)
+    // fall back to returning the raw text to avoid unhandled JSON parse errors
+    const contentType = response.headers.get('content-type') || '';
+    if (contentType.includes('application/json')) {
+      return response.json();
+    }
+    // Some backend endpoints may return an empty body or plain text; handle gracefully
+    const text = await response.text().catch(() => '');
+    if (!text) return undefined;
+    try {
+      return JSON.parse(text);
+    } catch {
+      return text;
+    }
   }
 };
 

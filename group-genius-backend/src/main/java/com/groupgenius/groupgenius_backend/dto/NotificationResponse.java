@@ -13,6 +13,7 @@ public class NotificationResponse {
     private Long recipientId;
     private String recipientName;
     private Long sessionId;
+    private Long invitationId;
     private String message;
     private Boolean read;
     private LocalDateTime createdAt;

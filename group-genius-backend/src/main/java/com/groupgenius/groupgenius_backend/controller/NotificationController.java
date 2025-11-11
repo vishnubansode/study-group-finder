@@ -9,21 +9,19 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 
 @RestController
-@RequestMapping("/api/notifications")
+@RequestMapping("/api")
 @RequiredArgsConstructor
 public class NotificationController {
 
     private final NotificationService notificationService;
 
-    // Get all notifications for a user
-    @GetMapping("/user/{userId}")
+    @GetMapping("/users/{userId}/notifications")
     public ResponseEntity<List<NotificationResponse>> getUserNotifications(@PathVariable Long userId) {
         return ResponseEntity.ok(notificationService.getNotificationsForUser(userId));
     }
 
-    // Mark a notification as read
-    @PutMapping("/{notificationId}/read")
-    public ResponseEntity<NotificationResponse> markAsRead(@PathVariable Long notificationId) {
+    @PostMapping("/notifications/{notificationId}/mark-read")
+    public ResponseEntity<NotificationResponse> markRead(@PathVariable Long notificationId) {
         return ResponseEntity.ok(notificationService.markAsRead(notificationId));
     }
 }

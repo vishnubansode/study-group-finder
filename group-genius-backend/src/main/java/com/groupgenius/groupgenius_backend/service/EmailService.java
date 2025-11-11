@@ -1,5 +1,6 @@
 package com.groupgenius.groupgenius_backend.service;
 
+import com.groupgenius.groupgenius_backend.entity.Invitation;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -38,11 +39,37 @@ public class EmailService {
     @Value("${app.contact.to:}")
     private String contactTo;
 
+    // Placeholder async invitation email; logs in dev mode
+    @Async
+    public void sendInvitationEmail(Invitation invitation) {
+        try {
+            if (!emailEnabled) {
+                log.info("===========================================");
+                log.info("INVITATION EMAIL (Development Mode)");
+                log.info("===========================================");
+                log.info("To userId: {}", invitation.getRecipient() != null ? invitation.getRecipient().getId() : null);
+                log.info("SessionId: {}", invitation.getSession() != null ? invitation.getSession().getId() : null);
+                log.info("Message: {}", invitation.getMessage());
+                log.info("===========================================");
+                return;
+            }
+            // In production, implement a proper HTML email using template engine
+            String toEmail = invitation.getRecipient() != null ? invitation.getRecipient().getEmail() : null;
+            if (toEmail != null) {
+                sendSimpleEmail(toEmail, "You are invited to a session",
+                        "You've been invited to join: "
+                                + (invitation.getSession() != null ? invitation.getSession().getTitle() : "a session"));
+            }
+        } catch (Exception e) {
+            log.warn("Failed to send invitation email: {}", e.getMessage());
+        }
+    }
+
     @Async
     public CompletableFuture<Void> sendPasswordResetEmail(String userEmail, String resetToken) {
         try {
             String resetLink = frontendUrl + "/reset-password?token=" + resetToken;
-            
+
             if (!emailEnabled) {
                 // Development mode - log to console
                 log.info("===========================================");
@@ -70,12 +97,12 @@ public class EmailService {
             // Production mode - send real email
             sendHtmlEmail(userEmail, "Reset Your GroupGenius Password", createPasswordResetEmail(userEmail, resetLink));
             log.info("Password reset email sent successfully to: {}", userEmail);
-            
+
         } catch (Exception e) {
             log.error("Failed to send password reset email to: {}", userEmail, e);
             throw new RuntimeException("Failed to send password reset email", e);
         }
-        
+
         return CompletableFuture.completedFuture(null);
     }
 
@@ -109,12 +136,12 @@ public class EmailService {
             // Production mode - send real email
             sendHtmlEmail(userEmail, "Welcome to GroupGenius!", createWelcomeEmail(firstName));
             log.info("Welcome email sent successfully to: {}", userEmail);
-            
+
         } catch (Exception e) {
             log.error("Failed to send welcome email to: {}", userEmail, e);
             // Don't throw exception for welcome email failures
         }
-        
+
         return CompletableFuture.completedFuture(null);
     }
 
@@ -126,8 +153,7 @@ public class EmailService {
             String subject,
             String message,
             InputStreamSource attachment,
-            String attachmentFilename
-    ) {
+            String attachmentFilename) {
         try {
             String safeName = senderName == null || senderName.isBlank() ? "Guest" : senderName.trim();
             String safeEmail = senderEmail == null || senderEmail.isBlank() ? fromEmail : senderEmail.trim();
@@ -167,7 +193,8 @@ public class EmailService {
             context.setVariable("queryType", safeQueryType);
             context.setVariable("subject", safeSubject);
             context.setVariable("message", formattedMessage);
-            context.setVariable("submittedAt", LocalDateTime.now().format(DateTimeFormatter.ofPattern("MMM d, yyyy h:mm a")));
+            context.setVariable("submittedAt",
+                    LocalDateTime.now().format(DateTimeFormatter.ofPattern("MMM d, yyyy h:mm a")));
             context.setVariable("hasAttachment", hasAttachment);
             context.setVariable("attachmentName", hasAttachment ? attachmentFilename : "");
 
@@ -187,7 +214,8 @@ public class EmailService {
 
             mailSender.send(mimeMessage);
 
-            log.info("Contact email sent successfully from: {} <{}> (attachment: {})", safeName, safeEmail, hasAttachment ? attachmentFilename : "none");
+            log.info("Contact email sent successfully from: {} <{}> (attachment: {})", safeName, safeEmail,
+                    hasAttachment ? attachmentFilename : "none");
         } catch (Exception e) {
             log.error("Failed to send contact email from: {} <{}>", senderName, senderEmail, e);
             throw new RuntimeException("Failed to send contact email", e);
@@ -221,12 +249,12 @@ public class EmailService {
             // Production mode - send real email
             sendSimpleEmail(userEmail, subject, message);
             log.info("Notification email sent successfully to: {}", userEmail);
-            
+
         } catch (Exception e) {
             log.error("Failed to send notification email to: {}", userEmail, e);
             // Don't throw exception for notification email failures
         }
-        
+
         return CompletableFuture.completedFuture(null);
     }
 
@@ -256,7 +284,7 @@ public class EmailService {
         context.setVariable("userEmail", userEmail);
         context.setVariable("resetLink", resetLink);
         context.setVariable("frontendUrl", frontendUrl);
-        
+
         return templateEngine.process("password-reset-email", context);
     }
 
@@ -264,7 +292,7 @@ public class EmailService {
         Context context = new Context();
         context.setVariable("firstName", firstName);
         context.setVariable("dashboardUrl", frontendUrl + "/dashboard");
-        
+
         return templateEngine.process("welcome-email", context);
     }
 }

@@ -11,6 +11,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.annotation.Propagation;
 
 import java.util.List;
 
@@ -24,6 +25,7 @@ public class NotificationService {
     private final UserRepository userRepository;
     private final SessionRepository sessionRepository;
     private final GroupMemberRepository groupMemberRepository;
+    private final com.groupgenius.groupgenius_backend.repository.InvitationRepository invitationRepository;
 
     /**
      * Notify all group members (except session creator)
@@ -36,7 +38,8 @@ public class NotificationService {
                 User recipient = member.getUser();
 
                 // Skip the creator
-                if (recipient.getId().equals(session.getCreatedBy().getId())) continue;
+                if (recipient.getId().equals(session.getCreatedBy().getId()))
+                    continue;
 
                 Notification notification = Notification.builder()
                         .recipient(recipient)
@@ -61,6 +64,7 @@ public class NotificationService {
     /**
      * Trigger direct notification for a specific recipient
      */
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void triggerSessionNotification(Long recipientId, Long sessionId, String message) {
         try {
             User recipient = userRepository.findById(recipientId)
@@ -84,6 +88,47 @@ public class NotificationService {
             throw new NotificationProcessingException("Failed to save notification due to invalid data.", e);
         } catch (Exception e) {
             log.error("Unexpected error while triggering notification: {}", e.getMessage(), e);
+            throw new NotificationProcessingException("Unexpected error while triggering notification.", e);
+        }
+    }
+
+    /**
+     * Trigger a notification related to a specific invitation (links to Invitation
+     * entity)
+     */
+    // Run in the caller transaction so the session entity (just created but not yet
+    // committed) is visible when creating notifications during session creation.
+    // Using REQUIRES_NEW here caused the new transaction to not see the uncommitted
+    // session row and notification creation would fail. Invitations are created as
+    // part of the same logical flow as session creation, so join the existing
+    // transaction.
+    public void triggerInvitationNotification(Long recipientId, Long sessionId, Long invitationId, String message) {
+        try {
+            User recipient = userRepository.findById(recipientId)
+                    .orElseThrow(() -> new ResourceNotFoundException("User not found with ID: " + recipientId));
+
+            Session session = sessionRepository.findById(sessionId)
+                    .orElseThrow(() -> new ResourceNotFoundException("Session not found with ID: " + sessionId));
+
+            var invitation = invitationRepository.findById(invitationId).orElse(null);
+
+            Notification notification = Notification.builder()
+                    .recipient(recipient)
+                    .session(session)
+                    .invitation(invitation)
+                    .message(message)
+                    .read(false)
+                    .build();
+
+            notificationRepository.save(notification);
+            log.info("📨 Invitation notification sent to user {} for session {} (invitation {})", recipientId,
+                    sessionId, invitationId);
+
+        } catch (DataIntegrityViolationException e) {
+            log.error("Database error while saving invitation notification: {}", e.getMessage());
+            throw new NotificationProcessingException("Failed to save notification due to invalid data.", e);
+        } catch (Exception e) {
+            log.error("Unexpected error while triggering invitation notification: {}", e.getMessage(), e);
             throw new NotificationProcessingException("Unexpected error while triggering notification.", e);
         }
     }
@@ -117,7 +162,8 @@ public class NotificationService {
     public NotificationResponse markAsRead(Long notificationId) {
         try {
             Notification notification = notificationRepository.findById(notificationId)
-                    .orElseThrow(() -> new ResourceNotFoundException("Notification not found with ID: " + notificationId));
+                    .orElseThrow(
+                            () -> new ResourceNotFoundException("Notification not found with ID: " + notificationId));
 
             notification.setRead(true);
             Notification updated = notificationRepository.save(notification);
@@ -131,6 +177,36 @@ public class NotificationService {
         } catch (Exception e) {
             log.error("Unexpected error marking notification {} as read: {}", notificationId, e.getMessage(), e);
             throw new NotificationProcessingException("Unexpected error while marking notification as read.", e);
+        }
+    }
+
+    /**
+     * Create a notification that does not reference a Session entity (standalone).
+     * Useful for post-delete/cancellation notices where the session row will be
+     * removed.
+     */
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public void triggerStandaloneNotification(Long recipientId, String message) {
+        try {
+            User recipient = userRepository.findById(recipientId)
+                    .orElseThrow(() -> new ResourceNotFoundException("User not found with ID: " + recipientId));
+
+            Notification notification = Notification.builder()
+                    .recipient(recipient)
+                    .session(null)
+                    .message(message)
+                    .read(false)
+                    .build();
+
+            notificationRepository.save(notification);
+            log.info("📨 Standalone notification sent to user {}", recipientId);
+
+        } catch (DataIntegrityViolationException e) {
+            log.error("Database error while saving standalone notification: {}", e.getMessage());
+            throw new NotificationProcessingException("Failed to save notification due to invalid data.", e);
+        } catch (Exception e) {
+            log.error("Unexpected error while triggering standalone notification: {}", e.getMessage(), e);
+            throw new NotificationProcessingException("Unexpected error while triggering notification.", e);
         }
     }
 }
