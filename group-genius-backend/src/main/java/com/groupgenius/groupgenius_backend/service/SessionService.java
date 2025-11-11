@@ -1,124 +1,198 @@
 package com.groupgenius.groupgenius_backend.service;
 
+import com.groupgenius.groupgenius_backend.dto.SessionCreateWithInvitationsRequest;
 import com.groupgenius.groupgenius_backend.dto.SessionRequestDTO;
 import com.groupgenius.groupgenius_backend.dto.SessionResponseDTO;
 import com.groupgenius.groupgenius_backend.entity.Group;
+import com.groupgenius.groupgenius_backend.entity.GroupMember;
 import com.groupgenius.groupgenius_backend.entity.Session;
 import com.groupgenius.groupgenius_backend.entity.User;
 import com.groupgenius.groupgenius_backend.exception.ResourceNotFoundException;
 import com.groupgenius.groupgenius_backend.exception.TimeSlotConflictException;
 import com.groupgenius.groupgenius_backend.mapper.SessionMapper;
+import com.groupgenius.groupgenius_backend.repository.GroupMemberRepository;
 import com.groupgenius.groupgenius_backend.repository.GroupRepository;
 import com.groupgenius.groupgenius_backend.repository.SessionRepository;
 import com.groupgenius.groupgenius_backend.repository.UserRepository;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
+import java.util.stream.Collectors;
 
+@Slf4j
 @Service
 @Transactional
 public class SessionService {
 
-    private final SessionRepository sessionRepository;
-    private final GroupRepository groupRepository;
-    private final UserRepository userRepository;
-    private final NotificationService notificationService;
+        private final SessionRepository sessionRepository;
+        private final GroupRepository groupRepository;
+        private final UserRepository userRepository;
+        private final GroupMemberRepository groupMemberRepository;
+        private final NotificationService notificationService;
+        private final SessionInvitationService invitationService;
 
-
-    public SessionService(SessionRepository sessionRepository, GroupRepository groupRepository, UserRepository userRepository, NotificationService notificationService) {
-        this.sessionRepository = sessionRepository;
-        this.groupRepository = groupRepository;
-        this.userRepository = userRepository;
-        this.notificationService = notificationService;
-    }
-
-
-    public SessionResponseDTO createSession(Long groupId, Long createdById, SessionRequestDTO requestDTO) {
-        Group group = groupRepository.findById(groupId)
-                .orElseThrow(() -> new ResourceNotFoundException("Group not found with ID: " + groupId));
-
-        User creator = userRepository.findById(createdById)
-                .orElseThrow(() -> new ResourceNotFoundException("User not found with ID: " + createdById));
-
-        // Validate overlap
-        List<Session> conflicts = sessionRepository.findOverlappingSessions(
-                group, requestDTO.getStartTime(), requestDTO.getEndTime());
-        if (!conflicts.isEmpty()) {
-            throw new TimeSlotConflictException("Session time overlaps with another existing session");
+        public SessionService(SessionRepository sessionRepository, GroupRepository groupRepository,
+                        UserRepository userRepository, GroupMemberRepository groupMemberRepository,
+                        NotificationService notificationService, SessionInvitationService invitationService) {
+                this.sessionRepository = sessionRepository;
+                this.groupRepository = groupRepository;
+                this.userRepository = userRepository;
+                this.groupMemberRepository = groupMemberRepository;
+                this.notificationService = notificationService;
+                this.invitationService = invitationService;
         }
 
-        Session session = Session.builder()
-                .group(group)
-                .title(requestDTO.getTitle())
-                .description(requestDTO.getDescription())
-                .startTime(requestDTO.getStartTime())
-                .endTime(requestDTO.getEndTime())
-                .meetingLink(requestDTO.getMeetingLink())
-                .createdBy(creator)
-                .build();
+        public SessionResponseDTO createSession(Long groupId, Long createdById, SessionRequestDTO requestDTO) {
+                Group group = groupRepository.findById(groupId)
+                                .orElseThrow(() -> new ResourceNotFoundException(
+                                                "Group not found with ID: " + groupId));
 
-        Session saved = sessionRepository.save(session);
-        // Notify all group members (except creator)
-        notificationService.notifyGroupMembersOnSessionEvent(saved,
-                "New session \"" + saved.getTitle() + "\" has been scheduled in your group \""
-                        + saved.getGroup().getGroupName() + "\".");
-        return SessionMapper.toDTO(saved);
-    }
+                User creator = userRepository.findById(createdById)
+                                .orElseThrow(() -> new ResourceNotFoundException(
+                                                "User not found with ID: " + createdById));
 
+                // Validate overlap
+                List<Session> conflicts = sessionRepository.findOverlappingSessions(
+                                group, requestDTO.getStartTime(), requestDTO.getEndTime());
+                if (!conflicts.isEmpty()) {
+                        throw new TimeSlotConflictException("Session time overlaps with another existing session");
+                }
 
-    public SessionResponseDTO updateSession(Long id, SessionRequestDTO requestDTO) {
-        Session existing = sessionRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("Session not found with ID: " + id));
+                Session session = Session.builder()
+                                .group(group)
+                                .title(requestDTO.getTitle())
+                                .description(requestDTO.getDescription())
+                                .startTime(requestDTO.getStartTime())
+                                .endTime(requestDTO.getEndTime())
+                                .meetingLink(requestDTO.getMeetingLink())
+                                .createdBy(creator)
+                                .build();
 
-        List<Session> conflicts = sessionRepository.findOverlappingSessions(
-                existing.getGroup(),
-                requestDTO.getStartTime(),
-                requestDTO.getEndTime());
+                Session saved = sessionRepository.save(session);
+                log.info("📅 Session created: {} in group {}", saved.getTitle(), group.getGroupName());
 
-        if (!conflicts.isEmpty() && conflicts.stream().anyMatch(s -> !s.getId().equals(id))) {
-            throw new TimeSlotConflictException("Session time overlaps with another session");
+                // Get all group members except the creator and send invitations
+                List<GroupMember> groupMembers = groupMemberRepository.findByGroup(group);
+                List<Long> memberIds = groupMembers.stream()
+                                .map(gm -> gm.getUser().getId())
+                                .filter(userId -> !userId.equals(createdById)) // Exclude creator
+                                .collect(Collectors.toList());
+
+                if (!memberIds.isEmpty()) {
+                        invitationService.createInvitations(saved, memberIds);
+                        log.info("📨 Sent {} invitations for session: {}", memberIds.size(), saved.getTitle());
+                } else {
+                        log.info("ℹ️ No other members in group to invite for session: {}", saved.getTitle());
+                }
+
+                return SessionMapper.toDTO(saved);
         }
 
-        existing.setTitle(requestDTO.getTitle());
-        existing.setDescription(requestDTO.getDescription());
-        existing.setStartTime(requestDTO.getStartTime());
-        existing.setEndTime(requestDTO.getEndTime());
-        existing.setMeetingLink(requestDTO.getMeetingLink());
+        public SessionResponseDTO updateSession(Long id, SessionRequestDTO requestDTO) {
+                Session existing = sessionRepository.findById(id)
+                                .orElseThrow(() -> new ResourceNotFoundException("Session not found with ID: " + id));
 
-        Session updated = sessionRepository.save(existing);
+                List<Session> conflicts = sessionRepository.findOverlappingSessions(
+                                existing.getGroup(),
+                                requestDTO.getStartTime(),
+                                requestDTO.getEndTime());
 
-        // Notify all group members (except creator)
-        notificationService.notifyGroupMembersOnSessionEvent(updated,
-                "Session \"" + updated.getTitle() + "\" has been updated in group \""
-                        + updated.getGroup().getGroupName() + "\".");
-        return SessionMapper.toDTO(updated);
-    }
+                if (!conflicts.isEmpty() && conflicts.stream().anyMatch(s -> !s.getId().equals(id))) {
+                        throw new TimeSlotConflictException("Session time overlaps with another session");
+                }
 
+                existing.setTitle(requestDTO.getTitle());
+                existing.setDescription(requestDTO.getDescription());
+                existing.setStartTime(requestDTO.getStartTime());
+                existing.setEndTime(requestDTO.getEndTime());
+                existing.setMeetingLink(requestDTO.getMeetingLink());
 
-    public Page<SessionResponseDTO> getSessionsByGroup(Long groupId, int page, int size) {
-        Group group = groupRepository.findById(groupId)
-                .orElseThrow(() -> new ResourceNotFoundException("Group not found with ID: " + groupId));
+                Session updated = sessionRepository.save(existing);
 
-        return sessionRepository.findAll((root, query, cb) ->
-                        cb.equal(root.get("group"), group), PageRequest.of(page, size))
-                .map(SessionMapper::toDTO);
-    }
-
-
-    public SessionResponseDTO getSessionById(Long id) {
-        Session session = sessionRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("Session not found with ID: " + id));
-        return SessionMapper.toDTO(session);
-    }
-
-
-    public void deleteSession(Long id) {
-        if (!sessionRepository.existsById(id)) {
-            throw new ResourceNotFoundException("Session not found with ID: " + id);
+                // Notify all group members (except creator)
+                notificationService.notifyGroupMembersOnSessionEvent(updated,
+                                "Session \"" + updated.getTitle() + "\" has been updated in group \""
+                                                + updated.getGroup().getGroupName() + "\".");
+                return SessionMapper.toDTO(updated);
         }
-        sessionRepository.deleteById(id);
-    }
+
+        public Page<SessionResponseDTO> getSessionsByGroup(Long groupId, int page, int size) {
+                Group group = groupRepository.findById(groupId)
+                                .orElseThrow(() -> new ResourceNotFoundException(
+                                                "Group not found with ID: " + groupId));
+
+                return sessionRepository
+                                .findAll((root, query, cb) -> cb.equal(root.get("group"), group),
+                                                PageRequest.of(page, size))
+                                .map(SessionMapper::toDTO);
+        }
+
+        public SessionResponseDTO getSessionById(Long id) {
+                Session session = sessionRepository.findById(id)
+                                .orElseThrow(() -> new ResourceNotFoundException("Session not found with ID: " + id));
+                return SessionMapper.toDTO(session);
+        }
+
+        public void deleteSession(Long id) {
+                if (!sessionRepository.existsById(id)) {
+                        throw new ResourceNotFoundException("Session not found with ID: " + id);
+                }
+                sessionRepository.deleteById(id);
+        }
+
+        /**
+         * Create a session with invitations to selected group members
+         */
+        public SessionResponseDTO createSessionWithInvitations(Long createdById,
+                        SessionCreateWithInvitationsRequest request) {
+                Group group = groupRepository.findById(request.getGroupId())
+                                .orElseThrow(() -> new ResourceNotFoundException(
+                                                "Group not found with ID: " + request.getGroupId()));
+
+                User creator = userRepository.findById(createdById)
+                                .orElseThrow(() -> new ResourceNotFoundException(
+                                                "User not found with ID: " + createdById));
+
+                // Parse datetime strings to LocalDateTime
+                LocalDateTime startTime = LocalDateTime.parse(request.getStartTime(), DateTimeFormatter.ISO_DATE_TIME);
+                LocalDateTime endTime = LocalDateTime.parse(request.getEndTime(), DateTimeFormatter.ISO_DATE_TIME);
+
+                // Validate overlap
+                List<Session> conflicts = sessionRepository.findOverlappingSessions(group, startTime, endTime);
+                if (!conflicts.isEmpty()) {
+                        throw new TimeSlotConflictException("Session time overlaps with another existing session");
+                }
+
+                // Create session
+                Session session = Session.builder()
+                                .group(group)
+                                .title(request.getTitle())
+                                .description(request.getDescription())
+                                .startTime(startTime)
+                                .endTime(endTime)
+                                .meetingLink(request.getMeetingLink())
+                                .createdBy(creator)
+                                .build();
+
+                Session saved = sessionRepository.save(session);
+                log.info("📅 Session created: {} in group {}", saved.getTitle(), group.getGroupName());
+
+                // Create invitations for selected members
+                if (request.getInvitedUserIds() != null && !request.getInvitedUserIds().isEmpty()) {
+                        invitationService.createInvitations(saved, request.getInvitedUserIds());
+                } else {
+                        // If no specific users invited, notify all group members (old behavior)
+                        notificationService.notifyGroupMembersOnSessionEvent(saved,
+                                        "New session \"" + saved.getTitle() + "\" has been scheduled in your group \""
+                                                        + saved.getGroup().getGroupName() + "\".");
+                }
+
+                return SessionMapper.toDTO(saved);
+        }
 }

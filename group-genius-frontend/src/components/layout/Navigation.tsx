@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { 
@@ -14,6 +14,8 @@ import {
   Mail
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
+import { NotificationViewer } from '@/components/common/NotificationViewer';
+import { notificationAPI } from '@/lib/api/notificationApi';
 
 const navigationItems = [
   { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
@@ -27,8 +29,37 @@ const navigationItems = [
 
 export function Navigation() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [isNotificationViewerOpen, setIsNotificationViewerOpen] = useState(false);
+  const [unreadCount, setUnreadCount] = useState(0);
   const location = useLocation();
   const { user, logout } = useAuth();
+
+  // Load unread notification count
+  useEffect(() => {
+    if (user?.id) {
+      loadUnreadCount();
+      // Poll for new notifications every 30 seconds
+      const interval = setInterval(loadUnreadCount, 30000);
+      return () => clearInterval(interval);
+    }
+  }, [user?.id]);
+
+  const loadUnreadCount = async () => {
+    if (!user?.id) return;
+    try {
+      const notifications = await notificationAPI.getUserNotifications(user.id);
+      setUnreadCount(notifications.filter(n => !n.read).length);
+    } catch (error) {
+      console.error('Error loading notification count:', error);
+    }
+  };
+
+  const handleNotificationClick = () => {
+    setIsNotificationViewerOpen(!isNotificationViewerOpen);
+    if (!isNotificationViewerOpen) {
+      loadUnreadCount();
+    }
+  };
 
   const displayName = user ? `${user.firstName || ''} ${user.lastName || ''}`.trim() : '';
   const initials = user ? `${user.firstName?.charAt(0) ?? ''}${user.lastName?.charAt(0) ?? ''}`.toUpperCase() : '';
@@ -125,9 +156,18 @@ export function Navigation() {
         </div>
 
         <div className="flex items-center space-x-4">
-          <Button variant="ghost" size="icon" className="relative">
+          <Button 
+            variant="ghost" 
+            size="icon" 
+            className="relative"
+            onClick={handleNotificationClick}
+          >
             <Bell className="w-5 h-5" />
-            <div className="absolute -top-1 -right-1 w-3 h-3 bg-accent rounded-full" />
+            {unreadCount > 0 && (
+              <div className="absolute -top-1 -right-1 min-w-[1.25rem] h-5 bg-red-500 text-white text-xs font-medium rounded-full flex items-center justify-center px-1">
+                {unreadCount > 99 ? '99+' : unreadCount}
+              </div>
+            )}
           </Button>
           <div className="flex items-center gap-3">
             <div className="flex items-center gap-2">
@@ -156,9 +196,18 @@ export function Navigation() {
           </Link>
           
     <div className="flex-1 flex items-center justify-end space-x-2">
-            <Button variant="ghost" size="icon" className="relative">
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              className="relative"
+              onClick={handleNotificationClick}
+            >
               <Bell className="w-5 h-5" />
-              <div className="absolute -top-1 -right-1 w-2 h-2 bg-accent rounded-full" />
+              {unreadCount > 0 && (
+                <div className="absolute -top-1 -right-1 min-w-[1.25rem] h-5 bg-red-500 text-white text-xs font-medium rounded-full flex items-center justify-center px-1">
+                  {unreadCount > 9 ? '9+' : unreadCount}
+                </div>
+              )}
             </Button>
             <Button
               variant="ghost"
@@ -208,6 +257,15 @@ export function Navigation() {
 
       {/* Bottom Navigation for Mobile (hidden when hideBottomNav=true) */}
       {/* Bottom navigation removed — mobile menu (burger) is used instead */}
+
+      {/* Notification Viewer */}
+      <NotificationViewer
+        isOpen={isNotificationViewerOpen}
+        onClose={() => {
+          setIsNotificationViewerOpen(false);
+          loadUnreadCount();
+        }}
+      />
     </>
   );
 }

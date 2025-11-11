@@ -25,10 +25,16 @@ public class Notification {
     @JoinColumn(name = "session_id")
     private Session session;
 
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    @Builder.Default
+    private NotificationType type = NotificationType.GENERAL;
+
     @Column(nullable = false)
     private String message;
 
     @Column(name = "is_read", nullable = false)
+    @Builder.Default
     private Boolean read = false;
 
     @Column(nullable = false, updatable = false)
@@ -37,5 +43,15 @@ public class Notification {
     @PrePersist
     protected void onCreate() {
         this.createdAt = LocalDateTime.now();
+    }
+
+    public enum NotificationType {
+        GENERAL,
+        INVITATION,
+        ACCEPTED,
+        DECLINED,
+        REMINDER,
+        SESSION_UPDATE,
+        SESSION_CANCELLED
     }
 }

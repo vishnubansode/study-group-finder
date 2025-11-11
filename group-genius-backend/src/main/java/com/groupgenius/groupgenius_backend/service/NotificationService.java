@@ -36,11 +36,13 @@ public class NotificationService {
                 User recipient = member.getUser();
 
                 // Skip the creator
-                if (recipient.getId().equals(session.getCreatedBy().getId())) continue;
+                if (recipient.getId().equals(session.getCreatedBy().getId()))
+                    continue;
 
                 Notification notification = Notification.builder()
                         .recipient(recipient)
                         .session(session)
+                        .type(Notification.NotificationType.GENERAL)
                         .message(message)
                         .read(false)
                         .build();
@@ -72,6 +74,7 @@ public class NotificationService {
             Notification notification = Notification.builder()
                     .recipient(recipient)
                     .session(session)
+                    .type(Notification.NotificationType.GENERAL)
                     .message(message)
                     .read(false)
                     .build();
@@ -117,7 +120,8 @@ public class NotificationService {
     public NotificationResponse markAsRead(Long notificationId) {
         try {
             Notification notification = notificationRepository.findById(notificationId)
-                    .orElseThrow(() -> new ResourceNotFoundException("Notification not found with ID: " + notificationId));
+                    .orElseThrow(
+                            () -> new ResourceNotFoundException("Notification not found with ID: " + notificationId));
 
             notification.setRead(true);
             Notification updated = notificationRepository.save(notification);
