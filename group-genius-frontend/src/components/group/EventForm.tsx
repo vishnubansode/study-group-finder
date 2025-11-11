@@ -289,7 +289,7 @@ export default function EventForm({
           <Input
             id="title"
             type="text"
-            placeholder="e.g., Chapter 5 Review Session, Midterm Prep, Group Discussion"
+            placeholder="Add your session title"
             value={formData.title}
             onChange={(e) => handleInputChange('title', e.target.value)}
             className={cn(
@@ -321,7 +321,7 @@ export default function EventForm({
           </Label>
           <Textarea
             id="description"
-            placeholder="What will you study? Add any topics, materials, or goals for this session. Be specific to help your group members prepare..."
+            placeholder="Add session description ..."
             value={formData.description}
             onChange={(e) => handleInputChange('description', e.target.value)}
             className={cn(

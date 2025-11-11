@@ -14,6 +14,8 @@ import {
   Mail
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
+import { useNotifications } from '@/contexts/NotificationsContext';
+import { invitationAPI } from '@/lib/api/invitationApi';
 
 const navigationItems = [
   { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
@@ -29,6 +31,16 @@ export function Navigation() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const location = useLocation();
   const { user, logout } = useAuth();
+  const {
+    unreadCount,
+    togglePanel: notificationsToggle,
+    isOpen,
+    filteredNotifications,
+    markAllAsRead,
+    resetAlerts,
+    toggleStatus,
+    deleteNotification
+  } = useNotifications();
 
   const displayName = user ? `${user.firstName || ''} ${user.lastName || ''}`.trim() : '';
   const initials = user ? `${user.firstName?.charAt(0) ?? ''}${user.lastName?.charAt(0) ?? ''}`.toUpperCase() : '';
@@ -125,10 +137,88 @@ export function Navigation() {
         </div>
 
         <div className="flex items-center space-x-4">
-          <Button variant="ghost" size="icon" className="relative">
-            <Bell className="w-5 h-5" />
-            <div className="absolute -top-1 -right-1 w-3 h-3 bg-accent rounded-full" />
-          </Button>
+          {/* Notification bell (uses shared NotificationsContext) */}
+          <div className="relative">
+            <Button variant="ghost" size="icon" className="relative" onClick={() => { try { notificationsToggle(); } catch {} }}>
+              <Bell className="w-5 h-5" />
+              {unreadCount > 0 && (
+                <div className="absolute -top-1 -right-1 w-3 h-3 bg-accent rounded-full text-[10px] leading-none flex items-center justify-center text-white">{unreadCount}</div>
+              )}
+            </Button>
+            {isOpen && (
+              <div className="absolute right-0 mt-2 w-80 bg-card border border-border rounded-lg shadow-lg p-3 z-50">
+                <div className="flex items-center justify-between mb-2">
+                  <strong>Notifications</strong>
+                  <div className="flex items-center gap-2">
+                    <button className="text-xs text-muted-foreground" onClick={() => markAllAsRead()}>Mark all read</button>
+                    <button className="text-xs text-muted-foreground" onClick={() => resetAlerts()}>Reset</button>
+                  </div>
+                </div>
+                <div className="max-h-60 overflow-auto space-y-2">
+                  {filteredNotifications.length === 0 ? (
+                    <div className="text-xs text-muted-foreground">No notifications</div>
+                  ) : (
+                    filteredNotifications.map((n) => (
+                      <div key={n.id} className={`p-2 rounded-md ${n.status === 'unread' ? 'bg-primary/5' : 'bg-transparent'}`}>
+                        <div className="flex items-start justify-between">
+                          <div className="min-w-0">
+                            <div className="text-sm font-medium truncate">{n.message}</div>
+                            <div className="text-xs text-muted-foreground">{n.timestamp}</div>
+                          </div>
+                          <div className="flex flex-col items-end ml-2">
+                            {n.type === 'invitation' ? (
+                              <div className="flex flex-col items-end">
+                                <div className="flex gap-2">
+                                  <button
+                                    className="text-xs text-primary"
+                                    onClick={async () => {
+                                      try {
+                                        await invitationAPI.respondToInvitation(n.id, 'accept');
+                                        // remove notification locally
+                                        deleteNotification(n.id);
+                                        // notify other parts of the app to reload sessions
+                                        try { window.dispatchEvent(new CustomEvent('invitation:accepted', { detail: { sessionId: n.session } })); } catch {}
+                                        alert('Invitation accepted');
+                                      } catch (err: any) {
+                                        console.error('Failed to accept invitation', err);
+                                        alert(err?.message || 'Failed to accept invitation');
+                                      }
+                                    }}
+                                  >
+                                    Accept
+                                  </button>
+                                  <button
+                                    className="text-xs text-destructive"
+                                    onClick={async () => {
+                                      try {
+                                        await invitationAPI.respondToInvitation(n.id, 'decline');
+                                        deleteNotification(n.id);
+                                        alert('Invitation declined');
+                                      } catch (err: any) {
+                                        console.error('Failed to decline invitation', err);
+                                        alert(err?.message || 'Failed to decline invitation');
+                                      }
+                                    }}
+                                  >
+                                    Decline
+                                  </button>
+                                </div>
+                              </div>
+                            ) : (
+                              <div className="flex flex-col items-end ml-2">
+                                <button className="text-xs text-muted-foreground" onClick={() => toggleStatus(n.id)}>{n.status === 'unread' ? 'Mark read' : 'Mark unread'}</button>
+                                <button className="text-xs text-destructive mt-1" onClick={() => deleteNotification(n.id)}>Delete</button>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
           <div className="flex items-center gap-3">
             <div className="flex items-center gap-2">
               {imageSrc ? (
@@ -156,9 +246,9 @@ export function Navigation() {
           </Link>
           
     <div className="flex-1 flex items-center justify-end space-x-2">
-            <Button variant="ghost" size="icon" className="relative">
+            <Button variant="ghost" size="icon" className="relative" onClick={() => notificationsToggle()}>
               <Bell className="w-5 h-5" />
-              <div className="absolute -top-1 -right-1 w-2 h-2 bg-accent rounded-full" />
+              {unreadCount > 0 && <div className="absolute -top-1 -right-1 w-2 h-2 bg-accent rounded-full" />}
             </Button>
             <Button
               variant="ghost"

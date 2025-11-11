@@ -8,6 +8,9 @@ import { Plus } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { groupAPI } from '@/lib/api/groupApi';
 import { sessionAPI } from '@/lib/api/sessionApi';
+import { invitationAPI } from '@/lib/api/invitationApi';
+import { tokenService } from '@/services/api';
+import { useNotifications } from '@/contexts/NotificationsContext';
 
 interface Props {
   onCreated?: (created: any) => void;
@@ -15,6 +18,7 @@ interface Props {
 
 export function SessionCreateDialog({ onCreated }: Props) {
   const { user } = useAuth();
+  const { addNotification: addLocalNotification } = useNotifications();
   const [open, setOpen] = useState(false);
   const [groups, setGroups] = useState<Array<any>>([]);
   const [loadingGroups, setLoadingGroups] = useState(false);
@@ -68,6 +72,35 @@ export function SessionCreateDialog({ onCreated }: Props) {
 
       const created = await sessionAPI.createSession(values.groupId, user.id, payload);
       console.log('Session created', created);
+      // After creating the session, create invitations for group members (excluding creator)
+      try {
+        const token = tokenService.getToken();
+        const members = await groupAPI.getGroupMembers(token || '', values.groupId!);
+        const inviteeIds: number[] = (Array.isArray(members) ? members : []).map((m: any) => m.userId ?? m.id).filter((id: number) => id !== user.id);
+        if (inviteeIds.length > 0) {
+          await invitationAPI.createInvitationsForSession(created.id, inviteeIds);
+        }
+      } catch (inviteErr) {
+        console.warn('Failed to create/send invitations:', inviteErr);
+        // non-fatal: session was created; inform the user
+      }
+
+      // Add a local in-app notification for the creator that invitations were sent (or attempted)
+      try {
+        // useNotifications is a hook; obtain it via a closure above
+        // We'll call a small helper below (defined via hook)
+        addLocalNotification?.({
+          id: Date.now(),
+          type: 'invitation',
+          message: `Invitations created for session "${values.title}"`,
+          status: 'unread',
+          timestamp: 'just now',
+          channel: 'both',
+          session: values.title
+        });
+      } catch (e) {
+        // ignore
+      }
       onCreated?.(created);
       setOpen(false);
       setValues({ groupId: undefined, title: '', description: '', start: '', end: '', meetingLink: '' });

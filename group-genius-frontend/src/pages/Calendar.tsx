@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState,useMemo,useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -14,11 +14,19 @@ import {
   BookOpen,
   Video,
   Coffee,
-  RefreshCw
+  RefreshCw,
+  Bell,
+  Mail,
+  CircleCheck,
+  ArrowRight,
+  Clock4,
+  UserPlus,
+  Trash2
 } from 'lucide-react';
 import SessionCreateDialog from '@/components/session/SessionCreateDialog';
 import SessionEditDialog from '@/components/session/SessionEditDialog';
 import { useAuth } from '@/contexts/AuthContext';
+import { useNotifications } from '@/contexts/NotificationsContext';
 import { groupAPI } from '@/lib/api/groupApi';
 import { sessionAPI } from '@/lib/api/sessionApi';
 
@@ -44,6 +52,73 @@ const monthNames = [
 
 const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
+type NotificationStatus = 'read' | 'unread';
+type NotificationType = 'reminder' | 'invitation' | 'session-update';
+
+type Notification = {
+  id: number;
+  type: NotificationType;
+  message: string;
+  status: NotificationStatus;
+  timestamp: string;
+  channel: 'email' | 'in-app' | 'both';
+  session?: string;
+};
+
+const notificationTypeMeta: Record<NotificationType, { label: string; accent: string; icon: typeof Bell }> = {
+  reminder: { label: 'Reminder', accent: 'bg-primary/10 text-primary', icon: Clock4 },
+  invitation: { label: 'Invitation', accent: 'bg-secondary/10 text-secondary-foreground', icon: UserPlus },
+  'session-update': { label: 'Session Update', accent: 'bg-accent/10 text-accent-foreground', icon: RefreshCw }
+};
+
+const mockNotifications: Notification[] = [
+  {
+    id: 1,
+    type: 'reminder',
+    message: 'Study session "CS 101 Study Session" starts in 30 minutes.',
+    status: 'unread',
+    timestamp: 'Today • 1:30 PM',
+    channel: 'both',
+    session: 'CS 101 Study Session'
+  },
+  {
+    id: 2,
+    type: 'invitation',
+    message: 'You have been invited to join "Physics Lab Project Team".',
+    status: 'unread',
+    timestamp: 'Today • 9:12 AM',
+    channel: 'in-app',
+    session: 'Physics Lab Project Team'
+  },
+  {
+    id: 3,
+    type: 'session-update',
+    message: '"History Project Meeting" has been rescheduled to Nov 16, 1:00 PM.',
+    status: 'read',
+    timestamp: 'Yesterday • 8:05 PM',
+    channel: 'email',
+    session: 'History Project Meeting'
+  },
+  {
+    id: 4,
+    type: 'reminder',
+    message: 'Assignment deadline "Math Assignment Due" approaches in 24 hours.',
+    status: 'read',
+    timestamp: 'Yesterday • 7:45 PM',
+    channel: 'both',
+    session: 'Math Assignment Due'
+  },
+  {
+    id: 5,
+    type: 'invitation',
+    message: '"Virtual Study Group" host approved your request to join.',
+    status: 'unread',
+    timestamp: '2 days ago',
+    channel: 'email',
+    session: 'Virtual Study Group'
+  }
+];
+
 export default function Calendar() {
   const [selectedDate, setSelectedDate] = useState(currentDate);
   const [viewMode, setViewMode] = useState<'month' | 'week'>('month');
@@ -51,6 +126,20 @@ export default function Calendar() {
   const { user } = useAuth();
   const [sessionsState, setSessionsState] = useState<any[]>(DEFAULT_SESSIONS);
   const [loadingSessions, setLoadingSessions] = useState(false);
+  // Use shared notifications context instead of local state
+  const {
+    notifications,
+    filteredNotifications,
+    unreadCount,
+    isOpen: isNotificationPanelOpen,
+    togglePanel: setIsNotificationPanelOpen,
+    setActiveFilter: setActiveNotificationFilter,
+    setShowOnlyUnread,
+    markAllAsRead,
+    resetAlerts,
+    toggleStatus: handleNotificationStatusToggle,
+    deleteNotification: handleNotificationDelete
+  } = useNotifications();
   const [lastRefresh, setLastRefresh] = useState<Date>(new Date());
 
   const getDaysInMonth = (date: Date) => {
@@ -145,6 +234,20 @@ export default function Calendar() {
     loadSessions();
   }, [user]);
 
+  // Listen for invitation accept events so we can reload sessions immediately
+  useEffect(() => {
+    const handler = (e: Event) => {
+      try {
+        // reload sessions when invitation accepted
+        loadSessions();
+      } catch (err) {
+        // ignore
+      }
+    };
+    window.addEventListener('invitation:accepted', handler as EventListener);
+    return () => window.removeEventListener('invitation:accepted', handler as EventListener);
+  }, [user]);
+
   // Auto-refresh sessions every 30 seconds to show newly created sessions by other users
   useEffect(() => {
     if (!user) return;
@@ -187,6 +290,8 @@ export default function Calendar() {
       setTimeout(() => loadSessions(), 1000);
     } catch (e) { console.error(e); }
   };
+
+  // notification helpers now come from context; keep names compatible where used in this file
 
   const handleSessionUpdated = (updated: any) => {
     try {
@@ -234,6 +339,97 @@ export default function Calendar() {
     return acc;
   }, {} as Record<string, any[]>);
 
+  function toast({
+    title,
+    description,
+    duration = 4000
+  }: {
+    title: string;
+    description?: string;
+    duration?: number;
+  }) {
+    if (typeof document === 'undefined') return;
+
+    const containerId = 'app-toast-portal';
+    let container = document.getElementById(containerId);
+    if (!container) {
+      container = document.createElement('div');
+      container.id = containerId;
+      // position top-right, stack toasts vertically
+      container.className = 'fixed top-4 right-4 z-[9999] flex flex-col gap-2';
+      document.body.appendChild(container);
+    }
+
+    const toastEl = document.createElement('div');
+    toastEl.className =
+      'max-w-xs w-full bg-card border border-border/70 rounded-lg shadow-lg p-3 text-sm text-foreground';
+    // start hidden for enter animation
+    toastEl.style.opacity = '0';
+    toastEl.style.transform = 'translateY(-6px)';
+    toastEl.style.transition = 'opacity 180ms ease, transform 180ms ease';
+
+    toastEl.innerHTML = `
+      <div style="display:flex;align-items:flex-start;gap:8px">
+        <div style="flex:1;min-width:0">
+          <div style="font-weight:600;margin-bottom:4px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;">
+            ${escapeHtml(title)}
+          </div>
+          ${description ? `<div style="color:var(--muted-foreground);font-size:0.85rem;line-height:1.2;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(description)}</div>` : ''}
+        </div>
+        <button aria-label="Close toast" style="background:transparent;border:0;color:inherit;cursor:pointer;padding:4px;margin-left:8px">
+          ×
+        </button>
+      </div>
+    `;
+
+    // append and animate in
+    container.appendChild(toastEl);
+    // ensure animation frame so transition applies
+    requestAnimationFrame(() => {
+      toastEl.style.opacity = '1';
+      toastEl.style.transform = 'translateY(0)';
+    });
+
+    // helper remove with exit animation
+    const remove = () => {
+      toastEl.style.opacity = '0';
+      toastEl.style.transform = 'translateY(-6px)';
+      setTimeout(() => {
+        try {
+          container?.removeChild(toastEl);
+          // if container empty remove it
+          if (container && container.childElementCount === 0) {
+            container.parentElement?.removeChild(container);
+          }
+        } catch {}
+      }, 200);
+    };
+
+    // click close button
+    const btn = toastEl.querySelector('button');
+    btn?.addEventListener('click', remove);
+
+    // auto remove after duration
+    const timeout = setTimeout(remove, duration);
+
+    // clear timeout if user hovers to keep visible while hovering
+    toastEl.addEventListener('mouseenter', () => clearTimeout(timeout));
+    toastEl.addEventListener('mouseleave', () => setTimeout(remove, 1200));
+  }
+
+  // small helper to avoid injecting raw HTML
+  function escapeHtml(str: string | undefined) {
+    if (!str) return '';
+    return String(str)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#039;');
+  }
+
+  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState<boolean>(false);
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/10">
       {/* Compact Modern Header */}
@@ -251,16 +447,13 @@ export default function Calendar() {
                 </p>
               </div>
             </div>
-            <div className="flex items-center gap-2">
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => loadSessions()}
-                disabled={loadingSessions}
-                className="h-9 w-9"
-                title="Refresh sessions"
+            <div className="flex flex-col sm:flex-row gap-3 relative">
+              <Button 
+                className="btn-hero"
+                onClick={() => setIsCreateDialogOpen(true)}
               >
-                <RefreshCw className={`w-4 h-4 ${loadingSessions ? 'animate-spin' : ''}`} />
+                <Plus className="w-5 h-5 mr-2" />
+                Create Event
               </Button>
               <React.Suspense fallback={<Button size="sm"><Plus className="w-4 h-4 sm:mr-2"/><span className="hidden sm:inline">New</span></Button>}>
                 <SessionCreateDialog onCreated={(created) => { handleSessionCreated(created); }} />
