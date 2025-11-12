@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -21,13 +21,50 @@ import SessionEditDialog from '@/components/session/SessionEditDialog';
 import { useAuth } from '@/contexts/AuthContext';
 import { groupAPI } from '@/lib/api/groupApi';
 import { sessionAPI } from '@/lib/api/sessionApi';
+import { Group } from '@/types/group';
 
 const currentDate = new Date();
 const currentMonth = currentDate.getMonth();
 const currentYear = currentDate.getFullYear();
 
+interface SessionResponseDTO {
+  id: number;
+  groupId: number;
+  title: string;
+  description?: string;
+  startTime?: string;
+  endTime?: string;
+  start?: string;
+  end?: string;
+  date?: string;
+  createdById: number;
+  createdByName?: string;
+  meetingLink?: string;
+}
+
+interface Session {
+  id: number;
+  title: string;
+  date: string;
+  time: string;
+  startTime: string | null;
+  endTime: string | null;
+  description?: string;
+  meetingLink?: string;
+  groupId: number;
+  createdById: number;
+  createdByName?: string;
+  raw: SessionResponseDTO;
+  type: 'study' | 'deadline' | 'class' | 'meeting' | 'informal';
+}
+
+interface PageResponse<T> {
+  content?: T[];
+  items?: T[];
+}
+
 // sessions will be loaded from backend for user's groups
-const DEFAULT_SESSIONS: any[] = [];
+const DEFAULT_SESSIONS: Session[] = [];
 
 const sessionTypes = {
   study: { color: 'bg-primary', icon: Users, label: 'Study Session' },
@@ -49,7 +86,7 @@ export default function Calendar() {
   const [viewMode, setViewMode] = useState<'month' | 'week'>('month');
   const [currentViewDate, setCurrentViewDate] = useState(new Date(currentYear, currentMonth, 1));
   const { user } = useAuth();
-  const [sessionsState, setSessionsState] = useState<any[]>(DEFAULT_SESSIONS);
+  const [sessionsState, setSessionsState] = useState<Session[]>(DEFAULT_SESSIONS);
   const [loadingSessions, setLoadingSessions] = useState(false);
   const [lastRefresh, setLastRefresh] = useState<Date>(new Date());
 
@@ -112,49 +149,7 @@ export default function Calendar() {
     .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
     .slice(0, 5);
 
-  // Load sessions for groups the user belongs to
-  const loadSessions = async () => {
-    if (!user) return;
-    setLoadingSessions(true);
-    try {
-      const token = localStorage.getItem('token');
-      const groups = await groupAPI.searchGroups(token, { userId: user.id, size: 100, filterByMembership: true });
-      const arr = Array.isArray(groups) ? groups : (groups?.content ?? []);
-      const groupIds = arr.map((g: any) => g.groupId ?? g.id);
-      const pagePromises = groupIds.map((gid: number) => sessionAPI.getSessionsByGroup(gid, 0, 100));
-      const pages = await Promise.all(pagePromises);
-      // pages may be Page objects or arrays
-      const allSessions: any[] = [];
-      pages.forEach((p: any, idx: number) => {
-        const items = Array.isArray(p) ? p : (Array.isArray(p.content) ? p.content : (p.items ?? []));
-        items.forEach((it: any) => {
-          const mapped = mapDtoToUi(it);
-          allSessions.push(mapped);
-        });
-      });
-      setSessionsState(allSessions);
-      setLastRefresh(new Date());
-    } catch (e) {
-      console.error('Failed to load sessions', e);
-    } finally {
-      setLoadingSessions(false);
-    }
-  };
-
-  useEffect(() => {
-    loadSessions();
-  }, [user]);
-
-  // Auto-refresh sessions every 30 seconds to show newly created sessions by other users
-  useEffect(() => {
-    if (!user) return;
-    const interval = setInterval(() => {
-      loadSessions();
-    }, 30000); // 30 seconds
-    return () => clearInterval(interval);
-  }, [user]);
-
-  const mapDtoToUi = (dto: any) => {
+  const mapDtoToUi = useCallback((dto: SessionResponseDTO): Session => {
     // dto: SessionResponseDTO
     const start = dto.startTime || dto.start || null;
     const end = dto.endTime || dto.end || null;
@@ -176,9 +171,51 @@ export default function Calendar() {
       raw: dto,
       type: 'study'
     };
-  };
+  }, []);
 
-  const handleSessionCreated = (created: any) => {
+  // Load sessions for groups the user belongs to
+  const loadSessions = useCallback(async () => {
+    if (!user) return;
+    setLoadingSessions(true);
+    try {
+      const token = localStorage.getItem('token');
+      const groups = await groupAPI.searchGroups(token, { userId: user.id, size: 100, filterByMembership: true });
+      const arr = Array.isArray(groups) ? groups : (groups?.content ?? []);
+      const groupIds = arr.map((g: Group) => g.groupId ?? (g as unknown as { id: number }).id);
+      const pagePromises = groupIds.map((gid: number) => sessionAPI.getSessionsByGroup(gid, 0, 100));
+      const pages = await Promise.all(pagePromises);
+      // pages may be Page objects or arrays
+      const allSessions: Session[] = [];
+      pages.forEach((p: PageResponse<SessionResponseDTO> | SessionResponseDTO[], idx: number) => {
+        const items = Array.isArray(p) ? p : (Array.isArray(p.content) ? p.content : (p.items ?? []));
+        items.forEach((it: SessionResponseDTO) => {
+          const mapped = mapDtoToUi(it);
+          allSessions.push(mapped);
+        });
+      });
+      setSessionsState(allSessions);
+      setLastRefresh(new Date());
+    } catch (e) {
+      console.error('Failed to load sessions', e);
+    } finally {
+      setLoadingSessions(false);
+    }
+  }, [user, mapDtoToUi]);
+
+  useEffect(() => {
+    loadSessions();
+  }, [loadSessions]);
+
+  // Auto-refresh sessions every 30 seconds to show newly created sessions by other users
+  useEffect(() => {
+    if (!user) return;
+    const interval = setInterval(() => {
+      loadSessions();
+    }, 30000); // 30 seconds
+    return () => clearInterval(interval);
+  }, [user, loadSessions]);
+
+  const handleSessionCreated = (created: SessionResponseDTO) => {
     try {
       const mapped = mapDtoToUi(created);
       setSessionsState((s) => [mapped, ...s]);
@@ -188,7 +225,7 @@ export default function Calendar() {
     } catch (e) { console.error(e); }
   };
 
-  const handleSessionUpdated = (updated: any) => {
+  const handleSessionUpdated = (updated: SessionResponseDTO) => {
     try {
       const mapped = mapDtoToUi(updated);
       setSessionsState((s) => s.map((x) => (x.id === mapped.id ? mapped : x)));
@@ -227,12 +264,12 @@ export default function Calendar() {
   }, [lastRefresh]);
 
   // Helper: sessions grouped by date for mobile list
-  const sessionsByDate = sessionsState.reduce((acc: Record<string, any[]>, s) => {
+  const sessionsByDate = sessionsState.reduce((acc: Record<string, Session[]>, s) => {
     if (!s.date) return acc;
     acc[s.date] = acc[s.date] || [];
     acc[s.date].push(s);
     return acc;
-  }, {} as Record<string, any[]>);
+  }, {} as Record<string, Session[]>);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/10">
@@ -317,7 +354,7 @@ export default function Calendar() {
                     ) : (
                       Object.entries(sessionsByDate)
                         .sort((a,b) => new Date(a[0]).getTime() - new Date(b[0]).getTime())
-                        .map(([date, items]: [string, any[]]) => (
+                        .map(([date, items]: [string, Session[]]) => (
                           <div key={date} className="space-y-2">
                             <div className="flex items-center gap-2 px-2">
                               <div className="h-px flex-1 bg-border" />
