@@ -11,4 +11,6 @@ public interface NotificationRepository extends JpaRepository<Notification, Long
     List<Notification> findByRecipientOrderByCreatedAtDesc(User recipient);
 
     List<Notification> findBySession(Session session);
+
+    boolean existsBySessionAndTypeAndMessage(Session session, Notification.NotificationType type, String message);
 }

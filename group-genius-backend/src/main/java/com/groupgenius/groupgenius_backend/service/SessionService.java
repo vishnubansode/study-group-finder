@@ -21,7 +21,11 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
+import java.time.Instant;
+import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeParseException;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -48,6 +52,54 @@ public class SessionService {
                 this.invitationService = invitationService;
         }
 
+        /**
+         * Parse an incoming ISO datetime string which may include a timezone offset
+         * (e.g. +05:30).
+         * If an offset is present we normalize to the server default zone and return a
+         * LocalDateTime.
+         * If no offset is present we parse as LocalDateTime directly.
+         */
+        private LocalDateTime parseIncomingToLocalDateTime(String incoming) {
+                if (incoming == null)
+                        return null;
+                try {
+                        // Try parsing as OffsetDateTime first (handles offset like +05:30 or Z)
+                        OffsetDateTime odt = OffsetDateTime.parse(incoming, DateTimeFormatter.ISO_DATE_TIME);
+                        Instant instant = odt.toInstant();
+                        return LocalDateTime.ofInstant(instant, ZoneId.systemDefault());
+                } catch (DateTimeParseException ex) {
+                        // Fallback: try parsing as LocalDateTime
+                        try {
+                                return LocalDateTime.parse(incoming, DateTimeFormatter.ISO_DATE_TIME);
+                        } catch (DateTimeParseException ex2) {
+                                throw new IllegalArgumentException("Invalid datetime format: " + incoming);
+                        }
+                }
+        }
+
+        /**
+         * Prefer a local wall-clock string when provided (format YYYY-MM-DDTHH:mm or
+         * ISO_LOCAL_DATE_TIME),
+         * otherwise parse the offset-aware/incoming value.
+         */
+        private LocalDateTime resolveStartTime(String startTimeLocal, String incoming) {
+                if (startTimeLocal != null && !startTimeLocal.trim().isEmpty()) {
+                        try {
+                                return LocalDateTime.parse(startTimeLocal, DateTimeFormatter.ISO_DATE_TIME);
+                        } catch (DateTimeParseException ex) {
+                                // Try without seconds (YYYY-MM-DDTHH:mm)
+                                try {
+                                        return LocalDateTime.parse(startTimeLocal + ":00",
+                                                        DateTimeFormatter.ISO_DATE_TIME);
+                                } catch (DateTimeParseException ex2) {
+                                        throw new IllegalArgumentException(
+                                                        "Invalid local datetime format: " + startTimeLocal);
+                                }
+                        }
+                }
+                return parseIncomingToLocalDateTime(incoming);
+        }
+
         public SessionResponseDTO createSession(Long groupId, Long createdById, SessionRequestDTO requestDTO) {
                 Group group = groupRepository.findById(groupId)
                                 .orElseThrow(() -> new ResourceNotFoundException(
@@ -57,11 +109,14 @@ public class SessionService {
                                 .orElseThrow(() -> new ResourceNotFoundException(
                                                 "User not found with ID: " + createdById));
 
+                // Resolve start time: prefer local wall-clock if provided by frontend, else
+                // parse offset-aware string
+                LocalDateTime start = resolveStartTime(requestDTO.getStartTimeLocal(), requestDTO.getStartTime());
                 // Validate overlap (compute end time from durationDays)
-                LocalDateTime computedEnd = requestDTO.getStartTime()
+                LocalDateTime computedEnd = start
                                 .plusDays(requestDTO.getDurationDays() == null ? 1 : requestDTO.getDurationDays());
                 List<Session> conflicts = sessionRepository.findOverlappingSessions(
-                                group.getId(), requestDTO.getStartTime(), computedEnd);
+                                group.getId(), start, computedEnd);
                 if (!conflicts.isEmpty()) {
                         throw new TimeSlotConflictException("Session time overlaps with another existing session");
                 }
@@ -70,7 +125,7 @@ public class SessionService {
                                 .group(group)
                                 .title(requestDTO.getTitle())
                                 .description(requestDTO.getDescription())
-                                .startTime(requestDTO.getStartTime())
+                                .startTime(start)
                                 .durationDays(requestDTO.getDurationDays() == null ? 1 : requestDTO.getDurationDays())
                                 .meetingLink(requestDTO.getMeetingLink())
                                 .createdBy(creator)
@@ -103,11 +158,12 @@ public class SessionService {
                 Session existing = sessionRepository.findById(id)
                                 .orElseThrow(() -> new ResourceNotFoundException("Session not found with ID: " + id));
 
-                LocalDateTime updatedEnd = requestDTO.getStartTime()
+                LocalDateTime start = resolveStartTime(requestDTO.getStartTimeLocal(), requestDTO.getStartTime());
+                LocalDateTime updatedEnd = start
                                 .plusDays(requestDTO.getDurationDays() == null ? 1 : requestDTO.getDurationDays());
                 List<Session> conflicts = sessionRepository.findOverlappingSessions(
                                 existing.getGroup().getId(),
-                                requestDTO.getStartTime(),
+                                start,
                                 updatedEnd);
 
                 if (!conflicts.isEmpty() && conflicts.stream().anyMatch(s -> !s.getId().equals(id))) {
@@ -116,7 +172,7 @@ public class SessionService {
 
                 existing.setTitle(requestDTO.getTitle());
                 existing.setDescription(requestDTO.getDescription());
-                existing.setStartTime(requestDTO.getStartTime());
+                existing.setStartTime(start);
                 existing.setDurationDays(requestDTO.getDurationDays() == null ? 1 : requestDTO.getDurationDays());
                 existing.setMeetingLink(requestDTO.getMeetingLink());
 
@@ -215,8 +271,9 @@ public class SessionService {
                                 .orElseThrow(() -> new ResourceNotFoundException(
                                                 "User not found with ID: " + createdById));
 
-                // Parse datetime strings to LocalDateTime
-                LocalDateTime startTime = LocalDateTime.parse(request.getStartTime(), DateTimeFormatter.ISO_DATE_TIME);
+                // Resolve datetime: prefer startTimeLocal when present, else parse offset-aware
+                // string
+                LocalDateTime startTime = resolveStartTime(request.getStartTimeLocal(), request.getStartTime());
                 Integer duration = request.getDurationDays() == null ? 1 : request.getDurationDays();
                 LocalDateTime endTime = startTime.plusDays(duration);
 

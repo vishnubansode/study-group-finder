@@ -28,6 +28,34 @@ export function SessionCreateDialog({ onCreated }: Props) {
     meetingLink: '',
   });
 
+  // Compute earliest allowed start: now + 1 hour, rounded up to the next 30-minute slot.
+  const computeEarliestStart = () => {
+    const now = new Date();
+    const earliest = new Date(now.getTime() + 60 * 60 * 1000); // +1 hour
+    // Round up to next 30-minute increment
+    const mins = earliest.getMinutes();
+    const rem = mins % 30;
+    if (rem !== 0) {
+      earliest.setMinutes(mins + (30 - rem));
+    }
+    earliest.setSeconds(0, 0);
+    return earliest;
+  };
+
+  const toDatetimeLocal = (d: Date) => {
+    const pad = (n: number) => String(n).padStart(2, '0');
+    const year = d.getFullYear();
+    const month = pad(d.getMonth() + 1);
+    const day = pad(d.getDate());
+    const hours = pad(d.getHours());
+    const minutes = pad(d.getMinutes());
+    return `${year}-${month}-${day}T${hours}:${minutes}`;
+  };
+
+  // min value for datetime-local input
+  const earliestStart = computeEarliestStart();
+  const earliestStartString = toDatetimeLocal(earliestStart);
+
   useEffect(() => {
     if (!open || !user) return;
     (async () => {
@@ -55,12 +83,35 @@ export function SessionCreateDialog({ onCreated }: Props) {
   const handleSubmit = async () => {
     if (!isValid || !user || !values.groupId) return;
     try {
+      // Validate earliest allowed start
+      const chosen = values.start ? new Date(values.start) : null;
+      const minAllowed = computeEarliestStart();
+      if (!chosen || chosen.getTime() < minAllowed.getTime()) {
+        alert('Start time must be at least 1 hour from now (rounded to the next 30-minute slot). Please choose a later time.');
+        return;
+      }
       // Backend expects LocalDateTime-like strings; datetime-local produces e.g. 2024-11-07T14:00
+      const formatWithOffset = (localDatetime: string) => {
+        // localDatetime expected 'YYYY-MM-DDTHH:mm'
+        if (!localDatetime) return localDatetime;
+        // ensure seconds
+        const base = localDatetime.length === 16 ? `${localDatetime}:00` : localDatetime;
+        const offsetMinutes = -new Date().getTimezoneOffset(); // minutes east of UTC
+        const sign = offsetMinutes >= 0 ? '+' : '-';
+        const abs = Math.abs(offsetMinutes);
+        const hh = String(Math.floor(abs / 60)).padStart(2, '0');
+        const mm = String(abs % 60).padStart(2, '0');
+        return `${base}${sign}${hh}:${mm}`; // e.g. 2025-11-13T05:00:00-05:00
+      };
+
       const payload = {
         groupId: values.groupId,
         title: values.title,
         description: values.description,
-        startTime: values.start,
+        // send local datetime with explicit timezone offset to avoid server/client ambiguity
+        startTime: values.start ? formatWithOffset(values.start) : values.start,
+        // include local wall-clock form so server can choose to preserve local date/time if desired
+        startTimeLocal: values.start || null,
         durationDays: Number(values.durationDays) || 1,
         createdById: user.id,
         meetingLink: values.meetingLink || null,
@@ -70,12 +121,19 @@ export function SessionCreateDialog({ onCreated }: Props) {
       console.log('Session created', created);
       onCreated?.(created);
       setOpen(false);
-      setValues({ groupId: undefined, title: '', description: '', start: '', end: '', meetingLink: '' });
+      setValues({ groupId: undefined, title: '', description: '', start: '', durationDays: 1, meetingLink: '' });
     } catch (err: any) {
       console.error('Failed to create session', err);
       alert(err?.message || 'Failed to create session');
     }
   };
+
+  // When dialog opens, default start to earliest allowed slot if empty
+  useEffect(() => {
+    if (!open) return;
+    const es = computeEarliestStart();
+    setValues((v) => ({ ...v, start: v.start || toDatetimeLocal(es) }));
+  }, [open]);
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -130,7 +188,12 @@ export function SessionCreateDialog({ onCreated }: Props) {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-2">
               <label className="text-sm font-medium">Start</label>
-              <Input type="datetime-local" value={values.start} onChange={(e) => setValues((v) => ({ ...v, start: e.target.value }))} />
+              <Input
+                type="datetime-local"
+                value={values.start}
+                onChange={(e) => setValues((v) => ({ ...v, start: e.target.value }))}
+                min={toDatetimeLocal(computeEarliestStart())}
+              />
             </div>
             <div className="space-y-2">
               <label className="text-sm font-medium">Duration (days)</label>

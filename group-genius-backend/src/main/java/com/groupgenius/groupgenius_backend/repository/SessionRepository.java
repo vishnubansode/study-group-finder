@@ -39,4 +39,8 @@ public interface SessionRepository extends JpaRepository<Session, Long>, JpaSpec
 
     // Find active sessions for a group (paged)
     Page<Session> findByGroupAndArchivedFalse(Group group, Pageable pageable);
+
+    @Query("SELECT s FROM Session s WHERE s.archived = false AND s.startTime BETWEEN :start AND :end")
+    List<Session> findActiveSessionsBetween(@Param("start") LocalDateTime start,
+            @Param("end") LocalDateTime end);
 }

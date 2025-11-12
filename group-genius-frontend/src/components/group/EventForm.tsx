@@ -46,7 +46,7 @@ export interface EventFormData {
   description: string;
   date: Date | undefined;
   startTime: string;
-  endTime: string;
+  durationDays: number;
   groupId: number | undefined;
 }
 
@@ -73,7 +73,7 @@ export default function EventForm({
     description: initialData?.description || '',
     date: initialData?.date || undefined,
     startTime: initialData?.startTime || '',
-    endTime: initialData?.endTime || '',
+  durationDays: initialData?.durationDays || 1,
     groupId: initialData?.groupId || undefined,
   });
 
@@ -81,8 +81,38 @@ export default function EventForm({
   const [isLoadingGroups, setIsLoadingGroups] = useState(false);
   const [errors, setErrors] = useState<Partial<Record<keyof EventFormData, string>>>({});
 
+  // Helper to parse 'HH:mm' into minutes since midnight
+  const parseTimeToMinutes = (t?: string) => {
+    if (!t) return 0;
+    const parts = t.split(':').map(Number);
+    if (parts.length < 2) return 0;
+    return parts[0] * 60 + parts[1];
+  };
+
+  // Earliest allowed start: now +1 hour, rounded up to next 30-minute slot
+  const computeEarliestForToday = () => {
+    const now = new Date();
+    const earliest = new Date(now.getTime() + 60 * 60 * 1000);
+    const mins = earliest.getMinutes();
+    const rem = mins % 30;
+    if (rem !== 0) earliest.setMinutes(mins + (30 - rem));
+    earliest.setSeconds(0, 0);
+    return earliest;
+  };
+
+  const timeToHHMM = (d: Date) => {
+    const pad = (n: number) => String(n).padStart(2, '0');
+    return `${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  };
+
+  const selectedDateIsToday = formData.date
+    ? (() => { const t = new Date(); t.setHours(0,0,0,0); const s = new Date(formData.date); s.setHours(0,0,0,0); return s.getTime() === t.getTime(); })()
+    : false;
+
+  const earliestTimeForSelected = selectedDateIsToday ? timeToHHMM(computeEarliestForToday()) : undefined;
+
   // Fetch user's groups
-  useEffect(() => {
+    useEffect(() => {
     const fetchGroups = async () => {
       if (!user) return;
 
@@ -91,7 +121,8 @@ export default function EventForm({
 
       try {
         setIsLoadingGroups(true);
-        const response = await groupAPI.getAllGroups(token);
+        // use the available searchGroups method instead of the nonexistent getAllGroups
+        const response = await groupAPI.searchGroups(token);
         setGroups(response || []);
       } catch (err) {
         console.error('Failed to load groups:', err);
@@ -138,23 +169,18 @@ export default function EventForm({
 
     if (!formData.startTime.trim()) {
       newErrors.startTime = 'Start time is required';
-    }
-
-    if (!formData.endTime.trim()) {
-      newErrors.endTime = 'End time is required';
-    }
-
-    // Validate that end time is after start time
-    if (formData.startTime && formData.endTime) {
-      const [startHours, startMinutes] = formData.startTime.split(':').map(Number);
-      const [endHours, endMinutes] = formData.endTime.split(':').map(Number);
-      
-      const startTotal = startHours * 60 + startMinutes;
-      const endTotal = endHours * 60 + endMinutes;
-      
-      if (endTotal <= startTotal) {
-        newErrors.endTime = 'End time must be after start time';
+    } else if (selectedDateIsToday) {
+      const earliest = computeEarliestForToday();
+      const [sh, sm] = formData.startTime.split(':').map(Number);
+      const chosen = new Date(); chosen.setHours(sh, sm, 0, 0);
+      // If chosen time earlier than earliest -> error
+      if (chosen.getTime() < earliest.getTime()) {
+        newErrors.startTime = 'Start time must be at least 1 hour from now (rounded to next 30-minute slot)';
       }
+    }
+
+    if (!formData.durationDays || formData.durationDays < 1) {
+      newErrors.durationDays = 'Duration (days) must be at least 1';
     }
 
     if (!formData.groupId) {
@@ -172,7 +198,34 @@ export default function EventForm({
       return;
     }
 
-    await onSubmit(formData);
+    // Combine date + time into an ISO-like string with explicit timezone offset so backend gets an unambiguous instant
+    const formatDateAndTimeWithOffset = (date?: Date, time?: string) => {
+      if (!date || !time) return undefined;
+      const pad = (n: number) => String(n).padStart(2, '0');
+      const year = date.getFullYear();
+      const month = pad(date.getMonth() + 1);
+      const day = pad(date.getDate());
+      // time is expected 'HH:mm'
+      const [hh, mm] = time.split(':');
+      const base = `${year}-${month}-${day}T${hh}:${mm}:00`;
+      const offsetMinutes = -new Date().getTimezoneOffset();
+      const sign = offsetMinutes >= 0 ? '+' : '-';
+      const abs = Math.abs(offsetMinutes);
+      const offH = String(Math.floor(abs / 60)).padStart(2, '0');
+      const offM = String(abs % 60).padStart(2, '0');
+      return `${base}${sign}${offH}:${offM}`;
+    };
+
+    const combined = formatDateAndTimeWithOffset(formData.date, formData.startTime);
+    const local = formData.date && formData.startTime ? `${formData.date.getFullYear()}-${String(formData.date.getMonth()+1).padStart(2,'0')}-${String(formData.date.getDate()).padStart(2,'0')}T${formData.startTime}` : formData.startTime;
+    const payload: EventFormData = {
+      ...formData,
+      startTime: combined || formData.startTime,
+    };
+    // @ts-ignore add local wall-clock representation for backend
+    (payload as any).startTimeLocal = local;
+
+    await onSubmit(payload);
   };
 
   const handleInputChange = (field: keyof EventFormData, value: string | Date | number | undefined) => {
@@ -191,18 +244,7 @@ export default function EventForm({
   };
 
   const selectedGroup = groups.find(g => g.id === formData.groupId);
-  const duration = formData.startTime && formData.endTime 
-    ? (() => {
-        const [startHours, startMinutes] = formData.startTime.split(':').map(Number);
-        const [endHours, endMinutes] = formData.endTime.split(':').map(Number);
-        const startTotal = startHours * 60 + startMinutes;
-        const endTotal = endHours * 60 + endMinutes;
-        const durationMinutes = endTotal - startTotal;
-        const hours = Math.floor(durationMinutes / 60);
-        const minutes = durationMinutes % 60;
-        return hours > 0 ? `${hours}h ${minutes > 0 ? `${minutes}m` : ''}`.trim() : `${minutes}m`;
-      })()
-    : null;
+  const duration = formData.durationDays ? `${formData.durationDays} day${formData.durationDays > 1 ? 's' : ''}` : null;
 
   return (
     <div className="w-full">
@@ -412,6 +454,7 @@ export default function EventForm({
                   type="time"
                   value={formData.startTime}
                   onChange={(e) => handleInputChange('startTime', e.target.value)}
+                  min={earliestTimeForSelected}
                   className={cn(
                     "h-12 text-base transition-all duration-200 focus:ring-2 focus:ring-primary/20",
                     errors.startTime && "border-destructive focus-visible:ring-destructive"
@@ -428,36 +471,36 @@ export default function EventForm({
               )}
             </div>
 
-            {/* End Time */}
+            {/* Duration (days) */}
             <div className="space-y-2">
-              <Label htmlFor="endTime" className="text-xs text-muted-foreground font-medium">
-                End Time
+              <Label htmlFor="durationDays" className="text-xs text-muted-foreground font-medium">
+                Duration (days)
               </Label>
               <div className="relative">
                 <Input
-                  id="endTime"
-                  type="time"
-                  value={formData.endTime}
-                  onChange={(e) => handleInputChange('endTime', e.target.value)}
+                  id="durationDays"
+                  type="number"
+                  min={1}
+                  value={String(formData.durationDays)}
+                  onChange={(e) => handleInputChange('durationDays', Number(e.target.value) || 1)}
                   className={cn(
                     "h-12 text-base transition-all duration-200 focus:ring-2 focus:ring-primary/20",
-                    errors.endTime && "border-destructive focus-visible:ring-destructive"
+                    errors.durationDays && "border-destructive focus-visible:ring-destructive"
                   )}
                   disabled={isLoading}
                 />
-                <Clock className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
               </div>
-              {errors.endTime && (
+              {errors.durationDays && (
                 <p className="text-xs text-destructive flex items-center gap-1 animate-in fade-in">
                   <AlertCircle className="h-3 w-3" />
-                  {errors.endTime}
+                  {errors.durationDays}
                 </p>
               )}
             </div>
           </div>
 
           {/* Duration Display */}
-          {duration && formData.startTime && formData.endTime && !errors.endTime && (
+          {duration && formData.startTime && formData.durationDays && !errors.durationDays && (
             <div className="flex items-center gap-2 p-3 rounded-lg bg-primary/5 border border-primary/10 animate-in fade-in">
               <Clock className="h-4 w-4 text-primary" />
               <span className="text-sm font-medium text-foreground">

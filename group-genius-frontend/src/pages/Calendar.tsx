@@ -27,6 +27,9 @@ const currentDate = new Date();
 const currentMonth = currentDate.getMonth();
 const currentYear = currentDate.getFullYear();
 
+const toLocalDateKey = (date: Date) =>
+  `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+
 // sessions will be loaded from backend for user's groups
 const DEFAULT_SESSIONS: any[] = [];
 
@@ -107,8 +110,8 @@ export default function Calendar() {
     setCurrentViewDate(newDate);
   };
 
-  // Use the shifted currentDate as "today"
-  const today = currentDate.toISOString().split('T')[0];
+  // Use local calendar date for "today" to avoid timezone shifts
+  const today = toLocalDateKey(currentDate);
   const todaySessions = getSessionsForDate(today);
   const upcomingSessions = sessionsState
     .filter(session => new Date(session.date) >= currentDate)
@@ -232,10 +235,26 @@ export default function Calendar() {
     const start = dto.startTime || dto.start || null;
     // compute endTime from durationDays (durationDays is integer number of days)
     const duration = dto.durationDays == null ? dto.duration || 1 : dto.durationDays;
-    const startDate = start ? new Date(start) : null;
-    const computedEnd = startDate ? new Date(startDate.getTime() + (duration * 24 * 60 * 60 * 1000)) : null;
-    const date = startDate ? startDate.toISOString().split('T')[0] : (dto.date ?? '');
-    const time = startDate ? `${startDate.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}${computedEnd ? ' - ' + computedEnd.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}) : ''}` : '';
+    // Parse server start into a local Date reliably: if the server string includes a timezone (Z or +/-offset)
+    // use Date parsing; otherwise treat the string as local and build a Date from components to avoid implicit UTC conversions.
+    const parseServerToLocalDate = (s: string | null) => {
+      if (!s) return null;
+      const hasTZ = /[zZ]$|[+-]\d{2}:?\d{2}$/.test(s);
+      if (hasTZ) return new Date(s);
+      // expected format YYYY-MM-DDTHH:mm[:ss]
+      const parts = s.split('T');
+      if (parts.length < 2) return new Date(s);
+      const [y, m, d] = parts[0].split('-').map(Number);
+      const [hh, mm] = parts[1].split(':').map(Number);
+      return new Date(y, m - 1, d, hh || 0, mm || 0, 0);
+    };
+
+  const startDate = parseServerToLocalDate(start);
+  const computedEnd = startDate ? new Date(startDate.getTime() + (duration * 24 * 60 * 60 * 1000)) : null;
+  const formatLocalDate = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  const date = startDate ? formatLocalDate(startDate) : (dto.date ?? '');
+  const startTimeDisplay = startDate ? startDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
+  const time = startDate ? `${startTimeDisplay}${computedEnd ? ' - ' + computedEnd.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}) : ''}` : '';
     return {
       id: dto.id,
       title: dto.title,
@@ -249,6 +268,7 @@ export default function Calendar() {
       createdById: dto.createdById,
       createdByName: dto.createdByName,
       raw: dto,
+      startTimeDisplay,
       isParticipant: false,
       type: 'study'
     };
@@ -579,7 +599,7 @@ export default function Calendar() {
                               </div>
                               <div className="flex-1 min-w-0">
                                 <p className="text-sm font-medium truncate">{session.title}</p>
-                                <p className="text-xs text-muted-foreground">{session.time}</p>
+                                <p className="text-xs text-muted-foreground">{session.startTimeDisplay || session.time}</p>
                               </div>
                               <div className="flex items-center gap-2">
                                 {user?.id === session.createdById && (
