@@ -77,6 +77,9 @@ public class SessionService {
                 Session saved = sessionRepository.save(session);
                 log.info("📅 Session created: {} in group {}", saved.getTitle(), group.getGroupName());
 
+                // Automatically add creator as a participant (they don't need an invitation)
+                invitationService.addCreatorAsParticipant(saved, creator);
+
                 // Get all group members except the creator and send invitations
                 List<GroupMember> groupMembers = groupMemberRepository.findByGroup(group);
                 List<Long> memberIds = groupMembers.stream()
@@ -127,9 +130,8 @@ public class SessionService {
                                 .orElseThrow(() -> new ResourceNotFoundException(
                                                 "Group not found with ID: " + groupId));
 
-                return sessionRepository
-                                .findAll((root, query, cb) -> cb.equal(root.get("group"), group),
-                                                PageRequest.of(page, size))
+                // Return only active (non-archived) sessions by default
+                return sessionRepository.findByGroupAndArchivedFalse(group, PageRequest.of(page, size))
                                 .map(SessionMapper::toDTO);
         }
 
@@ -143,7 +145,57 @@ public class SessionService {
                 if (!sessionRepository.existsById(id)) {
                         throw new ResourceNotFoundException("Session not found with ID: " + id);
                 }
-                sessionRepository.deleteById(id);
+                // Defensive deletion: remove any legacy rows in an older `invitations` table
+                // then remove invitation/participant/notification rows managed by repositories.
+                // This protects against mismatched DB schemas where an `invitations` table
+                // exists (FK prevents session deletion).
+                try {
+                        invitationService.deleteLegacyInvitationsBySessionId(id);
+                } catch (Exception ex) {
+                        log.debug("No legacy invitation cleanup needed: {}", ex.getMessage());
+                }
+
+                Session session = sessionRepository.findById(id)
+                                .orElseThrow(() -> new ResourceNotFoundException("Session not found with ID: " + id));
+
+                // remove session-related entities that JPA/Hibernate should also cascade,
+                // but we explicitly delete to be safe against schema drift
+                try {
+                        invitationService.deleteInvitationsBySession(session);
+                } catch (Exception ex) {
+                        log.debug("Failed to delete session invitations explicitly: {}", ex.getMessage());
+                }
+                try {
+                        invitationService.deleteParticipantsBySession(session);
+                } catch (Exception ex) {
+                        log.debug("Failed to delete session participants explicitly: {}", ex.getMessage());
+                }
+                try {
+                        invitationService.deleteNotificationsBySession(session);
+                } catch (Exception ex) {
+                        log.debug("Failed to delete session notifications explicitly: {}", ex.getMessage());
+                }
+
+                // Finally delete the session (JPA cascade will handle anything remaining)
+                sessionRepository.delete(session);
+                log.info("🗑️ Session with ID {} deleted successfully.", id);
+        }
+
+        /**
+         * Get all sessions created by a specific user across all groups
+         */
+        public List<SessionResponseDTO> getSessionsByCreator(Long creatorId) {
+                User creator = userRepository.findById(creatorId)
+                                .orElseThrow(() -> new ResourceNotFoundException(
+                                                "User not found with ID: " + creatorId));
+
+                // Return only active (non-archived) sessions by default
+                List<Session> sessions = sessionRepository.findByCreatedByAndArchivedFalse(creator);
+                log.info("📋 Found {} sessions created by user: {}", sessions.size(), creator.getEmail());
+
+                return sessions.stream()
+                                .map(SessionMapper::toDTO)
+                                .collect(Collectors.toList());
         }
 
         /**
@@ -182,6 +234,9 @@ public class SessionService {
 
                 Session saved = sessionRepository.save(session);
                 log.info("📅 Session created: {} in group {}", saved.getTitle(), group.getGroupName());
+
+                // Automatically add creator as a participant (they don't need an invitation)
+                invitationService.addCreatorAsParticipant(saved, creator);
 
                 // Create invitations for selected members
                 if (request.getInvitedUserIds() != null && !request.getInvitedUserIds().isEmpty()) {

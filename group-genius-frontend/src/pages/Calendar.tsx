@@ -105,10 +105,11 @@ export default function Calendar() {
     setCurrentViewDate(newDate);
   };
 
-  const today = new Date().toISOString().split('T')[0];
+  // Use the shifted currentDate as "today"
+  const today = currentDate.toISOString().split('T')[0];
   const todaySessions = getSessionsForDate(today);
   const upcomingSessions = sessionsState
-    .filter(session => new Date(session.date) >= new Date())
+    .filter(session => new Date(session.date) >= currentDate)
     .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
     .slice(0, 5);
 
@@ -118,20 +119,44 @@ export default function Calendar() {
     setLoadingSessions(true);
     try {
       const token = localStorage.getItem('token');
+      
+      // Load sessions from groups the user is part of
       const groups = await groupAPI.searchGroups(token, { userId: user.id, size: 100, filterByMembership: true });
       const arr = Array.isArray(groups) ? groups : (groups?.content ?? []);
       const groupIds = arr.map((g: any) => g.groupId ?? g.id);
       const pagePromises = groupIds.map((gid: number) => sessionAPI.getSessionsByGroup(gid, 0, 100));
       const pages = await Promise.all(pagePromises);
-      // pages may be Page objects or arrays
+      
+      // Also load all sessions created by the user (including ended ones)
+      const createdSessions = await sessionAPI.getSessionsByCreator(user.id);
+      
+  // Combine and deduplicate sessions
       const allSessions: any[] = [];
-      pages.forEach((p: any, idx: number) => {
+      const seenIds = new Set<number>();
+      
+      // Add sessions from groups
+      pages.forEach((p: any) => {
         const items = Array.isArray(p) ? p : (Array.isArray(p.content) ? p.content : (p.items ?? []));
         items.forEach((it: any) => {
-          const mapped = mapDtoToUi(it);
-          allSessions.push(mapped);
+          if (!seenIds.has(it.id)) {
+            seenIds.add(it.id);
+            const mapped = mapDtoToUi(it);
+            allSessions.push(mapped);
+          }
         });
       });
+      
+      // Add sessions created by the user (may include ended sessions not in participant list)
+      const createdItems = Array.isArray(createdSessions) ? createdSessions : [];
+      createdItems.forEach((it: any) => {
+        if (!seenIds.has(it.id)) {
+          seenIds.add(it.id);
+          const mapped = mapDtoToUi(it);
+          allSessions.push(mapped);
+        }
+      });
+
+      // Show all available sessions (include past/ended sessions)
       setSessionsState(allSessions);
       setLastRefresh(new Date());
     } catch (e) {

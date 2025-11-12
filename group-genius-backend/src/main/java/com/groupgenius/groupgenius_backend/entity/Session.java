@@ -3,6 +3,8 @@ package com.groupgenius.groupgenius_backend.entity;
 import jakarta.persistence.*;
 import lombok.*;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
 
 @Entity
 @Table(name = "sessions")
@@ -43,8 +45,29 @@ public class Session {
     @Column(length = 500)
     private String meetingLink;
 
+    @OneToMany(mappedBy = "session", cascade = CascadeType.ALL, orphanRemoval = true)
+    @Builder.Default
+    private List<SessionInvitation> invitations = new ArrayList<>();
+
+    @OneToMany(mappedBy = "session", cascade = CascadeType.ALL, orphanRemoval = true)
+    @Builder.Default
+    private List<SessionParticipant> participants = new ArrayList<>();
+
+    @OneToMany(mappedBy = "session", cascade = CascadeType.ALL, orphanRemoval = true)
+    @Builder.Default
+    private List<Notification> notifications = new ArrayList<>();
+
     @PrePersist
     protected void onCreate() {
         createdAt = LocalDateTime.now();
     }
+
+    // Soft-archive flag: when true the session is hidden from regular queries but
+    // preserved in DB
+    @Column(nullable = false)
+    @Builder.Default
+    private Boolean archived = false;
+
+    @Column
+    private LocalDateTime archivedAt;
 }

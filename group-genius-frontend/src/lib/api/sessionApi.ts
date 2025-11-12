@@ -66,5 +66,17 @@ export const sessionAPI = {
       },
     });
     return handleResponse(response);
+  },
+
+  getSessionsByCreator: async (creatorId: number) => {
+    const url = `${API_BASE_URL}/sessions/creator/${creatorId}`;
+    const response = await fetch(url, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+        ...buildHeaders(),
+      },
+    });
+    return handleResponse(response);
   }
 };
