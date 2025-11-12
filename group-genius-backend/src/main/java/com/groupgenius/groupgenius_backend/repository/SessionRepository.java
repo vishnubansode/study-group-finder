@@ -16,14 +16,10 @@ import org.springframework.data.domain.Pageable;
 public interface SessionRepository extends JpaRepository<Session, Long>, JpaSpecificationExecutor<Session> {
 
     // Find overlapping sessions for the same group
-    @Query("""
-                SELECT s FROM Session s
-                WHERE s.group = :group
-                AND (
-                    (s.startTime < :endTime AND s.endTime > :startTime)
-                )
-            """)
-    List<Session> findOverlappingSessions(@Param("group") Group group,
+    // Overlap: existing_start < new_end AND existing_end > new_start
+    // existing_end = DATE_ADD(s.start_time, INTERVAL s.duration_days DAY)
+    @Query(value = "SELECT * FROM sessions s WHERE s.group_id = :groupId AND (s.start_time < :endTime AND DATE_ADD(s.start_time, INTERVAL s.duration_days DAY) > :startTime)", nativeQuery = true)
+    List<Session> findOverlappingSessions(@Param("groupId") Long groupId,
             @Param("startTime") LocalDateTime startTime,
             @Param("endTime") LocalDateTime endTime);
 

@@ -145,6 +145,19 @@ public class SessionInvitationService {
         }
 
         /**
+         * Get declined invitations for a user so they can rejoin later
+         */
+        @Transactional(readOnly = true)
+        public List<SessionInvitationResponse> getDeclinedInvitationsForUser(Long userId) {
+                com.groupgenius.groupgenius_backend.entity.User user = userRepository.findById(userId)
+                                .orElseThrow(() -> new ResourceNotFoundException("User not found with ID: " + userId));
+
+                return invitationRepository.findByUserAndStatus(user, SessionInvitation.Status.DECLINED).stream()
+                                .map(SessionInvitationMapper::toDTO)
+                                .collect(Collectors.toList());
+        }
+
+        /**
          * Accept an invitation
          */
         public SessionInvitationResponse acceptInvitation(Long invitationId, Long userId) {
@@ -237,6 +250,54 @@ public class SessionInvitationService {
 
                 log.info("❌ User {} declined invitation {} for session {}", userId, invitationId,
                                 invitation.getSession().getId());
+
+                return SessionInvitationMapper.toDTO(invitation);
+        }
+
+        /**
+         * Allow a user who previously declined to rejoin the session.
+         */
+        public SessionInvitationResponse rejoinDeclinedInvitation(Long invitationId, Long userId) {
+                SessionInvitation invitation = invitationRepository.findById(invitationId)
+                                .orElseThrow(() -> new ResourceNotFoundException(
+                                                "Invitation not found with ID: " + invitationId));
+
+                if (!invitation.getUser().getId().equals(userId)) {
+                        throw new UnauthorizedActionException("You are not authorized to rejoin this invitation");
+                }
+
+                if (invitation.getStatus() != SessionInvitation.Status.DECLINED) {
+                        throw new IllegalStateException("Only declined invitations can be rejoined");
+                }
+
+                invitation.setStatus(SessionInvitation.Status.ACCEPTED);
+                invitation.setRespondedAt(LocalDateTime.now());
+                invitationRepository.save(invitation);
+
+                if (!participantRepository.existsBySessionAndUser(invitation.getSession(), invitation.getUser())) {
+                        SessionParticipant participant = SessionParticipant.builder()
+                                        .session(invitation.getSession())
+                                        .user(invitation.getUser())
+                                        .build();
+                        participantRepository.save(participant);
+                }
+
+                String message = String.format("%s %s is joining '%s' after previously declining",
+                                invitation.getUser().getFirstName(),
+                                invitation.getUser().getLastName(),
+                                invitation.getSession().getTitle());
+
+                Notification notification = Notification.builder()
+                                .recipient(invitation.getSession().getCreatedBy())
+                                .session(invitation.getSession())
+                                .type(Notification.NotificationType.ACCEPTED)
+                                .message(message)
+                                .read(false)
+                                .build();
+                notificationRepository.save(notification);
+
+                log.info("✅ User {} rejoined session {} via invitation {}", userId,
+                                invitation.getSession().getId(), invitationId);
 
                 return SessionInvitationMapper.toDTO(invitation);
         }

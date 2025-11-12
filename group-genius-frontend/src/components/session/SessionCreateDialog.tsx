@@ -24,7 +24,7 @@ export function SessionCreateDialog({ onCreated }: Props) {
     title: '',
     description: '',
     start: '', // datetime-local
-    end: '',
+    durationDays: 1,
     meetingLink: '',
   });
 
@@ -50,7 +50,7 @@ export function SessionCreateDialog({ onCreated }: Props) {
   }, [open, user]);
 
   const isValid =
-    typeof values.groupId === 'number' && values.title.trim().length > 0 && values.start.trim().length > 0;
+    typeof values.groupId === 'number' && values.title.trim().length > 0 && values.start.trim().length > 0 && Number(values.durationDays) >= 1;
 
   const handleSubmit = async () => {
     if (!isValid || !user || !values.groupId) return;
@@ -61,7 +61,7 @@ export function SessionCreateDialog({ onCreated }: Props) {
         title: values.title,
         description: values.description,
         startTime: values.start,
-        endTime: values.end || null,
+        durationDays: Number(values.durationDays) || 1,
         createdById: user.id,
         meetingLink: values.meetingLink || null,
       };
@@ -133,8 +133,8 @@ export function SessionCreateDialog({ onCreated }: Props) {
               <Input type="datetime-local" value={values.start} onChange={(e) => setValues((v) => ({ ...v, start: e.target.value }))} />
             </div>
             <div className="space-y-2">
-              <label className="text-sm font-medium">End (optional)</label>
-              <Input type="datetime-local" value={values.end} onChange={(e) => setValues((v) => ({ ...v, end: e.target.value }))} />
+              <label className="text-sm font-medium">Duration (days)</label>
+              <Input type="number" min={1} value={String(values.durationDays)} onChange={(e) => setValues((v) => ({ ...v, durationDays: Number(e.target.value) }))} />
             </div>
           </div>
 

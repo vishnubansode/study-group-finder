@@ -14,7 +14,7 @@ public class SessionResponseDTO {
     private String title;
     private String description;
     private LocalDateTime startTime;
-    private LocalDateTime endTime;
+    private Integer durationDays;
     private Long createdById;
     private String createdByName;
     private LocalDateTime createdAt;

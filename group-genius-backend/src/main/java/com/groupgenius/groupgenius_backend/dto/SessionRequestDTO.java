@@ -13,7 +13,7 @@ public class SessionRequestDTO {
     private String title;
     private String description;
     private LocalDateTime startTime;
-    private LocalDateTime endTime;
+    private Integer durationDays;
     private Long createdById;
     private String meetingLink;
 

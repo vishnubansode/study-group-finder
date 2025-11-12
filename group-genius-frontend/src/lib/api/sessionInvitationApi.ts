@@ -12,7 +12,9 @@ const handleResponse = async (response: Response) => {
   const text = await response.text().catch(() => '');
   const data = contentType.includes('application/json') ? JSON.parse(text || '{}') : text;
   if (!response.ok) {
-    const errMsg = (data && typeof data === 'object' && data.message) ? data.message : text || `Request failed (${response.status})`;
+    const errMsg = (data && typeof data === 'object' && data.message)
+      ? data.message
+      : text || `Request failed (${response.status})`;
     throw new Error(errMsg);
   }
   return data;
@@ -40,7 +42,7 @@ export interface SessionCreateWithInvitationsRequest {
   title: string;
   description?: string;
   startTime: string; // ISO format
-  endTime: string;   // ISO format
+  durationDays: number; // integer number of days (>=1)
   meetingLink?: string;
   invitedUserIds: number[];
 }
@@ -101,6 +103,18 @@ export const sessionInvitationAPI = {
     return handleResponse(response);
   },
 
+  getDeclinedInvitations: async (userId: number): Promise<SessionInvitation[]> => {
+    const url = `${API_BASE_URL}/sessions/invitations/user/${userId}/declined`;
+    const response = await fetch(url, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+        ...buildHeaders(),
+      },
+    });
+    return handleResponse(response);
+  },
+
   /**
    * Accept an invitation
    */
@@ -121,6 +135,18 @@ export const sessionInvitationAPI = {
    */
   declineInvitation: async (invitationId: number, userId: number): Promise<SessionInvitation> => {
     const url = `${API_BASE_URL}/sessions/invitations/${invitationId}/decline?userId=${userId}`;
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...buildHeaders(),
+      },
+    });
+    return handleResponse(response);
+  },
+
+  rejoinInvitation: async (invitationId: number, userId: number): Promise<SessionInvitation> => {
+    const url = `${API_BASE_URL}/sessions/invitations/${invitationId}/rejoin?userId=${userId}`;
     const response = await fetch(url, {
       method: 'POST',
       headers: {

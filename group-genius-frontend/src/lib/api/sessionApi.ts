@@ -79,4 +79,67 @@ export const sessionAPI = {
     });
     return handleResponse(response);
   }
+,
+
+  // Participant endpoints
+  getParticipants: async (sessionId: number) => {
+    const url = `${API_BASE_URL}/sessions/participants/${sessionId}`;
+    const response = await fetch(url, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+        ...buildHeaders(),
+      },
+    });
+    return handleResponse(response);
+  },
+
+  getParticipantCount: async (sessionId: number) => {
+    const url = `${API_BASE_URL}/sessions/participants/${sessionId}/count`;
+    const response = await fetch(url, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+        ...buildHeaders(),
+      },
+    });
+    return handleResponse(response);
+  },
+
+  isParticipant: async (sessionId: number, userId: number) => {
+    const url = `${API_BASE_URL}/sessions/participants/${sessionId}/user/${userId}/is-participant`;
+    const response = await fetch(url, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+        ...buildHeaders(),
+      },
+    });
+    // The backend returns { isParticipant: true/false } — extract the boolean
+    const data = await handleResponse(response);
+    return data?.isParticipant ?? false;
+  },
+
+  addParticipant: async (sessionId: number, userId: number) => {
+    const url = `${API_BASE_URL}/sessions/participants/${sessionId}/user/${userId}`;
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...buildHeaders(),
+      },
+    });
+    return handleResponse(response);
+  },
+
+  removeParticipant: async (sessionId: number, userId: number) => {
+    const url = `${API_BASE_URL}/sessions/participants/${sessionId}/user/${userId}`;
+    const response = await fetch(url, {
+      method: 'DELETE',
+      headers: {
+        ...buildHeaders(),
+      },
+    });
+    return handleResponse(response);
+  }
 };

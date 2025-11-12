@@ -57,9 +57,11 @@ public class SessionService {
                                 .orElseThrow(() -> new ResourceNotFoundException(
                                                 "User not found with ID: " + createdById));
 
-                // Validate overlap
+                // Validate overlap (compute end time from durationDays)
+                LocalDateTime computedEnd = requestDTO.getStartTime()
+                                .plusDays(requestDTO.getDurationDays() == null ? 1 : requestDTO.getDurationDays());
                 List<Session> conflicts = sessionRepository.findOverlappingSessions(
-                                group, requestDTO.getStartTime(), requestDTO.getEndTime());
+                                group.getId(), requestDTO.getStartTime(), computedEnd);
                 if (!conflicts.isEmpty()) {
                         throw new TimeSlotConflictException("Session time overlaps with another existing session");
                 }
@@ -69,7 +71,7 @@ public class SessionService {
                                 .title(requestDTO.getTitle())
                                 .description(requestDTO.getDescription())
                                 .startTime(requestDTO.getStartTime())
-                                .endTime(requestDTO.getEndTime())
+                                .durationDays(requestDTO.getDurationDays() == null ? 1 : requestDTO.getDurationDays())
                                 .meetingLink(requestDTO.getMeetingLink())
                                 .createdBy(creator)
                                 .build();
@@ -101,10 +103,12 @@ public class SessionService {
                 Session existing = sessionRepository.findById(id)
                                 .orElseThrow(() -> new ResourceNotFoundException("Session not found with ID: " + id));
 
+                LocalDateTime updatedEnd = requestDTO.getStartTime()
+                                .plusDays(requestDTO.getDurationDays() == null ? 1 : requestDTO.getDurationDays());
                 List<Session> conflicts = sessionRepository.findOverlappingSessions(
-                                existing.getGroup(),
+                                existing.getGroup().getId(),
                                 requestDTO.getStartTime(),
-                                requestDTO.getEndTime());
+                                updatedEnd);
 
                 if (!conflicts.isEmpty() && conflicts.stream().anyMatch(s -> !s.getId().equals(id))) {
                         throw new TimeSlotConflictException("Session time overlaps with another session");
@@ -113,7 +117,7 @@ public class SessionService {
                 existing.setTitle(requestDTO.getTitle());
                 existing.setDescription(requestDTO.getDescription());
                 existing.setStartTime(requestDTO.getStartTime());
-                existing.setEndTime(requestDTO.getEndTime());
+                existing.setDurationDays(requestDTO.getDurationDays() == null ? 1 : requestDTO.getDurationDays());
                 existing.setMeetingLink(requestDTO.getMeetingLink());
 
                 Session updated = sessionRepository.save(existing);
@@ -213,10 +217,11 @@ public class SessionService {
 
                 // Parse datetime strings to LocalDateTime
                 LocalDateTime startTime = LocalDateTime.parse(request.getStartTime(), DateTimeFormatter.ISO_DATE_TIME);
-                LocalDateTime endTime = LocalDateTime.parse(request.getEndTime(), DateTimeFormatter.ISO_DATE_TIME);
+                Integer duration = request.getDurationDays() == null ? 1 : request.getDurationDays();
+                LocalDateTime endTime = startTime.plusDays(duration);
 
                 // Validate overlap
-                List<Session> conflicts = sessionRepository.findOverlappingSessions(group, startTime, endTime);
+                List<Session> conflicts = sessionRepository.findOverlappingSessions(group.getId(), startTime, endTime);
                 if (!conflicts.isEmpty()) {
                         throw new TimeSlotConflictException("Session time overlaps with another existing session");
                 }
@@ -227,7 +232,7 @@ public class SessionService {
                                 .title(request.getTitle())
                                 .description(request.getDescription())
                                 .startTime(startTime)
-                                .endTime(endTime)
+                                .durationDays(duration)
                                 .meetingLink(request.getMeetingLink())
                                 .createdBy(creator)
                                 .build();

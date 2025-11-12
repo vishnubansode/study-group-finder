@@ -14,6 +14,7 @@ public class SessionInvitationResponse {
     private String sessionDescription;
     private LocalDateTime sessionStartTime;
     private LocalDateTime sessionEndTime;
+    private Integer sessionDurationDays;
     private Long groupId;
     private String groupName;
     private Long invitedBy;

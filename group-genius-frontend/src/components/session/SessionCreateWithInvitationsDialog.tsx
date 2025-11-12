@@ -37,8 +37,7 @@ export default function SessionCreateWithInvitationsDialog({
   const [description, setDescription] = useState('');
   const [startDate, setStartDate] = useState('');
   const [startTime, setStartTime] = useState('');
-  const [endDate, setEndDate] = useState('');
-  const [endTime, setEndTime] = useState('');
+  const [durationDays, setDurationDays] = useState<number>(1);
   const [meetingLink, setMeetingLink] = useState('');
 
   useEffect(() => {
@@ -89,24 +88,23 @@ export default function SessionCreateWithInvitationsDialog({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!user || !title || !startDate || !startTime || !endDate || !endTime) {
-      alert('Please fill in all required fields');
+    if (!user || !title || !startDate || !startTime || !durationDays || durationDays < 1) {
+      alert('Please fill in all required fields and set duration (>= 1 day)');
       return;
     }
 
     try {
       setLoading(true);
 
-      // Combine date and time into ISO format
+      // Combine date and time into ISO format and include duration in days
       const startDateTime = new Date(`${startDate}T${startTime}`).toISOString();
-      const endDateTime = new Date(`${endDate}T${endTime}`).toISOString();
 
       const request: SessionCreateWithInvitationsRequest = {
         groupId,
         title,
         description,
         startTime: startDateTime,
-        endTime: endDateTime,
+        durationDays: durationDays,
         meetingLink: meetingLink || undefined,
         invitedUserIds: selectedUserIds,
       };
@@ -118,8 +116,7 @@ export default function SessionCreateWithInvitationsDialog({
       setDescription('');
       setStartDate('');
       setStartTime('');
-      setEndDate('');
-      setEndTime('');
+  setDurationDays(1);
       setMeetingLink('');
       setSelectedUserIds([]);
       
@@ -195,25 +192,14 @@ export default function SessionCreateWithInvitationsDialog({
                 required
               />
             </div>
-
             <div className="space-y-2">
-              <Label htmlFor="endDate">End Date *</Label>
+              <Label htmlFor="durationDays">Duration (days) *</Label>
               <Input
-                id="endDate"
-                type="date"
-                value={endDate}
-                onChange={(e) => setEndDate(e.target.value)}
-                required
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="endTime">End Time *</Label>
-              <Input
-                id="endTime"
-                type="time"
-                value={endTime}
-                onChange={(e) => setEndTime(e.target.value)}
+                id="durationDays"
+                type="number"
+                min={1}
+                value={durationDays}
+                onChange={(e) => setDurationDays(Number(e.target.value))}
                 required
               />
             </div>

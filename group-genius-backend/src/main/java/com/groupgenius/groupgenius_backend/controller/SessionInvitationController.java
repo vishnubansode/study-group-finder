@@ -44,6 +44,16 @@ public class SessionInvitationController {
     }
 
     /**
+     * Get declined invitations for a user
+     * GET /api/sessions/invitations/user/{userId}/declined
+     */
+    @GetMapping("/user/{userId}/declined")
+    public ResponseEntity<List<SessionInvitationResponse>> getDeclinedInvitations(@PathVariable Long userId) {
+        List<SessionInvitationResponse> invitations = invitationService.getDeclinedInvitationsForUser(userId);
+        return ResponseEntity.ok(invitations);
+    }
+
+    /**
      * Get pending invitations for a user in a specific group
      * GET /api/sessions/invitations/groups/{groupId}/user/{userId}/pending
      */
@@ -80,6 +90,19 @@ public class SessionInvitationController {
             @RequestParam Long userId) {
 
         SessionInvitationResponse response = invitationService.declineInvitation(invitationId, userId);
+        return ResponseEntity.ok(response);
+    }
+
+    /**
+     * Rejoin a previously-declined invitation
+     * POST /api/sessions/invitations/{invitationId}/rejoin
+     */
+    @PostMapping("/{invitationId}/rejoin")
+    public ResponseEntity<SessionInvitationResponse> rejoinDeclinedInvitation(
+            @PathVariable Long invitationId,
+            @RequestParam Long userId) {
+
+        SessionInvitationResponse response = invitationService.rejoinDeclinedInvitation(invitationId, userId);
         return ResponseEntity.ok(response);
     }
 

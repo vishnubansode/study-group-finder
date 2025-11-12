@@ -15,9 +15,10 @@ public final class SessionInvitationMapper {
                 .sessionTitle(invitation.getSession().getTitle())
                 .sessionDescription(invitation.getSession().getDescription())
                 .sessionStartTime(invitation.getSession().getStartTime())
-                .sessionEndTime(invitation.getSession().getEndTime())
+                .sessionEndTime(invitation.getSession().getComputedEndTime())
                 .groupId(invitation.getSession().getGroup().getId())
                 .groupName(invitation.getSession().getGroup().getGroupName())
+                .sessionDurationDays(invitation.getSession().getDurationDays())
                 .invitedBy(invitation.getSession().getCreatedBy().getId())
                 .invitedByName(invitation.getSession().getCreatedBy().getFirstName() + " " +
                         invitation.getSession().getCreatedBy().getLastName())

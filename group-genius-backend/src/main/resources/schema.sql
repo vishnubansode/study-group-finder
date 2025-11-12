@@ -108,7 +108,7 @@ CREATE TABLE IF NOT EXISTS group_members (
   title VARCHAR(255) NOT NULL,
   description VARCHAR(1000) DEFAULT NULL,
   start_time DATETIME NOT NULL,
-  end_time DATETIME NOT NULL,
+  duration_days INT NOT NULL DEFAULT 1,
   meeting_link VARCHAR(500) DEFAULT NULL,
   created_by BIGINT NOT NULL,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,

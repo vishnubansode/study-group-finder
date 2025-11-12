@@ -5,7 +5,8 @@ import com.groupgenius.groupgenius_backend.entity.Session;
 
 public class SessionMapper {
 
-    private SessionMapper() {}
+    private SessionMapper() {
+    }
 
     public static SessionResponseDTO toDTO(Session session) {
         return SessionResponseDTO.builder()
@@ -14,7 +15,7 @@ public class SessionMapper {
                 .title(session.getTitle())
                 .description(session.getDescription())
                 .startTime(session.getStartTime())
-                .endTime(session.getEndTime())
+                .durationDays(session.getDurationDays())
                 .meetingLink(session.getMeetingLink())
                 .createdById(session.getCreatedBy().getId())
                 .createdByName(session.getCreatedBy().getFirstName())
@@ -22,4 +23,3 @@ public class SessionMapper {
                 .build();
     }
 }
-

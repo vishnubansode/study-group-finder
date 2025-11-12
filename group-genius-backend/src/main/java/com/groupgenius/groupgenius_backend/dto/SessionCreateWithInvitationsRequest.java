@@ -12,7 +12,7 @@ public class SessionCreateWithInvitationsRequest {
     private String title;
     private String description;
     private String startTime; // ISO format datetime
-    private String endTime; // ISO format datetime
+    private Integer durationDays; // number of days the session continues
     private String meetingLink;
     private List<Long> invitedUserIds; // List of user IDs to invite
 }

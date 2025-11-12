@@ -19,6 +19,7 @@ import {
 import SessionCreateDialog from '@/components/session/SessionCreateDialog';
 import SessionEditDialog from '@/components/session/SessionEditDialog';
 import { useAuth } from '@/contexts/AuthContext';
+import { sessionInvitationAPI } from '@/lib/api/sessionInvitationApi';
 import { groupAPI } from '@/lib/api/groupApi';
 import { sessionAPI } from '@/lib/api/sessionApi';
 
@@ -50,6 +51,7 @@ export default function Calendar() {
   const [currentViewDate, setCurrentViewDate] = useState(new Date(currentYear, currentMonth, 1));
   const { user } = useAuth();
   const [sessionsState, setSessionsState] = useState<any[]>(DEFAULT_SESSIONS);
+  const [invitationMap, setInvitationMap] = useState<Record<number, { id: number; status: string }>>({});
   const [loadingSessions, setLoadingSessions] = useState(false);
   const [lastRefresh, setLastRefresh] = useState<Date>(new Date());
 
@@ -156,9 +158,55 @@ export default function Calendar() {
         }
       });
 
-      // Show all available sessions (include past/ended sessions)
-      setSessionsState(allSessions);
+      // Resolve participation state for current user and only show sessions where
+      // the current user is a participant. Also load user's pending/declined invitations
+      // so we can show 'Invited' or 'Rejoin' states in the UI for non-creators.
       setLastRefresh(new Date());
+      if (user) {
+        try {
+          // Fetch user's pending and declined invitations once
+          const [pending, declined] = await Promise.all([
+            sessionInvitationAPI.getPendingInvitations(user.id),
+            sessionInvitationAPI.getDeclinedInvitations(user.id),
+          ]);
+
+          const invMap: Record<number, { id: number; status: string }> = {};
+          pending.forEach((inv: any) => { invMap[inv.sessionId] = { id: inv.id, status: inv.status }; });
+          declined.forEach((inv: any) => { invMap[inv.sessionId] = { id: inv.id, status: inv.status }; });
+          setInvitationMap(invMap);
+
+          const checks = await Promise.all(allSessions.map(async (s) => {
+            try {
+              const isPart = await sessionAPI.isParticipant(s.id, user.id);
+              return { id: s.id, isPart };
+            } catch (err) {
+              return { id: s.id, isPart: false };
+            }
+          }));
+
+          const visible = allSessions
+            .map(s => {
+              const inv = invMap[s.id] || null;
+              return {
+                ...s,
+                isParticipant: !!(checks.find(c => c.id === s.id)?.isPart),
+                invitationStatus: inv ? inv.status : 'NONE',
+                invitationId: inv ? inv.id : null,
+              };
+            })
+            // show only sessions where current user is a participant OR where they created the session OR where they have an invitation
+            .filter(s => s.isParticipant || s.createdById === user.id || s.invitationStatus !== 'NONE');
+
+          setSessionsState(visible);
+        } catch (err) {
+          console.warn('Error checking participant status or loading invitations', err);
+          // Fallback: show none if we couldn't verify participation
+          setSessionsState([]);
+        }
+      } else {
+        // No user -> no sessions
+        setSessionsState([]);
+      }
     } catch (e) {
       console.error('Failed to load sessions', e);
     } finally {
@@ -180,45 +228,65 @@ export default function Calendar() {
   }, [user]);
 
   const mapDtoToUi = (dto: any) => {
-    // dto: SessionResponseDTO
+    // dto: SessionResponseDTO (now has startTime and durationDays)
     const start = dto.startTime || dto.start || null;
-    const end = dto.endTime || dto.end || null;
+    // compute endTime from durationDays (durationDays is integer number of days)
+    const duration = dto.durationDays == null ? dto.duration || 1 : dto.durationDays;
     const startDate = start ? new Date(start) : null;
+    const computedEnd = startDate ? new Date(startDate.getTime() + (duration * 24 * 60 * 60 * 1000)) : null;
     const date = startDate ? startDate.toISOString().split('T')[0] : (dto.date ?? '');
-    const time = startDate ? `${startDate.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}${end ? ' - ' + (new Date(end)).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}) : ''}` : '';
+    const time = startDate ? `${startDate.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}${computedEnd ? ' - ' + computedEnd.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}) : ''}` : '';
     return {
       id: dto.id,
       title: dto.title,
       date,
       time,
       startTime: start,
-      endTime: end,
+      endTime: computedEnd ? computedEnd.toISOString() : null,
       description: dto.description,
       meetingLink: dto.meetingLink,
       groupId: dto.groupId,
       createdById: dto.createdById,
       createdByName: dto.createdByName,
       raw: dto,
+      isParticipant: false,
       type: 'study'
     };
   };
 
   const handleSessionCreated = (created: any) => {
-    try {
-      const mapped = mapDtoToUi(created);
-      setSessionsState((s) => [mapped, ...s]);
-      setLastRefresh(new Date());
-      // Optionally reload to ensure consistency with backend
-      setTimeout(() => loadSessions(), 1000);
-    } catch (e) { console.error(e); }
+    (async () => {
+      try {
+        const mapped = mapDtoToUi(created);
+        // Only add if current user is a participant (creator is auto-participant)
+        if (user) {
+          const isPart = await sessionAPI.isParticipant(mapped.id, user.id).catch(() => false);
+          if (isPart) {
+            setSessionsState((s) => [mapped, ...s]);
+            setLastRefresh(new Date());
+          }
+        }
+        // Also attempt a lightweight reload to keep things consistent
+        setTimeout(() => loadSessions(), 1000);
+      } catch (e) { console.error(e); }
+    })();
   };
 
   const handleSessionUpdated = (updated: any) => {
-    try {
-      const mapped = mapDtoToUi(updated);
-      setSessionsState((s) => s.map((x) => (x.id === mapped.id ? mapped : x)));
-      setLastRefresh(new Date());
-    } catch (e) { console.error(e); }
+    (async () => {
+      try {
+        const mapped = mapDtoToUi(updated);
+        if (user) {
+          const isPart = await sessionAPI.isParticipant(mapped.id, user.id).catch(() => false);
+          setSessionsState((s) => {
+            // If user is participant, upsert; otherwise remove from view
+            if (isPart) return s.map((x) => (x.id === mapped.id ? mapped : x));
+            return s.filter(x => x.id !== mapped.id);
+          });
+          setLastRefresh(new Date());
+        }
+      } catch (e) { console.error(e); }
+    })();
   };
 
   const handleSessionDeleted = (id: number) => {
@@ -370,9 +438,42 @@ export default function Calendar() {
                                         <span>{session.time}</span>
                                       </div>
                                     </div>
-                                    {user?.id === session.createdById && (
-                                      <SessionEditDialog session={session} onSaved={(u) => { handleSessionUpdated(u); }} onDeleted={() => { handleSessionDeleted(session.id); }} />
-                                    )}
+                                    <div className="flex items-center gap-2">
+                                      {user?.id === session.createdById && (
+                                        <SessionEditDialog session={session} onSaved={(u) => { handleSessionUpdated(u); }} onDeleted={() => { handleSessionDeleted(session.id); }} />
+                                      )}
+                                      {user && user.id !== session.createdById && (
+                                        // For non-creators show participant/invitation state
+                                        session.isParticipant ? (
+                                          <Badge variant="outline" className="px-3">Joined</Badge>
+                                        ) : (
+                                          session.invitationStatus === 'PENDING' ? (
+                                            <Badge variant="outline" className="px-3">Invited</Badge>
+                                          ) : session.invitationStatus === 'DECLINED' ? (
+                                            <Button size="sm" onClick={async () => {
+                                              try {
+                                                if (session.invitationId) {
+                                                  await sessionInvitationAPI.rejoinInvitation(session.invitationId, user.id);
+                                                } else {
+                                                  // Fallback: try to add participant directly
+                                                  await sessionAPI.addParticipant(session.id, user.id);
+                                                }
+                                                // Optimistically mark participant and refresh
+                                                setSessionsState(s => s.map(x => x.id === session.id ? { ...x, isParticipant: true, invitationStatus: 'NONE' } : x));
+                                                setTimeout(() => loadSessions(), 800);
+                                              } catch (err) { console.error(err); }
+                                            }}>Rejoin</Button>
+                                          ) : (
+                                            <Button size="sm" onClick={async () => {
+                                              try {
+                                                await sessionAPI.addParticipant(session.id, user.id);
+                                                setSessionsState(s => s.map(x => x.id === session.id ? { ...x, isParticipant: true } : x));
+                                              } catch (err) { console.error(err); }
+                                            }}>Join</Button>
+                                          )
+                                        )
+                                      )}
+                                    </div>
                                   </div>
                                 </div>
                               );
@@ -480,9 +581,39 @@ export default function Calendar() {
                                 <p className="text-sm font-medium truncate">{session.title}</p>
                                 <p className="text-xs text-muted-foreground">{session.time}</p>
                               </div>
-                              {user?.id === session.createdById && (
-                                <SessionEditDialog session={session} onSaved={(u) => { handleSessionUpdated(u); }} onDeleted={() => { handleSessionDeleted(session.id); }} />
-                              )}
+                              <div className="flex items-center gap-2">
+                                {user?.id === session.createdById && (
+                                  <SessionEditDialog session={session} onSaved={(u) => { handleSessionUpdated(u); }} onDeleted={() => { handleSessionDeleted(session.id); }} />
+                                )}
+                                {user && user.id !== session.createdById && (
+                                  session.isParticipant ? (
+                                    <Badge variant="outline" className="px-3">Joined</Badge>
+                                  ) : (
+                                    session.invitationStatus === 'PENDING' ? (
+                                      <Badge variant="outline" className="px-3">Invited</Badge>
+                                    ) : session.invitationStatus === 'DECLINED' ? (
+                                      <Button size="sm" onClick={async () => {
+                                        try {
+                                          if (session.invitationId) {
+                                            await sessionInvitationAPI.rejoinInvitation(session.invitationId, user.id);
+                                          } else {
+                                            await sessionAPI.addParticipant(session.id, user.id);
+                                          }
+                                          setSessionsState(s => s.map(x => x.id === session.id ? { ...x, isParticipant: true, invitationStatus: 'NONE' } : x));
+                                          setTimeout(() => loadSessions(), 800);
+                                        } catch (err) { console.error(err); }
+                                      }}>Rejoin</Button>
+                                    ) : (
+                                      <Button size="sm" onClick={async () => {
+                                        try {
+                                          await sessionAPI.addParticipant(session.id, user.id);
+                                          setSessionsState(s => s.map(x => x.id === session.id ? { ...x, isParticipant: true } : x));
+                                        } catch (err) { console.error(err); }
+                                      }}>Join</Button>
+                                    )
+                                  )
+                                )}
+                              </div>
                             </div>
                           </div>
                         );
@@ -526,9 +657,39 @@ export default function Calendar() {
                                 {new Date(session.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
                               </p>
                             </div>
-                            {user?.id === session.createdById && (
-                              <SessionEditDialog session={session} onSaved={(u) => { handleSessionUpdated(u); }} onDeleted={() => { handleSessionDeleted(session.id); }} />
-                            )}
+                            <div className="flex items-center gap-2">
+                              {user?.id === session.createdById && (
+                                <SessionEditDialog session={session} onSaved={(u) => { handleSessionUpdated(u); }} onDeleted={() => { handleSessionDeleted(session.id); }} />
+                              )}
+                              {user && user.id !== session.createdById && (
+                                session.isParticipant ? (
+                                  <Badge variant="outline" className="px-3">Joined</Badge>
+                                ) : (
+                                  session.invitationStatus === 'PENDING' ? (
+                                    <Badge variant="outline" className="px-3">Invited</Badge>
+                                  ) : session.invitationStatus === 'DECLINED' ? (
+                                    <Button size="sm" onClick={async () => {
+                                      try {
+                                        if (session.invitationId) {
+                                          await sessionInvitationAPI.rejoinInvitation(session.invitationId, user.id);
+                                        } else {
+                                          await sessionAPI.addParticipant(session.id, user.id);
+                                        }
+                                        setSessionsState(s => s.map(x => x.id === session.id ? { ...x, isParticipant: true, invitationStatus: 'NONE' } : x));
+                                        setTimeout(() => loadSessions(), 800);
+                                      } catch (err) { console.error(err); }
+                                    }}>Rejoin</Button>
+                                  ) : (
+                                    <Button size="sm" onClick={async () => {
+                                      try {
+                                        await sessionAPI.addParticipant(session.id, user.id);
+                                        setSessionsState(s => s.map(x => x.id === session.id ? { ...x, isParticipant: true } : x));
+                                      } catch (err) { console.error(err); }
+                                    }}>Join</Button>
+                                  )
+                                )
+                              )}
+                            </div>
                           </div>
                         </div>
                       );

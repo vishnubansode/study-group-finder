@@ -33,7 +33,7 @@ public class Session {
     private LocalDateTime startTime;
 
     @Column(nullable = false)
-    private LocalDateTime endTime;
+    private Integer durationDays;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "created_by", nullable = false)
@@ -70,4 +70,10 @@ public class Session {
 
     @Column
     private LocalDateTime archivedAt;
+
+    public LocalDateTime getComputedEndTime() {
+        if (startTime == null || durationDays == null)
+            return null;
+        return startTime.plusDays(durationDays.longValue());
+    }
 }
