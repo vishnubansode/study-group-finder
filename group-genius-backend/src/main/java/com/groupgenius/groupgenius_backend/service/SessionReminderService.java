@@ -35,6 +35,7 @@ public class SessionReminderService {
     private final SessionRepository sessionRepository;
     private final SessionParticipantRepository participantRepository;
     private final NotificationRepository notificationRepository;
+    private final EmailService emailService;
 
     private enum ReminderType {
         DAY_OF,
@@ -117,6 +118,21 @@ public class SessionReminderService {
         notificationRepository.saveAll(notifications);
         log.info("Sent {} reminder notifications for session {} ({})", notifications.size(), session.getId(),
                 reminderType);
+
+        // Send email reminders to all recipients
+        String emailSubject = String.format("Session Reminder: %s", session.getTitle());
+        for (Notification notification : notifications) {
+            try {
+                emailService.sendNotificationEmail(
+                        notification.getRecipient().getEmail(),
+                        emailSubject,
+                        notification.getMessage());
+                log.info("📧 Reminder email sent to {}", notification.getRecipient().getEmail());
+            } catch (Exception e) {
+                log.error("Failed to send reminder email to {}: {}",
+                        notification.getRecipient().getEmail(), e.getMessage());
+            }
+        }
     }
 
     private void addRecipientFromUser(User user, Session session, String message,

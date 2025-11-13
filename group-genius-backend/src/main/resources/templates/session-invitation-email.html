@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Session Invitation</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f4f4f4;
+        }
+        .container {
+            background-color: #ffffff;
+            border-radius: 10px;
+            padding: 30px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+        .header {
+            text-align: center;
+            padding-bottom: 20px;
+            border-bottom: 3px solid #4f46e5;
+            margin-bottom: 30px;
+        }
+        .header h1 {
+            color: #4f46e5;
+            margin: 0;
+            font-size: 28px;
+        }
+        .icon {
+            font-size: 50px;
+            margin-bottom: 10px;
+        }
+        .invitation-message {
+            background-color: #f0f9ff;
+            border-left: 4px solid #3b82f6;
+            padding: 15px;
+            margin: 20px 0;
+            border-radius: 5px;
+        }
+        .session-details {
+            background-color: #fefce8;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 20px 0;
+        }
+        .session-details h2 {
+            color: #4f46e5;
+            margin-top: 0;
+            font-size: 20px;
+            border-bottom: 2px solid #e5e7eb;
+            padding-bottom: 10px;
+        }
+        .detail-row {
+            display: flex;
+            margin: 12px 0;
+        }
+        .detail-label {
+            font-weight: bold;
+            color: #6b7280;
+            min-width: 120px;
+        }
+        .detail-value {
+            color: #1f2937;
+        }
+        .button-container {
+            text-align: center;
+            margin: 30px 0;
+            padding: 20px 0;
+        }
+        .button {
+            display: inline-block;
+            padding: 14px 32px;
+            margin: 0 10px;
+            text-decoration: none;
+            border-radius: 8px;
+            font-weight: bold;
+            font-size: 16px;
+            transition: all 0.3s ease;
+        }
+        .accept-button {
+            background-color: #10b981;
+            color: #ffffff;
+        }
+        .accept-button:hover {
+            background-color: #059669;
+        }
+        .decline-button {
+            background-color: #ef4444;
+            color: #ffffff;
+        }
+        .decline-button:hover {
+            background-color: #dc2626;
+        }
+        .footer {
+            text-align: center;
+            margin-top: 30px;
+            padding-top: 20px;
+            border-top: 2px solid #e5e7eb;
+            color: #6b7280;
+            font-size: 14px;
+        }
+        .footer-message {
+            margin-bottom: 15px;
+            color: #1f2937;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="icon">📅</div>
+            <h1>Session Invitation</h1>
+        </div>
+
+        <div class="invitation-message">
+            <p th:text="${message}"></p>
+        </div>
+
+        <div class="session-details">
+            <h2>📋 Session Details</h2>
+            <div class="detail-row">
+                <span class="detail-label">📚 Title:</span>
+                <span class="detail-value" th:text="${sessionTitle}"></span>
+            </div>
+            <div class="detail-row">
+                <span class="detail-label">👥 Group:</span>
+                <span class="detail-value" th:text="${groupName}"></span>
+            </div>
+            <div class="detail-row">
+                <span class="detail-label">🕐 Start Time:</span>
+                <span class="detail-value" th:text="${startTime}"></span>
+            </div>
+            <div class="detail-row" th:if="${location}">
+                <span class="detail-label">📍 Location:</span>
+                <span class="detail-value" th:text="${location}"></span>
+            </div>
+            <div class="detail-row" th:if="${description}">
+                <span class="detail-label">📝 Description:</span>
+                <span class="detail-value" th:text="${description}"></span>
+            </div>
+        </div>
+
+        <div class="button-container">
+            <a th:href="${acceptLink}" class="button accept-button">
+                ✓ Accept Invitation
+            </a>
+            <a th:href="${declineLink}" class="button decline-button">
+                ✗ Decline Invitation
+            </a>
+        </div>
+
+        <div class="footer">
+            <p class="footer-message">We look forward to seeing you there! 🎉</p>
+            <p>
+                <strong>GroupGenius Team</strong><br>
+                Building better study groups together
+            </p>
+        </div>
+    </div>
+</body>
+</html>

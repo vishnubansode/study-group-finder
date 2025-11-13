@@ -42,7 +42,7 @@ public class EmailService {
     public CompletableFuture<Void> sendPasswordResetEmail(String userEmail, String resetToken) {
         try {
             String resetLink = frontendUrl + "/reset-password?token=" + resetToken;
-            
+
             if (!emailEnabled) {
                 // Development mode - log to console
                 log.info("===========================================");
@@ -70,12 +70,12 @@ public class EmailService {
             // Production mode - send real email
             sendHtmlEmail(userEmail, "Reset Your GroupGenius Password", createPasswordResetEmail(userEmail, resetLink));
             log.info("Password reset email sent successfully to: {}", userEmail);
-            
+
         } catch (Exception e) {
             log.error("Failed to send password reset email to: {}", userEmail, e);
             throw new RuntimeException("Failed to send password reset email", e);
         }
-        
+
         return CompletableFuture.completedFuture(null);
     }
 
@@ -109,12 +109,12 @@ public class EmailService {
             // Production mode - send real email
             sendHtmlEmail(userEmail, "Welcome to GroupGenius!", createWelcomeEmail(firstName));
             log.info("Welcome email sent successfully to: {}", userEmail);
-            
+
         } catch (Exception e) {
             log.error("Failed to send welcome email to: {}", userEmail, e);
             // Don't throw exception for welcome email failures
         }
-        
+
         return CompletableFuture.completedFuture(null);
     }
 
@@ -126,8 +126,7 @@ public class EmailService {
             String subject,
             String message,
             InputStreamSource attachment,
-            String attachmentFilename
-    ) {
+            String attachmentFilename) {
         try {
             String safeName = senderName == null || senderName.isBlank() ? "Guest" : senderName.trim();
             String safeEmail = senderEmail == null || senderEmail.isBlank() ? fromEmail : senderEmail.trim();
@@ -167,7 +166,8 @@ public class EmailService {
             context.setVariable("queryType", safeQueryType);
             context.setVariable("subject", safeSubject);
             context.setVariable("message", formattedMessage);
-            context.setVariable("submittedAt", LocalDateTime.now().format(DateTimeFormatter.ofPattern("MMM d, yyyy h:mm a")));
+            context.setVariable("submittedAt",
+                    LocalDateTime.now().format(DateTimeFormatter.ofPattern("MMM d, yyyy h:mm a")));
             context.setVariable("hasAttachment", hasAttachment);
             context.setVariable("attachmentName", hasAttachment ? attachmentFilename : "");
 
@@ -187,7 +187,8 @@ public class EmailService {
 
             mailSender.send(mimeMessage);
 
-            log.info("Contact email sent successfully from: {} <{}> (attachment: {})", safeName, safeEmail, hasAttachment ? attachmentFilename : "none");
+            log.info("Contact email sent successfully from: {} <{}> (attachment: {})", safeName, safeEmail,
+                    hasAttachment ? attachmentFilename : "none");
         } catch (Exception e) {
             log.error("Failed to send contact email from: {} <{}>", senderName, senderEmail, e);
             throw new RuntimeException("Failed to send contact email", e);
@@ -221,12 +222,12 @@ public class EmailService {
             // Production mode - send real email
             sendSimpleEmail(userEmail, subject, message);
             log.info("Notification email sent successfully to: {}", userEmail);
-            
+
         } catch (Exception e) {
             log.error("Failed to send notification email to: {}", userEmail, e);
             // Don't throw exception for notification email failures
         }
-        
+
         return CompletableFuture.completedFuture(null);
     }
 
@@ -256,7 +257,7 @@ public class EmailService {
         context.setVariable("userEmail", userEmail);
         context.setVariable("resetLink", resetLink);
         context.setVariable("frontendUrl", frontendUrl);
-        
+
         return templateEngine.process("password-reset-email", context);
     }
 
@@ -264,7 +265,90 @@ public class EmailService {
         Context context = new Context();
         context.setVariable("firstName", firstName);
         context.setVariable("dashboardUrl", frontendUrl + "/dashboard");
-        
+
         return templateEngine.process("welcome-email", context);
+    }
+
+    @Async
+    public CompletableFuture<Void> sendInvitationEmail(
+            String userEmail,
+            Long invitationId,
+            Long groupId,
+            String message,
+            String sessionTitle,
+            String groupName,
+            String startTime,
+            String location,
+            String description) {
+        try {
+            String acceptLink = String.format("%s/groups/%d?invitation=%d&action=accept",
+                    frontendUrl, groupId, invitationId);
+            String declineLink = String.format("%s/groups/%d?invitation=%d&action=decline",
+                    frontendUrl, groupId, invitationId);
+            if (!emailEnabled) {
+                // Development mode - log to console
+                log.info("===========================================");
+                log.info("SESSION INVITATION EMAIL (Development Mode)");
+                log.info("===========================================");
+                log.info("To: {}", userEmail);
+                log.info("Subject: Session Invitation: {}", sessionTitle);
+                log.info("");
+                log.info("{}", message);
+                log.info("");
+                log.info("📋 Session Details:");
+                log.info("Title: {}", sessionTitle);
+                log.info("Group: {}", groupName);
+                log.info("Start Time: {}", startTime);
+                if (location != null && !location.isEmpty()) {
+                    log.info("Location: {}", location);
+                }
+                if (description != null && !description.isEmpty()) {
+                    log.info("Description: {}", description);
+                }
+                log.info("");
+                log.info("Accept: {}", acceptLink);
+                log.info("Decline: {}", declineLink);
+                log.info("");
+                log.info("We look forward to seeing you there!");
+                log.info("GroupGenius Team");
+                log.info("===========================================");
+                return CompletableFuture.completedFuture(null);
+            }
+
+            // Production mode - send real email with HTML template
+            String htmlContent = createInvitationEmail(
+                    message, sessionTitle, groupName, startTime,
+                    location, description, acceptLink, declineLink);
+            sendHtmlEmail(userEmail, "Session Invitation: " + sessionTitle, htmlContent);
+            log.info("Invitation email sent successfully to: {}", userEmail);
+
+        } catch (Exception e) {
+            log.error("Failed to send invitation email to: {}", userEmail, e);
+            // Don't throw exception for invitation email failures
+        }
+
+        return CompletableFuture.completedFuture(null);
+    }
+
+    private String createInvitationEmail(
+            String message,
+            String sessionTitle,
+            String groupName,
+            String startTime,
+            String location,
+            String description,
+            String acceptLink,
+            String declineLink) {
+        Context context = new Context();
+        context.setVariable("message", message);
+        context.setVariable("sessionTitle", sessionTitle);
+        context.setVariable("groupName", groupName);
+        context.setVariable("startTime", startTime);
+        context.setVariable("location", location);
+        context.setVariable("description", description);
+        context.setVariable("acceptLink", acceptLink);
+        context.setVariable("declineLink", declineLink);
+
+        return templateEngine.process("session-invitation-email", context);
     }
 }

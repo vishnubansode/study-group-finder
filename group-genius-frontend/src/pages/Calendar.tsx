@@ -33,12 +33,19 @@ const toLocalDateKey = (date: Date) =>
 // sessions will be loaded from backend for user's groups
 const DEFAULT_SESSIONS: any[] = [];
 
-const sessionTypes = {
-  study: { color: 'bg-primary', icon: Users, label: 'Study Session' },
-  deadline: { color: 'bg-destructive', icon: AlertCircle, label: 'Deadline' },
-  class: { color: 'bg-accent', icon: BookOpen, label: 'Class' },
-  meeting: { color: 'bg-secondary', icon: Users, label: 'Meeting' },
-  informal: { color: 'bg-muted-foreground', icon: Coffee, label: 'Informal' }
+// Helper to generate a color based on session ID for visual variety
+const getSessionColor = (sessionId: number) => {
+  const colors = [
+    'bg-blue-500',
+    'bg-purple-500',
+    'bg-pink-500',
+    'bg-green-500',
+    'bg-orange-500',
+    'bg-teal-500',
+    'bg-indigo-500',
+    'bg-rose-500'
+  ];
+  return colors[sessionId % colors.length];
 };
 
 const monthNames = [
@@ -90,15 +97,36 @@ export default function Calendar() {
     });
   };
 
-  const getSessionsForDate = (date: string) => {
-    return sessionsState.filter(session => session.date === date);
-  };
+    const dateKeyToDate = (dateKey: string) => {
+      const parts = dateKey.split('-').map((p) => Number(p));
+      return new Date(parts[0], parts[1] - 1, parts[2]);
+    };
 
-  const getSessionsForDay = (day: number | null) => {
-    if (!day) return [];
-    const dateString = `${currentViewDate.getFullYear()}-${String(currentViewDate.getMonth() + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-    return getSessionsForDate(dateString);
-  };
+    // Return sessions that occur on the provided local date (dateKey in YYYY-MM-DD)
+    const getSessionsForDate = (dateKey: string) => {
+      return sessionsState.filter((session) => {
+        // If map didn't provide a parsed startDateObj fallback to single-day match
+        if (!session.startDateObj) return session.date === dateKey;
+
+        const start = new Date(session.startDateObj);
+        start.setHours(0, 0, 0, 0);
+        const duration = session.durationDays ?? 1;
+        const end = new Date(start);
+        // session spans `duration` days including the start day
+        end.setDate(end.getDate() + duration - 1);
+
+        const target = dateKeyToDate(dateKey);
+        target.setHours(0, 0, 0, 0);
+
+        return target >= start && target <= end;
+      });
+    };
+
+    const getSessionsForDay = (day: number | null) => {
+      if (!day) return [];
+      const dateString = `${currentViewDate.getFullYear()}-${String(currentViewDate.getMonth() + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+      return getSessionsForDate(dateString);
+    };
 
   const navigateMonth = (direction: 'prev' | 'next') => {
     const newDate = new Date(currentViewDate);
@@ -259,6 +287,9 @@ export default function Calendar() {
       id: dto.id,
       title: dto.title,
       date,
+      // expose parsed start Date object and duration so calendar can render multi-day spans
+      startDateObj: startDate,
+      durationDays: duration,
       time,
       startTime: start,
       endTime: computedEnd ? computedEnd.toISOString() : null,
@@ -440,16 +471,15 @@ export default function Calendar() {
                               <div className="h-px flex-1 bg-border" />
                             </div>
                             {items.map((session) => {
-                              const sessionType = sessionTypes[session.type as keyof typeof sessionTypes];
-                              const Icon = sessionType.icon;
+                              const sessionColor = getSessionColor(session.id);
                               return (
                                 <div
                                   key={session.id}
                                   className="group relative bg-gradient-to-br from-card to-card/50 rounded-xl border border-border/50 p-3 shadow-sm hover:shadow-md transition-all duration-200"
                                 >
                                   <div className="flex items-start gap-3">
-                                    <div className={`${sessionType.color} w-12 h-12 rounded-xl flex items-center justify-center shadow-sm flex-shrink-0`}>
-                                      <Icon className="w-6 h-6 text-white" />
+                                    <div className={`${sessionColor} w-12 h-12 rounded-xl flex items-center justify-center shadow-sm flex-shrink-0`}>
+                                      <CalendarIcon className="w-6 h-6 text-white" />
                                     </div>
                                     <div className="flex-1 min-w-0">
                                       <h3 className="font-semibold text-sm text-foreground mb-1 truncate">{session.title}</h3>
@@ -543,11 +573,11 @@ export default function Calendar() {
                                 </div>
                                 <div className="space-y-1.5">
                                   {daySessions.slice(0, 3).map((session) => {
-                                    const sessionType = sessionTypes[session.type as keyof typeof sessionTypes];
+                                    const sessionColor = getSessionColor(session.id);
                                     return (
                                       <div
                                         key={session.id}
-                                        className={`text-xs px-2 py-1.5 rounded-lg text-white truncate cursor-pointer transition-all hover:scale-105 hover:shadow-md ${sessionType.color}`}
+                                        className={`text-xs px-2 py-1.5 rounded-lg text-white truncate cursor-pointer transition-all hover:scale-105 hover:shadow-md ${sessionColor}`}
                                         title={`${session.title} - ${session.time}`}
                                       >
                                         {session.title}
@@ -589,13 +619,12 @@ export default function Calendar() {
                   {todaySessions.length > 0 ? (
                     <div className="space-y-2">
                       {todaySessions.slice(0, 4).map((session) => {
-                        const sessionType = sessionTypes[session.type as keyof typeof sessionTypes];
-                        const Icon = sessionType.icon;
+                        const sessionColor = getSessionColor(session.id);
                         return (
                           <div key={session.id} className="group p-3 rounded-xl bg-gradient-to-br from-card to-muted/10 border border-border/40 hover:border-border hover:shadow-md transition-all">
                             <div className="flex items-center gap-3">
-                              <div className={`${sessionType.color} w-10 h-10 rounded-lg flex items-center justify-center shadow-sm flex-shrink-0`}>
-                                <Icon className="w-5 h-5 text-white" />
+                              <div className={`${sessionColor} w-10 h-10 rounded-lg flex items-center justify-center shadow-sm flex-shrink-0`}>
+                                <CalendarIcon className="w-5 h-5 text-white" />
                               </div>
                               <div className="flex-1 min-w-0">
                                 <p className="text-sm font-medium truncate">{session.title}</p>
@@ -663,13 +692,12 @@ export default function Calendar() {
                 <CardContent className="p-4">
                   <div className="space-y-2">
                     {upcomingSessions.slice(0, 5).map((session) => {
-                      const sessionType = sessionTypes[session.type as keyof typeof sessionTypes];
-                      const Icon = sessionType.icon;
+                      const sessionColor = getSessionColor(session.id);
                       return (
                         <div key={session.id} className="group p-3 rounded-xl bg-gradient-to-br from-card to-muted/10 border border-border/40 hover:border-border hover:shadow-md transition-all">
                           <div className="flex items-center gap-3">
-                            <div className={`${sessionType.color} w-10 h-10 rounded-lg flex items-center justify-center shadow-sm flex-shrink-0`}>
-                              <Icon className="w-5 h-5 text-white" />
+                            <div className={`${sessionColor} w-10 h-10 rounded-lg flex items-center justify-center shadow-sm flex-shrink-0`}>
+                              <CalendarIcon className="w-5 h-5 text-white" />
                             </div>
                             <div className="flex-1 min-w-0">
                               <p className="text-sm font-medium truncate">{session.title}</p>
@@ -711,28 +739,6 @@ export default function Calendar() {
                               )}
                             </div>
                           </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </CardContent>
-              </Card>
-
-              {/* Session Types Legend */}
-              <Card className="border border-border/50 shadow-lg rounded-2xl overflow-hidden">
-                <CardHeader className="bg-gradient-to-br from-card to-muted/20 border-b border-border/50 pb-4">
-                  <CardTitle className="text-sm">Session Types</CardTitle>
-                </CardHeader>
-                <CardContent className="p-4">
-                  <div className="grid gap-2">
-                    {Object.entries(sessionTypes).map(([key, type]) => {
-                      const Icon = type.icon;
-                      return (
-                        <div key={key} className="flex items-center gap-3 p-2 rounded-lg hover:bg-muted/50 transition-colors">
-                          <div className={`w-8 h-8 ${type.color} rounded-lg flex items-center justify-center shadow-sm`}>
-                            <Icon className="w-4 h-4 text-white" />
-                          </div>
-                          <span className="text-sm text-foreground">{type.label}</span>
                         </div>
                       );
                     })}

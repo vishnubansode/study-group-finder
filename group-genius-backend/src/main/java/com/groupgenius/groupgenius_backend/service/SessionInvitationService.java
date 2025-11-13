@@ -8,6 +8,7 @@ import com.groupgenius.groupgenius_backend.mapper.SessionInvitationMapper;
 import com.groupgenius.groupgenius_backend.repository.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -29,6 +30,10 @@ public class SessionInvitationService {
         private final GroupMemberRepository groupMemberRepository;
         private final NotificationRepository notificationRepository;
         private final JdbcTemplate jdbcTemplate;
+        private final EmailService emailService;
+
+        @Value("${app.frontend.url}")
+        private String frontendUrl;
 
         /**
          * Add creator as a participant (no invitation needed)
@@ -104,6 +109,29 @@ public class SessionInvitationService {
                                                 .build();
 
                                 notificationRepository.save(notification);
+
+                                // Send email invitation with Accept/Decline buttons
+                                try {
+                                        String formattedStartTime = session.getStartTime() != null
+                                                        ? session.getStartTime().toString().replace("T", " at ")
+                                                        : "TBD";
+
+                                        emailService.sendInvitationEmail(
+                                                        user.getEmail(),
+                                                        invitation.getId(),
+                                                        session.getGroup().getId(),
+                                                        message,
+                                                        session.getTitle(),
+                                                        session.getGroup().getGroupName(),
+                                                        formattedStartTime,
+                                                        null, // location not available in Session entity
+                                                        session.getDescription());
+                                        log.info("📧 Invitation email with Accept/Decline buttons sent to {}",
+                                                        user.getEmail());
+                                } catch (Exception e) {
+                                        log.error("Failed to send invitation email to {}: {}", user.getEmail(),
+                                                        e.getMessage());
+                                }
 
                                 log.info("✉️ Invitation sent to user {} for session {}", userId, session.getId());
 
