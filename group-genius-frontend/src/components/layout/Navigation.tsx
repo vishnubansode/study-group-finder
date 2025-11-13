@@ -16,6 +16,7 @@ import {
 import { useAuth } from '@/contexts/AuthContext';
 import { NotificationViewer } from '@/components/common/NotificationViewer';
 import { notificationAPI } from '@/lib/api/notificationApi';
+import { resolveMediaUrl } from '@/lib/media';
 
 const navigationItems = [
   { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
@@ -65,16 +66,7 @@ export function Navigation() {
   const initials = user ? `${user.firstName?.charAt(0) ?? ''}${user.lastName?.charAt(0) ?? ''}`.toUpperCase() : '';
   // Build image src: prefer `avatar` then `profileImageUrl`. If value is a full URL, use it as-is.
   const rawImageValue = user?.avatar || user?.profileImageUrl || undefined;
-  let imageSrc: string | undefined = undefined;
-  if (rawImageValue) {
-    if (rawImageValue.startsWith('http://') || rawImageValue.startsWith('https://')) {
-      imageSrc = rawImageValue;
-    } else {
-      // Backend stores path or filename; follow same pattern as Profile.tsx
-      const filename = rawImageValue.split('/').pop();
-      imageSrc = filename ? `http://localhost:8080/api/files/${filename}` : undefined;
-    }
-  }
+  const imageSrc = resolveMediaUrl(rawImageValue) ?? undefined;
 
   // Create dynamic menu items with user-specific dashboard URL
   const getDynamicMenuItems = () => {

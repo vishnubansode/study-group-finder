@@ -35,7 +35,7 @@ public class ChatMessage {
     @Column(name = "edited")
     private Boolean edited = false;
 
-    @Column(name = "attachment_url")
+    @Column(name = "file_url", columnDefinition = "TEXT")
     private String attachmentUrl;
 
     @Column(name = "attachment_type")

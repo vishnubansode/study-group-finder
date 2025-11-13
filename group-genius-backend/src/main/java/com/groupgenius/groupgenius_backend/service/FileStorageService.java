@@ -1,40 +1,56 @@
 package com.groupgenius.groupgenius_backend.service;
 
+import com.cloudinary.Cloudinary;
+import com.cloudinary.utils.ObjectUtils;
+import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.nio.file.StandardCopyOption;
-import java.util.Objects;
+import java.util.Map;
 
 @Service
+@RequiredArgsConstructor
 public class FileStorageService {
 
-    private final Path fileStorageLocation;
+    private final Cloudinary cloudinary;
 
-    public FileStorageService() {
-        // Use relative path from current working directory
-        String currentDir = System.getProperty("user.dir");
-        this.fileStorageLocation = Paths.get(currentDir, "uploads");
-
-        try {
-            Files.createDirectories(this.fileStorageLocation);
-        } catch (Exception ex) {
-            throw new RuntimeException("Could not create upload directory: " + this.fileStorageLocation, ex);
-        }
-    }
+    @Value("${cloudinary.upload-folder:group-genius}")
+    private String uploadFolder;
 
     public String storeFile(MultipartFile file) throws IOException {
-        String fileName = StringUtils.cleanPath(Objects.requireNonNull(file.getOriginalFilename()));
-        String newFileName = System.currentTimeMillis() + "_" + fileName;
+        @SuppressWarnings("unchecked")
+        Map<String, Object> uploadOptions = (Map<String, Object>) ObjectUtils.asMap(
+                "resource_type", "auto",
+                "folder", uploadFolder,
+                "public_id", generatePublicId(file.getOriginalFilename()));
 
-        Path targetLocation = this.fileStorageLocation.resolve(newFileName);
-        Files.copy(file.getInputStream(), targetLocation, StandardCopyOption.REPLACE_EXISTING);
+        @SuppressWarnings("unchecked")
+        Map<String, Object> uploadResult = (Map<String, Object>) cloudinary.uploader().upload(file.getBytes(),
+                uploadOptions);
 
-        return "/uploads/" + newFileName;
+        Object secureUrl = uploadResult.get("secure_url");
+        if (secureUrl instanceof String secureUrlString && !secureUrlString.isBlank()) {
+            return secureUrlString;
+        }
+
+        Object url = uploadResult.get("url");
+        if (url instanceof String urlString && !urlString.isBlank()) {
+            return urlString;
+        }
+
+        throw new IOException("Cloudinary upload did not return a URL");
+    }
+
+    private String generatePublicId(String originalFilename) {
+        String filename = StringUtils.getFilename(originalFilename);
+        if (filename == null || filename.isBlank()) {
+            filename = "file";
+        }
+
+        String sanitized = filename.replaceAll("[^a-zA-Z0-9._-]", "_");
+        return System.currentTimeMillis() + "_" + sanitized;
     }
 }

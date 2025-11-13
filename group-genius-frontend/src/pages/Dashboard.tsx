@@ -2,6 +2,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { resolveMediaUrl } from '@/lib/media';
 import { 
   Users, 
   Calendar, 
@@ -129,18 +130,7 @@ export default function Dashboard() {
               <CardContent className="pt-6">
                 <div className="flex flex-col sm:flex-row items-center sm:items-start gap-4">
                   <Avatar className="w-24 h-24 border-4 border-background shadow-lg">
-                    {(() => {
-                      const raw = user?.avatar || user?.profileImageUrl;
-                      let src: string | undefined;
-                      if (raw) {
-                        if (raw.startsWith('http://') || raw.startsWith('https://')) src = raw;
-                        else {
-                          const filename = raw.split('/').pop();
-                          src = filename ? `http://localhost:8080/api/files/${filename}` : undefined;
-                        }
-                      }
-                      return <AvatarImage src={src} />;
-                    })()}
+                    <AvatarImage src={resolveMediaUrl(user?.avatar || user?.profileImageUrl) ?? undefined} />
                     <AvatarFallback className="text-2xl font-bold bg-gradient-to-br from-primary to-secondary text-white">
                       {user?.firstName?.[0]}{user?.lastName?.[0]}
                     </AvatarFallback>

@@ -27,6 +27,7 @@ import {
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/components/ui/use-toast';
 import { Course } from '@/types/course';
+import { resolveMediaUrl } from '@/lib/media';
 
 const API_BASE_URL = 'http://localhost:8080/api';
 
@@ -275,6 +276,8 @@ export default function Profile() {
     );
   }
 
+  const profileImageSrc = resolveMediaUrl(user.profileImageUrl);
+
   return (
     <div className="min-h-screen bg-background pb-24 lg:pb-8">
       {/* Profile Header */}
@@ -284,9 +287,9 @@ export default function Profile() {
             <div className="flex items-center space-x-6">
               <div className="relative">
                 <div className="w-24 h-24 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-2xl font-bold text-white">
-                  {user.profileImageUrl ? (
+                  {profileImageSrc ? (
                     <img 
-                      src={`http://localhost:8080/api/files/${user.profileImageUrl?.split('/').pop()}`}
+                      src={profileImageSrc}
                       alt="Profile" 
                       className="w-24 h-24 rounded-full object-cover border-4 border-white"
                       onError={(e) => {
@@ -295,7 +298,7 @@ export default function Profile() {
                       }}
                     />
                   ) : null}
-                  {!user.profileImageUrl && (
+                  {!profileImageSrc && (
                     <span>{user.firstName?.[0]}{user.lastName?.[0]}</span>
                   )}
                 </div>

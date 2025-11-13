@@ -1,66 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Pencil, Trash2, MoreVertical, Download, FileText, Music, Mic, Reply, Smile } from "lucide-react";
-
-const API_ROOT = (import.meta?.env?.VITE_API_BASE_URL ?? "http://localhost:8080").replace(/\/$/, "");
-
-
-
-const resolveMediaUrl = (path) => {
-  if (!path) return null;
-  if (path.startsWith("http://") || path.startsWith("https://")) {
-    return path;
-  }
-
-  const normalized = path.startsWith("/") ? path : `/${path}`;
-  if (normalized.startsWith("/uploads/")) {
-    const filenameWithParams = normalized.split("/").pop();
-    const filename = filenameWithParams ? filenameWithParams.split("?")[0] : null;
-    if (filename) {
-      return `${API_ROOT}/api/files/${filename}`;
-    }
-  }
-
-  return `${API_ROOT}${normalized}`;
-};
-
-const resolveDocumentViewUrl = (path) => {
-  if (!path) return null;
-  if (path.startsWith("http://") || path.startsWith("https://")) {
-    return path;
-  }
-
-  const normalized = path.startsWith("/") ? path : `/${path}`;
-  if (normalized.startsWith("/uploads/")) {
-    const filenameWithParams = normalized.split("/").pop();
-    const filename = filenameWithParams ? filenameWithParams.split("?")[0] : null;
-    if (filename) {
-      return `${API_ROOT}/api/files/view/${filename}`;
-    }
-  }
-
-  return `${API_ROOT}${normalized}`;
-};
-
-const resolveDownloadUrl = (path) => {
-  if (!path) return null;
-  if (path.startsWith("http://") || path.startsWith("https://")) {
-    if (path.includes("/api/files/download/")) return path;
-    if (path.includes("/api/files/")) return path.replace("/api/files/", "/api/files/download/");
-    return path;
-  }
-
-  const normalized = path.startsWith("/") ? path : `/${path}`;
-  if (normalized.startsWith("/uploads/")) {
-    const filenameWithParams = normalized.split("/").pop();
-    const filename = filenameWithParams ? filenameWithParams.split("?")[0] : null;
-    if (filename) {
-      return `${API_ROOT}/api/files/download/${filename}`;
-    }
-  }
-
-  return `${API_ROOT}${normalized}`;
-};
+import { resolveMediaUrl, resolveDocumentUrl, resolveDownloadUrl } from "@/lib/media";
 
 const formatTime = (ts) => {
   try {
@@ -131,7 +72,7 @@ const MessageBubble = ({ message, isOwn, onEdit, onDelete, onReply, onReact }) =
   const isVideoAttachment = hasAttachment && attachmentType === "VIDEO";
   const isAudioAttachment = hasAttachment && attachmentType === "AUDIO";
   const isDocumentAttachment = hasAttachment && !isImageAttachment && !isVideoAttachment && !isAudioAttachment;
-  const documentViewUrl = isDocumentAttachment ? resolveDocumentViewUrl(message?.attachmentUrl) : null;
+  const documentViewUrl = isDocumentAttachment ? resolveDocumentUrl(message?.attachmentUrl) : null;
   const downloadUrl = isDocumentAttachment ? resolveDownloadUrl(message?.attachmentUrl) : null;
 
   const canEdit = isOwn && typeof onEdit === "function";

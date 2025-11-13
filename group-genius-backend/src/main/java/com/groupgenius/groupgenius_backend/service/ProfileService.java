@@ -68,6 +68,7 @@ public class ProfileService {
 
         String imageUrl = fileStorageService.storeFile(avatar);
         user.setProfileImageUrl(imageUrl);
-        return UserMapper.toResponse(user);
+        User saved = userRepository.save(user);
+        return UserMapper.toResponse(saved);
     }
 }
