@@ -1,9 +1,8 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Card, CardContent } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Clock, Bell, Calendar, Users, Sparkles, AlertCircle, CheckCircle2, Info, Plus, X, Save, Edit2, Trash2 } from 'lucide-react';
+import { Clock, Calendar, Users, Sparkles,StickyNote, AlertCircle, CheckCircle2, Info, Plus, X, Save, Edit2, Trash2 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { groupAPI } from '@/lib/api/groupApi';
 import { sessionAPI } from '@/lib/api/sessionApi';
@@ -40,13 +39,6 @@ interface PageResponse<T> {
   items?: T[];
 }
 
-interface Notification {
-  id: string;
-  type: 'info' | 'success' | 'warning' | 'reminder';
-  message: string;
-  time: string;
-  unread?: boolean;
-}
 
 interface StickyNote {
   id: string;
@@ -59,9 +51,10 @@ export function Sidebar() {
   const { user } = useAuth();
   const [nextSession, setNextSession] = useState<Session | null>(null);
   const [timeRemaining, setTimeRemaining] = useState<string>('');
-  const [notifications, setNotifications] = useState<Notification[]>([]);
+  
   const [groups, setGroups] = useState<Group[]>([]);
   const [stickyNotes, setStickyNotes] = useState<StickyNote[]>([]);
+  const [noteAssignments, setNoteAssignments] = useState<Record<string, string>>({});
   const [editingNoteId, setEditingNoteId] = useState<string | null>(null);
   const [editingContent, setEditingContent] = useState<string>('');
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -118,31 +111,7 @@ export function Sidebar() {
 
       setNextSession(upcoming);
 
-      // Generate sample notifications
-      const sampleNotifications: Notification[] = [
-        {
-          id: '1',
-          type: 'reminder',
-          message: 'Study session starting soon',
-          time: '2m ago',
-          unread: true
-        },
-        {
-          id: '2',
-          type: 'info',
-          message: 'New member joined your group',
-          time: '15m ago',
-          unread: true
-        },
-        {
-          id: '3',
-          type: 'success',
-          message: 'Assignment deadline extended',
-          time: '1h ago',
-          unread: false
-        }
-      ];
-      setNotifications(sampleNotifications);
+      // no-op: notifications removed from sidebar
     } catch (e) {
       console.error('Failed to load sessions', e);
     }
@@ -174,6 +143,32 @@ export function Sidebar() {
       };
       setStickyNotes([initialNote]);
     }
+    
+    // Load note assignments
+    const savedAssignments = localStorage.getItem(`stickyNoteAssignments_${user.id}`);
+    if (savedAssignments) {
+      try {
+        setNoteAssignments(JSON.parse(savedAssignments));
+      } catch (e) {
+        console.error('Failed to load note assignments', e);
+      }
+    }
+  }, [user]);
+
+  // Reload assignments periodically to sync with calendar
+  useEffect(() => {
+    if (!user) return;
+    const interval = setInterval(() => {
+      const savedAssignments = localStorage.getItem(`stickyNoteAssignments_${user.id}`);
+      if (savedAssignments) {
+        try {
+          setNoteAssignments(JSON.parse(savedAssignments));
+        } catch (e) {
+          console.error('Failed to reload note assignments', e);
+        }
+      }
+    }, 1000); // Check every second for assignment changes
+    return () => clearInterval(interval);
   }, [user]);
 
   // Save sticky notes to localStorage
@@ -183,6 +178,10 @@ export function Sidebar() {
   }, [stickyNotes, user]);
 
   const addStickyNote = () => {
+    if (stickyNotes.length >= 6) {
+      alert('Maximum 6 sticky notes allowed');
+      return;
+    }
     const colors: StickyNote['color'][] = ['yellow', 'pink', 'blue', 'green'];
     const rotations = [-1, 0.5, -0.5, 1];
     const randomColor = colors[Math.floor(Math.random() * colors.length)];
@@ -299,7 +298,9 @@ export function Sidebar() {
     return () => clearInterval(interval);
   }, [nextSession]);
 
-  const getNotificationIcon = (type: Notification['type']) => {
+  type NotificationType = 'success' | 'warning' | 'reminder' | 'info';
+
+  const getNotificationIcon = (type: NotificationType) => {
     switch (type) {
       case 'success':
         return <CheckCircle2 className="w-4 h-4 text-green-500" />;
@@ -307,10 +308,13 @@ export function Sidebar() {
         return <AlertCircle className="w-4 h-4 text-yellow-500" />;
       case 'reminder':
         return <Clock className="w-4 h-4 text-blue-500" />;
+      case 'info':
       default:
         return <Info className="w-4 h-4 text-blue-500" />;
     }
   };
+
+  // Notifications feature removed from sidebar
 
   if (!user) {
     return null;
@@ -319,7 +323,7 @@ export function Sidebar() {
   return (
     <div className="hidden lg:flex w-64 bg-card border-r border-border h-screen fixed left-0 top-16 z-30">
       <ScrollArea className="h-full w-full">
-        <div className="p-4 pb-6 space-y-4">
+        <div className="p-4 pb-40 space-y-4">
           {/* Next Session Card with Violet Gradient */}
           <Card className="border-0 shadow-lg overflow-hidden bg-gradient-to-br from-violet-500 via-purple-600 to-indigo-600 text-white">
             <CardContent className="p-4">
@@ -373,8 +377,8 @@ export function Sidebar() {
           <div className="space-y-3">
             <div className="flex items-center justify-between mb-2">
               <h3 className="text-sm font-semibold text-muted-foreground flex items-center gap-2">
-                <Sparkles className="w-4 h-4" />
-                Sticky Notes
+                <StickyNote className="w-4 h-4" />
+                Sticky Notes ({stickyNotes.length}/6)
               </h3>
               <Button
                 variant="ghost"
@@ -382,19 +386,42 @@ export function Sidebar() {
                 className="h-7 w-7 p-0"
                 onClick={addStickyNote}
                 title="Add new note"
+                disabled={stickyNotes.length >= 6}
               >
                 <Plus className="w-4 h-4" />
               </Button>
             </div>
             
-            {stickyNotes.map((note) => {
+            {(() => {
+              // Filter out notes that are assigned to calendar dates
+              const assignedNoteIds = new Set(Object.keys(noteAssignments));
+              const unassignedNotes = stickyNotes.filter(note => !assignedNoteIds.has(note.id));
+              
+              if (unassignedNotes.length === 0) {
+                return (
+                  <div className="text-center py-8 text-muted-foreground text-xs">
+                    <StickyNote className="w-8 h-8 mx-auto mb-2 opacity-50" />
+                    <p>{stickyNotes.length === 0 ? 'No sticky notes yet' : 'All notes are on the calendar'}</p>
+                    <p className="mt-1">{stickyNotes.length === 0 ? 'Click + to create one' : 'Drag notes from calendar or create new ones'}</p>
+                  </div>
+                );
+              }
+              
+              return unassignedNotes.map((note) => {
               const colors = getNoteColors(note.color);
               const isEditing = editingNoteId === note.id;
               
               return (
                 <div
                   key={note.id}
-                  className={`relative ${colors.bg} rounded-lg border-2 ${colors.border} shadow-md transform`}
+                  draggable={!isEditing}
+                  onDragStart={(e) => {
+                    if (!isEditing) {
+                      e.dataTransfer.setData('application/json', JSON.stringify(note));
+                      e.dataTransfer.effectAllowed = 'copy';
+                    }
+                  }}
+                  className={`relative ${colors.bg} rounded-lg border-2 ${colors.border} shadow-md transform ${!isEditing ? 'cursor-move hover:shadow-lg' : ''}`}
                   style={{ transform: `rotate(${note.rotation}deg)` }}
                 >
                   <div className={`absolute top-2 right-2 w-6 h-6 ${colors.circle} rounded-full opacity-50`}></div>
@@ -494,74 +521,11 @@ export function Sidebar() {
                   )}
                 </div>
               );
-            })}
+            });
+            })()}
           </div>
 
-          {/* Notifications Section */}
-          <Card className="border border-border shadow-lg bg-gradient-to-br from-card to-muted/20 mb-4">
-            <CardContent className="p-4">
-              <div className="flex items-center gap-2 mb-4">
-                <div className="w-8 h-8 bg-primary/10 rounded-lg flex items-center justify-center">
-                  <Bell className="w-4 h-4 text-primary" />
-                </div>
-                <h3 className="text-sm font-bold flex-1">Notifications</h3>
-                {notifications.filter(n => n.unread).length > 0 && (
-                  <Badge variant="destructive" className="h-5 min-w-5 rounded-full px-1.5 flex items-center justify-center text-xs font-bold">
-                    {notifications.filter(n => n.unread).length}
-                  </Badge>
-                )}
-              </div>
-              
-              <div className="space-y-2.5">
-                {notifications.length > 0 ? (
-                  notifications.map((notification) => (
-                    <div
-                      key={notification.id}
-                      className={`group relative p-3 rounded-xl border transition-all duration-200 ${
-                        notification.unread
-                          ? 'bg-gradient-to-r from-primary/10 via-primary/5 to-transparent border-primary/30 shadow-md hover:shadow-lg'
-                          : 'bg-muted/40 border-border/60 hover:bg-muted/60 hover:border-border'
-                      }`}
-                    >
-                      {notification.unread && (
-                        <div className="absolute left-0 top-0 bottom-0 w-1 bg-primary rounded-l-xl"></div>
-                      )}
-                      <div className="flex items-start gap-3 pl-1">
-                        <div className={`mt-0.5 p-1.5 rounded-lg ${
-                          notification.unread 
-                            ? 'bg-primary/20' 
-                            : 'bg-muted'
-                        }`}>
-                          {getNotificationIcon(notification.type)}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <p className={`text-xs font-semibold leading-tight mb-1 ${
-                            notification.unread ? 'text-foreground' : 'text-muted-foreground'
-                          }`}>
-                            {notification.message}
-                          </p>
-                          <div className="flex items-center gap-2">
-                            <p className="text-xs text-muted-foreground">{notification.time}</p>
-                            {notification.unread && (
-                              <Badge variant="secondary" className="h-4 px-1.5 text-[10px]">
-                                New
-                              </Badge>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  ))
-                ) : (
-                  <div className="text-center py-6">
-                    <Bell className="w-8 h-8 mx-auto mb-2 text-muted-foreground opacity-50" />
-                    <p className="text-xs text-muted-foreground">No notifications</p>
-                    <p className="text-xs text-muted-foreground/70 mt-1">You're all caught up!</p>
-                  </div>
-                )}
-              </div>
-            </CardContent>
-          </Card>
+          {/* Notifications feature removed */}
         </div>
       </ScrollArea>
     </div>

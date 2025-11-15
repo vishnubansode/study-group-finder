@@ -61,6 +61,9 @@ export default function Calendar() {
   const [currentViewDate, setCurrentViewDate] = useState(new Date(currentYear, currentMonth, 1));
   const { user } = useAuth();
   const [sessionsState, setSessionsState] = useState<any[]>(DEFAULT_SESSIONS);
+  const [stickyNotes, setStickyNotes] = useState<any[]>([]);
+  const [noteAssignments, setNoteAssignments] = useState<Record<string, string>>({});
+  const [expandedNoteId, setExpandedNoteId] = useState<string | null>(null);
   const [invitationMap, setInvitationMap] = useState<Record<number, { id: number; status: string }>>({});
   const [loadingSessions, setLoadingSessions] = useState(false);
   const [lastRefresh, setLastRefresh] = useState<Date>(new Date());
@@ -249,6 +252,34 @@ export default function Calendar() {
     loadSessions();
   }, [user]);
 
+  // Load sticky notes and assignments from localStorage
+  useEffect(() => {
+    if (!user) return;
+    const savedNotes = localStorage.getItem(`stickyNotes_${user.id}`);
+    if (savedNotes) {
+      try {
+        setStickyNotes(JSON.parse(savedNotes));
+      } catch (e) {
+        console.error('Failed to load sticky notes', e);
+      }
+    }
+
+    const savedAssign = localStorage.getItem(`stickyNoteAssignments_${user.id}`);
+    if (savedAssign) {
+      try {
+        setNoteAssignments(JSON.parse(savedAssign));
+      } catch (e) {
+        console.error('Failed to load sticky note assignments', e);
+      }
+    }
+  }, [user]);
+
+  // Persist assignments when changed
+  useEffect(() => {
+    if (!user) return;
+    localStorage.setItem(`stickyNoteAssignments_${user.id}`, JSON.stringify(noteAssignments));
+  }, [noteAssignments, user]);
+
   // Auto-refresh sessions every 30 seconds to show newly created sessions by other users
   useEffect(() => {
     if (!user) return;
@@ -347,6 +378,7 @@ export default function Calendar() {
 
   // Responsive breakpoint detection for mobile view
   const [isMobile, setIsMobile] = useState<boolean>(false);
+  const [showMobileCalendar, setShowMobileCalendar] = useState<boolean>(false);
   const [timeAgo, setTimeAgo] = useState<string>('just now');
 
   useEffect(() => {
@@ -441,6 +473,28 @@ export default function Calendar() {
               <ChevronRight className="w-5 h-5" />
             </Button>
           </div>
+          
+          {/* Mobile View Toggle */}
+          {isMobile && (
+            <div className="flex gap-2">
+              <Button
+                variant={!showMobileCalendar ? "default" : "outline"}
+                size="sm"
+                onClick={() => setShowMobileCalendar(false)}
+                className="text-xs"
+              >
+                List View
+              </Button>
+              <Button
+                variant={showMobileCalendar ? "default" : "outline"}
+                size="sm"
+                onClick={() => setShowMobileCalendar(true)}
+                className="text-xs"
+              >
+                Calendar View
+              </Button>
+            </div>
+          )}
         </div>
 
         <div className="grid grid-cols-1 xl:grid-cols-12 gap-6">
@@ -448,8 +502,8 @@ export default function Calendar() {
           <div className="xl:col-span-9">
             <Card className="border border-border/50 shadow-lg rounded-2xl overflow-hidden">
               <CardContent className="p-0">
-                {/* Mobile: List View | Desktop: Grid View */}
-                {isMobile ? (
+                {/* Mobile: List View or Calendar | Desktop: Grid View */}
+                {isMobile && !showMobileCalendar ? (
                   <div className="p-4 space-y-3">
                     {Object.keys(sessionsByDate).length === 0 ? (
                       <div className="text-center py-12">
@@ -475,11 +529,16 @@ export default function Calendar() {
                               return (
                                 <div
                                   key={session.id}
-                                  className="group relative bg-gradient-to-br from-card to-card/50 rounded-xl border border-border/50 p-3 shadow-sm hover:shadow-md transition-all duration-200"
+                                  className="group relative bg-gradient-to-br from-card to-card/50 rounded-xl border border-border/50 p-3 shadow-sm hover:shadow-md transition-all duration-200 cursor-pointer"
+                                  onClick={() => {
+                                    if (session.meetingLink) {
+                                      window.open(session.meetingLink, '_blank');
+                                    }
+                                  }}
                                 >
                                   <div className="flex items-start gap-3">
                                     <div className={`${sessionColor} w-12 h-12 rounded-xl flex items-center justify-center shadow-sm flex-shrink-0`}>
-                                      <CalendarIcon className="w-6 h-6 text-white" />
+                                      {session.meetingLink ? <Video className="w-6 h-6 text-white" /> : <CalendarIcon className="w-6 h-6 text-white" />}
                                     </div>
                                     <div className="flex-1 min-w-0">
                                       <h3 className="font-semibold text-sm text-foreground mb-1 truncate">{session.title}</h3>
@@ -533,11 +592,11 @@ export default function Calendar() {
                     )}
                   </div>
                 ) : (
-                  <div className="p-6">
-                    <div className="grid grid-cols-7 gap-3">
+                  <div className="p-2 sm:p-6">
+                    <div className="grid grid-cols-7 gap-1 sm:gap-3">
                       {/* Day Headers */}
                       {dayNames.map((day) => (
-                        <div key={day} className="text-center py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                        <div key={day} className="text-center py-2 sm:py-3 text-[10px] sm:text-xs font-semibold text-muted-foreground uppercase tracking-wider">
                           {day.substring(0, 3)}
                         </div>
                       ))}
@@ -545,48 +604,210 @@ export default function Calendar() {
                       {/* Calendar Days */}
                       {getDaysInMonth(currentViewDate).map((day, index) => {
                         const daySessions = getSessionsForDay(day);
+                        const hasEvents = daySessions.length > 0;
                         const isToday = day && 
                           currentViewDate.getMonth() === currentDate.getMonth() &&
                           currentViewDate.getFullYear() === currentDate.getFullYear() &&
                           day === currentDate.getDate();
-                        
+
+                        const baseClass = !day
+                          ? 'bg-transparent'
+                          : isToday
+                            ? 'bg-gradient-to-br from-primary/10 to-primary/5 border-2 border-primary/40 shadow-md ring-2 ring-primary/20'
+                            : hasEvents
+                              ? 'bg-gradient-to-br from-blue-200 to-blue-100 border border-blue-300 hover:border-blue-400 shadow-md'
+                              : 'bg-gradient-to-br from-blue-100 to-blue-50 border border-blue-200 hover:border-blue-300 shadow-sm';
+
+                        const dayTextClass = isToday ? 'text-primary' : hasEvents ? 'text-blue-800 font-semibold' : 'text-foreground/80';
+
+                        // Compute date key and assigned notes
+                        const dateKey = day ? toLocalDateKey(new Date(currentViewDate.getFullYear(), currentViewDate.getMonth(), day)) : null;
+                        const assignedNotes = dateKey 
+                          ? Object.entries(noteAssignments)
+                              .filter(([nid, d]) => d === dateKey)
+                              .map(([nid]) => nid)
+                          : [];
+
+                        const getNoteColorBg = (color: string) => {
+                          switch (color) {
+                            case 'yellow': return 'bg-yellow-400';
+                            case 'pink': return 'bg-pink-400';
+                            case 'blue': return 'bg-blue-400';
+                            case 'green': return 'bg-green-400';
+                            default: return 'bg-gray-400';
+                          }
+                        };
+
                         return (
-                          <div
-                            key={index}
-                            className={`min-h-[110px] p-3 rounded-xl transition-all duration-200 ${
-                              !day 
-                                ? 'bg-transparent' 
-                                : isToday 
-                                ? 'bg-gradient-to-br from-primary/10 to-primary/5 border-2 border-primary/40 shadow-md ring-2 ring-primary/20' 
-                                : 'bg-card/50 border border-border/40 hover:border-border hover:shadow-md hover:bg-card'
-                            }`}
+                          <div 
+                            key={index} 
+                            className={`relative min-h-[70px] sm:min-h-[110px] p-1.5 sm:p-3 rounded-lg sm:rounded-xl transition-all duration-200 ${baseClass}`}
+                            onDragOver={(e) => {
+                              if (day) {
+                                e.preventDefault();
+                                e.currentTarget.classList.add('ring-2', 'ring-primary', 'ring-offset-1');
+                              }
+                            }}
+                            onDragLeave={(e) => {
+                              e.currentTarget.classList.remove('ring-2', 'ring-primary', 'ring-offset-1');
+                            }}
+                            onDrop={(e) => {
+                              e.preventDefault();
+                              e.currentTarget.classList.remove('ring-2', 'ring-primary', 'ring-offset-1');
+                              if (!day || !user) return;
+                              
+                              try {
+                                const payload = e.dataTransfer.getData('application/json');
+                                if (!payload) return;
+                                const note = JSON.parse(payload) as { id: string; content: string; color: string };
+                                if (!note?.id) return;
+                                
+                                const dk = toLocalDateKey(new Date(currentViewDate.getFullYear(), currentViewDate.getMonth(), day));
+                                
+                                // Check if this note is already on this day
+                                if (noteAssignments[note.id] === dk) {
+                                  return; // Already assigned to this day
+                                }
+                                
+                                // Check if day already has 4 different notes
+                                const notesOnThisDay = Object.entries(noteAssignments)
+                                  .filter(([nid, d]) => d === dk && nid !== note.id)
+                                  .length;
+                                
+                                if (notesOnThisDay >= 4) {
+                                  alert('Maximum 4 sticky notes per day');
+                                  return;
+                                }
+                                
+                                setNoteAssignments(prev => ({ ...prev, [note.id]: dk }));
+                                
+                                // Refresh sticky notes from storage
+                                const saved = localStorage.getItem(`stickyNotes_${user.id}`);
+                                if (saved) {
+                                  try { setStickyNotes(JSON.parse(saved)); } catch {}
+                                }
+                              } catch (err) {
+                                console.error('Failed to handle drop', err);
+                              }
+                            }}
                           >
                             {day && (
                               <>
-                                <div className={`text-sm font-semibold mb-2 flex items-center justify-between ${
-                                  isToday ? 'text-primary' : 'text-foreground/80'
-                                }`}>
-                                  <span>{day}</span>
-                                  {isToday && (
-                                    <div className="w-2 h-2 bg-primary rounded-full animate-pulse" />
-                                  )}
+                                <div className={`text-xs sm:text-sm mb-1 sm:mb-2 flex items-center justify-between ${dayTextClass}`}>
+                                  <span className="flex items-center gap-1 sm:gap-2">
+                                    <span className={`${dayTextClass}`}>{day}</span>
+                                    {hasEvents && (
+                                      <span className={`${getSessionColor(daySessions[0].id)} w-1.5 sm:w-2 h-1.5 sm:h-2 rounded-full inline-block`} />
+                                    )}
+                                  </span>
+                                  {isToday && <div className="w-1.5 sm:w-2 h-1.5 sm:h-2 bg-primary rounded-full animate-pulse" />}
                                 </div>
-                                <div className="space-y-1.5">
-                                  {daySessions.slice(0, 3).map((session) => {
+                                <div className="space-y-1 sm:space-y-1.5">
+                                  {/* Render assigned sticky notes */}
+                                  {assignedNotes.length > 0 && (
+                                    <div className="absolute top-0 right-0 hidden sm:flex flex-col gap-0.5 z-10">
+                                      {assignedNotes.map((nid, idx) => {
+                                        const note = stickyNotes.find(s => s.id === nid);
+                                        if (!note) return null;
+                                        
+                                        const isExpanded = expandedNoteId === nid;
+                                        
+                                        const getNoteColors = (color: string) => {
+                                          switch (color) {
+                                            case 'yellow':
+                                              return {
+                                                bg: 'bg-gradient-to-br from-yellow-50 to-yellow-100',
+                                                border: 'border-yellow-300',
+                                                text: 'text-yellow-900',
+                                                shadow: 'shadow-yellow-200'
+                                              };
+                                            case 'pink':
+                                              return {
+                                                bg: 'bg-gradient-to-br from-pink-50 to-rose-100',
+                                                border: 'border-pink-300',
+                                                text: 'text-pink-900',
+                                                shadow: 'shadow-pink-200'
+                                              };
+                                            case 'blue':
+                                              return {
+                                                bg: 'bg-gradient-to-br from-blue-50 to-cyan-100',
+                                                border: 'border-blue-300',
+                                                text: 'text-blue-900',
+                                                shadow: 'shadow-blue-200'
+                                              };
+                                            case 'green':
+                                              return {
+                                                bg: 'bg-gradient-to-br from-green-50 to-emerald-100',
+                                                border: 'border-green-300',
+                                                text: 'text-green-900',
+                                                shadow: 'shadow-green-200'
+                                              };
+                                            default:
+                                              return {
+                                                bg: 'bg-gradient-to-br from-gray-50 to-gray-100',
+                                                border: 'border-gray-300',
+                                                text: 'text-gray-900',
+                                                shadow: 'shadow-gray-200'
+                                              };
+                                          }
+                                        };
+                                        
+                                        const colors = getNoteColors(note.color);
+                                        
+                                        return (
+                                          <div key={nid} className="relative">
+                                            {/* Collapsed: Simple colored strip in corner - always visible */}
+                                            {!isExpanded && (
+                                              <div 
+                                                className={`
+                                                  w-6 h-6 ${colors.bg} ${colors.border}
+                                                  border-2 rounded-bl-lg cursor-pointer
+                                                  transition-all duration-200 hover:w-8 hover:h-8 hover:shadow-lg
+                                                `}
+                                                style={{
+                                                  transform: `rotate(${(note.rotation || 0) + (idx * 2)}deg)`,
+                                                }}
+                                                onClick={(e) => {
+                                                  e.stopPropagation();
+                                                  setExpandedNoteId(nid);
+                                                }}
+                                              >
+                                                {/* Corner fold effect */}
+                                                <div className={`absolute bottom-0 left-0 w-2 h-2 ${colors.bg} border-r-2 border-t-2 ${colors.border}`}
+                                                     style={{
+                                                       clipPath: 'polygon(0 0, 0 100%, 100% 100%)',
+                                                       filter: 'brightness(0.85)'
+                                                     }}></div>
+                                              </div>
+                                            )}
+                                          </div>
+                                        );
+                                      })}
+                                    </div>
+                                  )}
+
+                                  {/* Render sessions */}
+                                  {daySessions.slice(0, isMobile ? 1 : 3).map((session) => {
                                     const sessionColor = getSessionColor(session.id);
                                     return (
                                       <div
                                         key={session.id}
-                                        className={`text-xs px-2 py-1.5 rounded-lg text-white truncate cursor-pointer transition-all hover:scale-105 hover:shadow-md ${sessionColor}`}
-                                        title={`${session.title} - ${session.time}`}
+                                        className={`text-[10px] sm:text-xs px-1.5 sm:px-2 py-1 sm:py-1.5 rounded-md sm:rounded-lg text-white truncate cursor-pointer transition-all hover:scale-105 hover:shadow-md ${sessionColor}`}
+                                        title={`${session.title} - ${session.time}${session.meetingLink ? ' (Click to join)' : ''}`}
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          if (session.meetingLink) {
+                                            window.open(session.meetingLink, '_blank');
+                                          }
+                                        }}
                                       >
                                         {session.title}
                                       </div>
                                     );
                                   })}
-                                  {daySessions.length > 3 && (
-                                    <div className="text-xs text-muted-foreground font-medium text-center pt-1">
-                                      +{daySessions.length - 3}
+                                  {daySessions.length > (isMobile ? 1 : 3) && (
+                                    <div className="text-[10px] sm:text-xs text-muted-foreground font-medium text-center pt-0.5 sm:pt-1">
+                                      +{daySessions.length - (isMobile ? 1 : 3)}
                                     </div>
                                   )}
                                 </div>
@@ -621,10 +842,15 @@ export default function Calendar() {
                       {todaySessions.slice(0, 4).map((session) => {
                         const sessionColor = getSessionColor(session.id);
                         return (
-                          <div key={session.id} className="group p-3 rounded-xl bg-gradient-to-br from-card to-muted/10 border border-border/40 hover:border-border hover:shadow-md transition-all">
+                          <div key={session.id} className="group p-3 rounded-xl bg-gradient-to-br from-card to-muted/10 border border-border/40 hover:border-border hover:shadow-md transition-all cursor-pointer"
+                            onClick={() => {
+                              if (session.meetingLink) {
+                                window.open(session.meetingLink, '_blank');
+                              }
+                            }}>
                             <div className="flex items-center gap-3">
                               <div className={`${sessionColor} w-10 h-10 rounded-lg flex items-center justify-center shadow-sm flex-shrink-0`}>
-                                <CalendarIcon className="w-5 h-5 text-white" />
+                                {session.meetingLink ? <Video className="w-5 h-5 text-white" /> : <CalendarIcon className="w-5 h-5 text-white" />}
                               </div>
                               <div className="flex-1 min-w-0">
                                 <p className="text-sm font-medium truncate">{session.title}</p>
@@ -694,10 +920,15 @@ export default function Calendar() {
                     {upcomingSessions.slice(0, 5).map((session) => {
                       const sessionColor = getSessionColor(session.id);
                       return (
-                        <div key={session.id} className="group p-3 rounded-xl bg-gradient-to-br from-card to-muted/10 border border-border/40 hover:border-border hover:shadow-md transition-all">
+                        <div key={session.id} className="group p-3 rounded-xl bg-gradient-to-br from-card to-muted/10 border border-border/40 hover:border-border hover:shadow-md transition-all cursor-pointer"
+                          onClick={() => {
+                            if (session.meetingLink) {
+                              window.open(session.meetingLink, '_blank');
+                            }
+                          }}>
                           <div className="flex items-center gap-3">
                             <div className={`${sessionColor} w-10 h-10 rounded-lg flex items-center justify-center shadow-sm flex-shrink-0`}>
-                              <CalendarIcon className="w-5 h-5 text-white" />
+                              {session.meetingLink ? <Video className="w-5 h-5 text-white" /> : <CalendarIcon className="w-5 h-5 text-white" />}
                             </div>
                             <div className="flex-1 min-w-0">
                               <p className="text-sm font-medium truncate">{session.title}</p>
@@ -749,6 +980,119 @@ export default function Calendar() {
           )}
         </div>
       </div>
+      
+      {/* Expanded Sticky Note - Rendered outside calendar grid */}
+      {expandedNoteId && (() => {
+        const note = stickyNotes.find(s => s.id === expandedNoteId);
+        if (!note) return null;
+        
+        const getNoteColors = (color: string) => {
+          switch (color) {
+            case 'yellow':
+              return {
+                bg: 'bg-gradient-to-br from-yellow-50 to-yellow-100',
+                border: 'border-yellow-300',
+                text: 'text-yellow-900',
+                shadow: 'shadow-yellow-200'
+              };
+            case 'pink':
+              return {
+                bg: 'bg-gradient-to-br from-pink-50 to-rose-100',
+                border: 'border-pink-300',
+                text: 'text-pink-900',
+                shadow: 'shadow-pink-200'
+              };
+            case 'blue':
+              return {
+                bg: 'bg-gradient-to-br from-blue-50 to-cyan-100',
+                border: 'border-blue-300',
+                text: 'text-blue-900',
+                shadow: 'shadow-blue-200'
+              };
+            case 'green':
+              return {
+                bg: 'bg-gradient-to-br from-green-50 to-emerald-100',
+                border: 'border-green-300',
+                text: 'text-green-900',
+                shadow: 'shadow-green-200'
+              };
+            default:
+              return {
+                bg: 'bg-gradient-to-br from-gray-50 to-gray-100',
+                border: 'border-gray-300',
+                text: 'text-gray-900',
+                shadow: 'shadow-gray-200'
+              };
+          }
+        };
+        
+        const colors = getNoteColors(note.color);
+        
+        return (
+          <>
+            {/* Backdrop overlay */}
+            <div 
+              className="fixed inset-0 bg-black/50 z-[999] backdrop-blur-sm"
+              onClick={() => setExpandedNoteId(null)}
+            />
+            
+            {/* Expanded sticky note */}
+            <div 
+              className={`
+                fixed inset-0 m-auto w-[280px] h-[280px]
+                ${colors.bg} ${colors.border} ${colors.text}
+                border-2 rounded-sm cursor-pointer z-[1000]
+                ${colors.shadow} shadow-2xl
+                transition-all duration-300 ease-in-out
+              `}
+              style={{
+                transform: `rotate(${note.rotation || 0}deg)`,
+              }}
+              onClick={(e) => {
+                e.stopPropagation();
+                setExpandedNoteId(null);
+              }}
+            >
+              <div className="p-4 h-full flex flex-col">
+                <div className="flex items-start justify-between gap-2 mb-3">
+                  <div className="flex-1 overflow-y-auto max-h-[220px]">
+                    {note.content ? (
+                      <p className="text-sm whitespace-pre-wrap break-words leading-relaxed">
+                        {note.content}
+                      </p>
+                    ) : (
+                      <p className="text-xs opacity-50 italic">Empty note</p>
+                    )}
+                  </div>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (window.confirm('Remove this sticky note from the calendar?')) {
+                        setNoteAssignments(prev => {
+                          const newAssignments = { ...prev };
+                          delete newAssignments[expandedNoteId];
+                          return newAssignments;
+                        });
+                        setExpandedNoteId(null);
+                      }
+                    }}
+                    className="text-xs px-2 py-1 bg-red-500 text-white rounded hover:bg-red-600 transition-colors flex-shrink-0"
+                  >
+                    ✕
+                  </button>
+                </div>
+              </div>
+              
+              {/* Corner fold effect */}
+              <div className={`absolute bottom-0 right-0 w-12 h-12 ${colors.bg} border-l-2 border-t-2 ${colors.border}`}
+                   style={{
+                     clipPath: 'polygon(100% 0, 100% 100%, 0 100%)',
+                     filter: 'brightness(0.85)'
+                   }}></div>
+            </div>
+          </>
+        );
+      })()}
     </div>
   );
 }

@@ -63,6 +63,8 @@ export const MessagingWidget: React.FC<MessagingWidgetProps> = ({
   const floatingButtonRef = useRef<HTMLDivElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const movedRef = useRef(false);
+  const initialDragPos = useRef({ x: 0, y: 0 });
   const [isMobile, setIsMobile] = useState<boolean>(false);
 
   // Pre-defined responses for common queries
@@ -221,12 +223,26 @@ export const MessagingWidget: React.FC<MessagingWidgetProps> = ({
   // Handle drag events for floating button
   const handleFloatingButtonMouseDown = (e: React.MouseEvent) => {
     const rect = e.currentTarget.getBoundingClientRect();
+    // record initial pointer to detect if it's a drag vs click
+    initialDragPos.current = { x: e.clientX, y: e.clientY };
+    movedRef.current = false;
     setDragOffset({
       x: e.clientX - rect.left,
       y: e.clientY - rect.top
     });
     setIsDragging(true);
     e.preventDefault();
+  };
+
+  const handleFloatingButtonClick = (e: React.MouseEvent) => {
+    // prevent opening when this interaction was a drag
+    if (movedRef.current) {
+      // reset flag and ignore click
+      movedRef.current = false;
+      return;
+    }
+    setIsOpen(true);
+    onOpenChange?.(true);
   };
 
   // Handle drag events for widget header
@@ -246,6 +262,14 @@ export const MessagingWidget: React.FC<MessagingWidgetProps> = ({
   useEffect(() => {
     const handleMouseMove = (e: MouseEvent) => {
       if (!isDragging || !onPositionChange) return;
+      // detect if pointer moved beyond threshold to treat as drag
+      if (!movedRef.current) {
+        const dx = e.clientX - initialDragPos.current.x;
+        const dy = e.clientY - initialDragPos.current.y;
+        if (Math.sqrt(dx * dx + dy * dy) > 5) {
+          movedRef.current = true;
+        }
+      }
       const newX = e.clientX - dragOffset.x;
       const newTop = e.clientY - dragOffset.y;
 
@@ -268,6 +292,8 @@ export const MessagingWidget: React.FC<MessagingWidgetProps> = ({
 
     const handleMouseUp = () => {
       setIsDragging(false);
+      // leave movedRef value for click handler to consult; reset shortly after
+      setTimeout(() => { movedRef.current = false; }, 50);
     };
 
     if (isDragging) {
@@ -434,10 +460,7 @@ export const MessagingWidget: React.FC<MessagingWidgetProps> = ({
           onMouseDown={handleFloatingButtonMouseDown}
         >
           <Button
-            onClick={() => {
-              setIsOpen(true);
-              onOpenChange?.(true);
-            }}
+            onClick={handleFloatingButtonClick}
             className="rounded-full w-14 h-14 bg-gradient-to-br from-primary to-secondary hover:from-primary/90 hover:to-secondary/90 shadow-elegant transition-all duration-300"
             size="icon"
           >

@@ -93,6 +93,8 @@ export default function SessionCreateWithInvitationsDialog({
       return;
     }
 
+    if (loading) return;
+
     try {
       setLoading(true);
 

@@ -18,6 +18,7 @@ export function SessionCreateDialog({ onCreated }: Props) {
   const [open, setOpen] = useState(false);
   const [groups, setGroups] = useState<Array<any>>([]);
   const [loadingGroups, setLoadingGroups] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
 
   const [values, setValues] = useState({
     groupId: undefined as number | undefined,
@@ -81,7 +82,8 @@ export function SessionCreateDialog({ onCreated }: Props) {
     typeof values.groupId === 'number' && values.title.trim().length > 0 && values.start.trim().length > 0 && Number(values.durationDays) >= 1;
 
   const handleSubmit = async () => {
-    if (!isValid || !user || !values.groupId) return;
+    if (!isValid || !user || !values.groupId || submitting) return;
+    setSubmitting(true);
     try {
       // Validate earliest allowed start
       const chosen = values.start ? new Date(values.start) : null;
@@ -125,6 +127,8 @@ export function SessionCreateDialog({ onCreated }: Props) {
     } catch (err: any) {
       console.error('Failed to create session', err);
       alert(err?.message || 'Failed to create session');
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -208,10 +212,10 @@ export function SessionCreateDialog({ onCreated }: Props) {
         </div>
 
         <DialogFooter className="flex flex-col-reverse sm:flex-row gap-2 sm:gap-2 mt-4">
-          <Button variant="outline" onClick={() => setOpen(false)} className="w-full sm:w-auto">Cancel</Button>
-          <Button onClick={handleSubmit} disabled={!isValid} className="w-full sm:w-auto">
+          <Button variant="outline" onClick={() => setOpen(false)} disabled={submitting} className="w-full sm:w-auto">Cancel</Button>
+          <Button onClick={handleSubmit} disabled={!isValid || submitting} className="w-full sm:w-auto">
             <Plus className="w-4 h-4 mr-2" />
-            Create Session
+            {submitting ? 'Creating...' : 'Create Session'}
           </Button>
         </DialogFooter>
       </DialogContent>
