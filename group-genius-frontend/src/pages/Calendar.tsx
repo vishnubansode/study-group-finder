@@ -292,7 +292,7 @@ export default function Calendar() {
   const mapDtoToUi = (dto: any) => {
     // dto: SessionResponseDTO (now has startTime and durationDays)
     const start = dto.startTime || dto.start || null;
-    // compute endTime from durationDays (durationDays is integer number of days)
+    const firstDayEnd = dto.endTime || dto.end || null;
     const duration = dto.durationDays == null ? dto.duration || 1 : dto.durationDays;
     // Parse server start into a local Date reliably: if the server string includes a timezone (Z or +/-offset)
     // use Date parsing; otherwise treat the string as local and build a Date from components to avoid implicit UTC conversions.
@@ -309,11 +309,13 @@ export default function Calendar() {
     };
 
   const startDate = parseServerToLocalDate(start);
-  const computedEnd = startDate ? new Date(startDate.getTime() + (duration * 24 * 60 * 60 * 1000)) : null;
+  const firstDayEndDate = parseServerToLocalDate(firstDayEnd);
+  const computedEnd = firstDayEndDate ? new Date(firstDayEndDate.getTime() + (Math.max(duration - 1, 0) * 24 * 60 * 60 * 1000)) : null;
+  const endTimeDisplay = firstDayEndDate ? firstDayEndDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
   const formatLocalDate = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
   const date = startDate ? formatLocalDate(startDate) : (dto.date ?? '');
   const startTimeDisplay = startDate ? startDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
-  const time = startDate ? `${startTimeDisplay}${computedEnd ? ' - ' + computedEnd.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}) : ''}` : '';
+  const time = startDate ? `${startTimeDisplay}${endTimeDisplay ? ' - ' + endTimeDisplay : ''}` : '';
     return {
       id: dto.id,
       title: dto.title,
@@ -323,7 +325,7 @@ export default function Calendar() {
       durationDays: duration,
       time,
       startTime: start,
-      endTime: computedEnd ? computedEnd.toISOString() : null,
+      endTime: dto.endTime,
       description: dto.description,
       meetingLink: dto.meetingLink,
       groupId: dto.groupId,

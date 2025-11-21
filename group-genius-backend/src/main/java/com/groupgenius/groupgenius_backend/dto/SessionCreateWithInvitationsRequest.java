@@ -14,6 +14,8 @@ public class SessionCreateWithInvitationsRequest {
     private String startTime; // ISO format datetime
     private String startTimeLocal; // optional local wall-clock representation (YYYY-MM-DDTHH:mm)
     private Integer durationDays; // number of days the session continues
+    private String endTime;
+    private String endTimeLocal;
     private String meetingLink;
     private List<Long> invitedUserIds; // List of user IDs to invite
 }

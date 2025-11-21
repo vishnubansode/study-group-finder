@@ -16,6 +16,7 @@ export default function EventForm({ mode, initial, onSaved, onDeleted, onCancel 
   const [title, setTitle] = useState(initial?.title || '');
   const [description, setDescription] = useState(initial?.description || '');
   const [start, setStart] = useState(() => initial?.startTime ? toInputDateTime(initial.startTime) : '');
+  const [end, setEnd] = useState(() => initial?.endTime ? toInputDateTime(initial.endTime) : '');
   const [meetingLink, setMeetingLink] = useState(initial?.meetingLink || '');
 
   const computeDurationDaysFromTimes = (s?: string, e?: string) => {
@@ -95,9 +96,20 @@ export default function EventForm({ mode, initial, onSaved, onDeleted, onCancel 
     try {
       // Validate earliest allowed start
       const chosen = start ? new Date(start) : null;
+      const endDate = end ? new Date(end) : null;
       const minAllowed = computeEarliestStart();
       if (!chosen || chosen.getTime() < minAllowed.getTime()) {
         alert('Start time must be at least 1 hour from now (rounded to the next 30-minute slot). Please choose a later time.');
+        setLoading(false);
+        return;
+      }
+      if (!endDate) {
+        alert('Please provide an end time.');
+        setLoading(false);
+        return;
+      }
+      if (endDate <= chosen || chosen.toDateString() !== endDate.toDateString()) {
+        alert('End time must be later than start time and on the same day.');
         setLoading(false);
         return;
       }
@@ -108,6 +120,8 @@ export default function EventForm({ mode, initial, onSaved, onDeleted, onCancel 
         startTime: start ? formatWithOffset(start) : start,
         // local wall-clock value without offset
         startTimeLocal: start || null,
+        endTime: end ? formatWithOffset(end) : end,
+        endTimeLocal: end || null,
         durationDays: Number(durationDays) || 1,
         meetingLink: meetingLink || null,
       };
@@ -126,9 +140,20 @@ export default function EventForm({ mode, initial, onSaved, onDeleted, onCancel 
     try {
       // Validate earliest allowed start for updates as well
       const chosen = start ? new Date(start) : null;
+      const endDate = end ? new Date(end) : null;
       const minAllowed = computeEarliestStart();
       if (!chosen || chosen.getTime() < minAllowed.getTime()) {
         alert('Start time must be at least 1 hour from now (rounded to the next 30-minute slot). Please choose a later time.');
+        setLoading(false);
+        return;
+      }
+      if (!endDate) {
+        alert('Please provide an end time.');
+        setLoading(false);
+        return;
+      }
+      if (endDate <= chosen || chosen.toDateString() !== endDate.toDateString()) {
+        alert('End time must be later than start time and on the same day.');
         setLoading(false);
         return;
       }
@@ -137,6 +162,8 @@ export default function EventForm({ mode, initial, onSaved, onDeleted, onCancel 
         description,
         startTime: start ? formatWithOffset(start) : start,
         startTimeLocal: start || null,
+        endTime: end ? formatWithOffset(end) : end,
+        endTimeLocal: end || null,
         durationDays: Number(durationDays) || 1,
         meetingLink: meetingLink || null,
       };
@@ -173,10 +200,14 @@ export default function EventForm({ mode, initial, onSaved, onDeleted, onCancel 
         <Textarea value={description} onChange={(e) => setDescription(e.target.value)} />
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <div>
           <label className="text-sm font-medium">Start</label>
           <Input type="datetime-local" value={start} onChange={(e) => setStart(e.target.value)} min={earliestStartString} />
+        </div>
+        <div>
+          <label className="text-sm font-medium">End</label>
+          <Input type="datetime-local" value={end} onChange={(e) => setEnd(e.target.value)} min={start || ''} />
         </div>
         <div>
           <label className="text-sm font-medium">Duration (days)</label>

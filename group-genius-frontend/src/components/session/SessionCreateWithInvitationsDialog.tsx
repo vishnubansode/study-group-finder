@@ -7,9 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Plus, Loader2, Users, Calendar, Clock } from 'lucide-react';
 import { sessionInvitationAPI, SessionCreateWithInvitationsRequest } from '@/lib/api/sessionInvitationApi';
-import { groupAPI } from '@/lib/api/groupApi';
 import { useAuth } from '@/contexts/AuthContext';
-import { format } from 'date-fns';
 
 interface GroupMember {
   groupMemberId: number;
@@ -37,6 +35,7 @@ export default function SessionCreateWithInvitationsDialog({
   const [description, setDescription] = useState('');
   const [startDate, setStartDate] = useState('');
   const [startTime, setStartTime] = useState('');
+  const [endTime, setEndTime] = useState('');
   const [durationDays, setDurationDays] = useState<number>(1);
   const [meetingLink, setMeetingLink] = useState('');
 
@@ -88,7 +87,7 @@ export default function SessionCreateWithInvitationsDialog({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!user || !title || !startDate || !startTime || !durationDays || durationDays < 1) {
+    if (!user || !title || !startDate || !startTime || !endTime || !durationDays || durationDays < 1) {
       alert('Please fill in all required fields and set duration (>= 1 day)');
       return;
     }
@@ -99,13 +98,33 @@ export default function SessionCreateWithInvitationsDialog({
       setLoading(true);
 
       // Combine date and time into ISO format and include duration in days
-      const startDateTime = new Date(`${startDate}T${startTime}`).toISOString();
+      const startLocal = `${startDate}T${startTime}`;
+      const endLocal = `${startDate}T${endTime}`;
+      const startMoment = new Date(startLocal);
+      const endMoment = new Date(endLocal);
+      if (endMoment <= startMoment) {
+        alert('End time must be later than the start time and on the same day.');
+        return;
+      }
+      const formatWithOffset = (localDatetime: string) => {
+        if (!localDatetime) return localDatetime;
+        const base = localDatetime.length === 16 ? `${localDatetime}:00` : localDatetime;
+        const offsetMinutes = -new Date().getTimezoneOffset();
+        const sign = offsetMinutes >= 0 ? '+' : '-';
+        const abs = Math.abs(offsetMinutes);
+        const hh = String(Math.floor(abs / 60)).padStart(2, '0');
+        const mm = String(abs % 60).padStart(2, '0');
+        return `${base}${sign}${hh}:${mm}`;
+      };
 
       const request: SessionCreateWithInvitationsRequest = {
         groupId,
         title,
         description,
-        startTime: startDateTime,
+        startTime: formatWithOffset(startLocal),
+        startTimeLocal: startLocal,
+        endTime: formatWithOffset(endLocal),
+        endTimeLocal: endLocal,
         durationDays: durationDays,
         meetingLink: meetingLink || undefined,
         invitedUserIds: selectedUserIds,
@@ -118,6 +137,7 @@ export default function SessionCreateWithInvitationsDialog({
       setDescription('');
       setStartDate('');
       setStartTime('');
+      setEndTime('');
   setDurationDays(1);
       setMeetingLink('');
       setSelectedUserIds([]);
@@ -172,7 +192,7 @@ export default function SessionCreateWithInvitationsDialog({
           </div>
 
           {/* Date and Time */}
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
             <div className="space-y-2">
               <Label htmlFor="startDate">Start Date *</Label>
               <Input
@@ -191,6 +211,17 @@ export default function SessionCreateWithInvitationsDialog({
                 type="time"
                 value={startTime}
                 onChange={(e) => setStartTime(e.target.value)}
+                required
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="endTime">End Time *</Label>
+              <Input
+                id="endTime"
+                type="time"
+                value={endTime}
+                onChange={(e) => setEndTime(e.target.value)}
                 required
               />
             </div>

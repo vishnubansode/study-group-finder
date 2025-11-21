@@ -78,8 +78,7 @@ export const sessionAPI = {
       },
     });
     return handleResponse(response);
-  }
-,
+  },
 
   // Participant endpoints
   getParticipants: async (sessionId: number) => {

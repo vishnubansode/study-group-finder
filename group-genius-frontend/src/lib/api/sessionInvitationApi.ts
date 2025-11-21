@@ -42,7 +42,10 @@ export interface SessionCreateWithInvitationsRequest {
   title: string;
   description?: string;
   startTime: string; // ISO format
+  startTimeLocal?: string;
   durationDays: number; // integer number of days (>=1)
+  endTime?: string;
+  endTimeLocal?: string;
   meetingLink?: string;
   invitedUserIds: number[];
 }

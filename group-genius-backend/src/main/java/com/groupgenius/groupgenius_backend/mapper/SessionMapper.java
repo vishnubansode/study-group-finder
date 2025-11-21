@@ -15,6 +15,7 @@ public class SessionMapper {
                 .title(session.getTitle())
                 .description(session.getDescription())
                 .startTime(session.getStartTime())
+                .endTime(session.getEndTime())
                 .durationDays(session.getDurationDays())
                 .meetingLink(session.getMeetingLink())
                 .createdById(session.getCreatedBy().getId())

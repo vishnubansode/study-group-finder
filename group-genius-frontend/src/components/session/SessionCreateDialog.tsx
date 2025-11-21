@@ -25,6 +25,7 @@ export function SessionCreateDialog({ onCreated }: Props) {
     title: '',
     description: '',
     start: '', // datetime-local
+    end: '',
     durationDays: 1,
     meetingLink: '',
   });
@@ -79,7 +80,11 @@ export function SessionCreateDialog({ onCreated }: Props) {
   }, [open, user]);
 
   const isValid =
-    typeof values.groupId === 'number' && values.title.trim().length > 0 && values.start.trim().length > 0 && Number(values.durationDays) >= 1;
+    typeof values.groupId === 'number' &&
+    values.title.trim().length > 0 &&
+    values.start.trim().length > 0 &&
+    values.end.trim().length > 0 &&
+    Number(values.durationDays) >= 1;
 
   const handleSubmit = async () => {
     if (!isValid || !user || !values.groupId || submitting) return;
@@ -106,6 +111,15 @@ export function SessionCreateDialog({ onCreated }: Props) {
         return `${base}${sign}${hh}:${mm}`; // e.g. 2025-11-13T05:00:00-05:00
       };
 
+      if (!values.end) {
+        alert('Please provide an end time for the session.');
+        return;
+      }
+      const endChosen = new Date(values.end);
+      if (endChosen <= chosen || chosen.toDateString() !== endChosen.toDateString()) {
+        alert('End time must be later than the start time and on the same day.');
+        return;
+      }
       const payload = {
         groupId: values.groupId,
         title: values.title,
@@ -114,6 +128,8 @@ export function SessionCreateDialog({ onCreated }: Props) {
         startTime: values.start ? formatWithOffset(values.start) : values.start,
         // include local wall-clock form so server can choose to preserve local date/time if desired
         startTimeLocal: values.start || null,
+        endTime: values.end ? formatWithOffset(values.end) : values.end,
+        endTimeLocal: values.end || null,
         durationDays: Number(values.durationDays) || 1,
         createdById: user.id,
         meetingLink: values.meetingLink || null,
@@ -123,7 +139,7 @@ export function SessionCreateDialog({ onCreated }: Props) {
       console.log('Session created', created);
       onCreated?.(created);
       setOpen(false);
-      setValues({ groupId: undefined, title: '', description: '', start: '', durationDays: 1, meetingLink: '' });
+      setValues({ groupId: undefined, title: '', description: '', start: '', end: '', durationDays: 1, meetingLink: '' });
     } catch (err: any) {
       console.error('Failed to create session', err);
       alert(err?.message || 'Failed to create session');
@@ -133,10 +149,21 @@ export function SessionCreateDialog({ onCreated }: Props) {
   };
 
   // When dialog opens, default start to earliest allowed slot if empty
+  const addMinutes = (iso: string, minutes: number) => {
+    if (!iso) return iso;
+    const next = new Date(iso);
+    next.setMinutes(next.getMinutes() + minutes);
+    return toDatetimeLocal(next);
+  };
+
   useEffect(() => {
     if (!open) return;
     const es = computeEarliestStart();
-    setValues((v) => ({ ...v, start: v.start || toDatetimeLocal(es) }));
+    setValues((v) => {
+      const startVal = v.start || toDatetimeLocal(es);
+      const endVal = v.end || addMinutes(startVal, 60);
+      return { ...v, start: startVal, end: endVal };
+    });
   }, [open]);
 
   return (
@@ -189,7 +216,7 @@ export function SessionCreateDialog({ onCreated }: Props) {
             <Textarea placeholder="Optional description" value={values.description} onChange={(e) => setValues((v) => ({ ...v, description: e.target.value }))} />
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div className="space-y-2">
               <label className="text-sm font-medium">Start</label>
               <Input
@@ -197,6 +224,15 @@ export function SessionCreateDialog({ onCreated }: Props) {
                 value={values.start}
                 onChange={(e) => setValues((v) => ({ ...v, start: e.target.value }))}
                 min={toDatetimeLocal(computeEarliestStart())}
+              />
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">End</label>
+              <Input
+                type="datetime-local"
+                value={values.end}
+                onChange={(e) => setValues((v) => ({ ...v, end: e.target.value }))}
+                min={values.start || toDatetimeLocal(computeEarliestStart())}
               />
             </div>
             <div className="space-y-2">

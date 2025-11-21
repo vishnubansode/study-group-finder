@@ -82,18 +82,18 @@ public class SessionService {
          * ISO_LOCAL_DATE_TIME),
          * otherwise parse the offset-aware/incoming value.
          */
-        private LocalDateTime resolveStartTime(String startTimeLocal, String incoming) {
-                if (startTimeLocal != null && !startTimeLocal.trim().isEmpty()) {
+        private LocalDateTime resolveDateTime(String localValue, String incoming) {
+                if (localValue != null && !localValue.trim().isEmpty()) {
                         try {
-                                return LocalDateTime.parse(startTimeLocal, DateTimeFormatter.ISO_DATE_TIME);
+                                return LocalDateTime.parse(localValue, DateTimeFormatter.ISO_DATE_TIME);
                         } catch (DateTimeParseException ex) {
                                 // Try without seconds (YYYY-MM-DDTHH:mm)
                                 try {
-                                        return LocalDateTime.parse(startTimeLocal + ":00",
+                                        return LocalDateTime.parse(localValue + ":00",
                                                         DateTimeFormatter.ISO_DATE_TIME);
                                 } catch (DateTimeParseException ex2) {
                                         throw new IllegalArgumentException(
-                                                        "Invalid local datetime format: " + startTimeLocal);
+                                                        "Invalid local datetime format: " + localValue);
                                 }
                         }
                 }
@@ -111,10 +111,18 @@ public class SessionService {
 
                 // Resolve start time: prefer local wall-clock if provided by frontend, else
                 // parse offset-aware string
-                LocalDateTime start = resolveStartTime(requestDTO.getStartTimeLocal(), requestDTO.getStartTime());
+                LocalDateTime start = resolveDateTime(requestDTO.getStartTimeLocal(), requestDTO.getStartTime());
+                LocalDateTime end = resolveDateTime(requestDTO.getEndTimeLocal(), requestDTO.getEndTime());
+                if (end == null) {
+                        throw new IllegalArgumentException("End time is required");
+                }
+                if (end.isBefore(start) || start.toLocalDate().isAfter(end.toLocalDate())) {
+                        throw new IllegalArgumentException("End time must be on the same day and after the start time");
+                }
                 // Validate overlap (compute end time from durationDays)
-                LocalDateTime computedEnd = start
-                                .plusDays(requestDTO.getDurationDays() == null ? 1 : requestDTO.getDurationDays());
+                int durationDays = requestDTO.getDurationDays() == null ? 1 : requestDTO.getDurationDays();
+                int normalizedDuration = durationDays < 1 ? 1 : durationDays;
+                LocalDateTime computedEnd = end.plusDays(normalizedDuration - 1);
                 List<Session> conflicts = sessionRepository.findOverlappingSessions(
                                 group.getId(), start, computedEnd);
                 if (!conflicts.isEmpty()) {
@@ -126,7 +134,8 @@ public class SessionService {
                                 .title(requestDTO.getTitle())
                                 .description(requestDTO.getDescription())
                                 .startTime(start)
-                                .durationDays(requestDTO.getDurationDays() == null ? 1 : requestDTO.getDurationDays())
+                                .endTime(end)
+                                .durationDays(normalizedDuration)
                                 .meetingLink(requestDTO.getMeetingLink())
                                 .createdBy(creator)
                                 .build();
@@ -158,9 +167,17 @@ public class SessionService {
                 Session existing = sessionRepository.findById(id)
                                 .orElseThrow(() -> new ResourceNotFoundException("Session not found with ID: " + id));
 
-                LocalDateTime start = resolveStartTime(requestDTO.getStartTimeLocal(), requestDTO.getStartTime());
-                LocalDateTime updatedEnd = start
-                                .plusDays(requestDTO.getDurationDays() == null ? 1 : requestDTO.getDurationDays());
+                LocalDateTime start = resolveDateTime(requestDTO.getStartTimeLocal(), requestDTO.getStartTime());
+                LocalDateTime end = resolveDateTime(requestDTO.getEndTimeLocal(), requestDTO.getEndTime());
+                if (end == null) {
+                        throw new IllegalArgumentException("End time is required");
+                }
+                if (end.isBefore(start) || start.toLocalDate().isAfter(end.toLocalDate())) {
+                        throw new IllegalArgumentException("End time must be on the same day and after the start time");
+                }
+                int durationDays = requestDTO.getDurationDays() == null ? 1 : requestDTO.getDurationDays();
+                int normalizedDuration = durationDays < 1 ? 1 : durationDays;
+                LocalDateTime updatedEnd = end.plusDays(normalizedDuration - 1);
                 List<Session> conflicts = sessionRepository.findOverlappingSessions(
                                 existing.getGroup().getId(),
                                 start,
@@ -173,7 +190,8 @@ public class SessionService {
                 existing.setTitle(requestDTO.getTitle());
                 existing.setDescription(requestDTO.getDescription());
                 existing.setStartTime(start);
-                existing.setDurationDays(requestDTO.getDurationDays() == null ? 1 : requestDTO.getDurationDays());
+                existing.setEndTime(end);
+                existing.setDurationDays(normalizedDuration);
                 existing.setMeetingLink(requestDTO.getMeetingLink());
 
                 Session updated = sessionRepository.save(existing);
@@ -273,12 +291,21 @@ public class SessionService {
 
                 // Resolve datetime: prefer startTimeLocal when present, else parse offset-aware
                 // string
-                LocalDateTime startTime = resolveStartTime(request.getStartTimeLocal(), request.getStartTime());
+                LocalDateTime startTime = resolveDateTime(request.getStartTimeLocal(), request.getStartTime());
+                LocalDateTime endTime = resolveDateTime(request.getEndTimeLocal(), request.getEndTime());
+                if (endTime == null) {
+                        throw new IllegalArgumentException("End time is required");
+                }
+                if (endTime.isBefore(startTime) || startTime.toLocalDate().isAfter(endTime.toLocalDate())) {
+                        throw new IllegalArgumentException("End time must be on the same day and after the start time");
+                }
                 Integer duration = request.getDurationDays() == null ? 1 : request.getDurationDays();
-                LocalDateTime endTime = startTime.plusDays(duration);
+                Integer normalizedDuration = duration < 1 ? 1 : duration;
+                LocalDateTime computedEnd = endTime.plusDays(normalizedDuration - 1);
 
                 // Validate overlap
-                List<Session> conflicts = sessionRepository.findOverlappingSessions(group.getId(), startTime, endTime);
+                List<Session> conflicts = sessionRepository.findOverlappingSessions(group.getId(), startTime,
+                                computedEnd);
                 if (!conflicts.isEmpty()) {
                         throw new TimeSlotConflictException("Session time overlaps with another existing session");
                 }
@@ -289,7 +316,8 @@ public class SessionService {
                                 .title(request.getTitle())
                                 .description(request.getDescription())
                                 .startTime(startTime)
-                                .durationDays(duration)
+                                .endTime(endTime)
+                                .durationDays(normalizedDuration)
                                 .meetingLink(request.getMeetingLink())
                                 .createdBy(creator)
                                 .build();
