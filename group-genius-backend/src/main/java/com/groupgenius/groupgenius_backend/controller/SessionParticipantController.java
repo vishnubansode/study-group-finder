@@ -1,6 +1,7 @@
 package com.groupgenius.groupgenius_backend.controller;
 
 import com.groupgenius.groupgenius_backend.dto.SessionParticipantResponse;
+import com.groupgenius.groupgenius_backend.dto.SessionParticipationStatusRequest;
 import com.groupgenius.groupgenius_backend.service.SessionParticipantService;
 import com.groupgenius.groupgenius_backend.mapper.SessionParticipantMapper;
 import lombok.RequiredArgsConstructor;
@@ -64,6 +65,18 @@ public class SessionParticipantController {
             return ResponseEntity.badRequest().body(Map.of("error", ex.getMessage()));
         }
         return ResponseEntity.ok(dto);
+    }
+
+    /**
+     * Bulk participation status for user across provided sessions
+     */
+    @PostMapping("/user/{userId}/status")
+    public ResponseEntity<Map<Long, Boolean>> getParticipationStatus(
+            @PathVariable Long userId,
+            @RequestBody SessionParticipationStatusRequest request) {
+        Map<Long, Boolean> statusMap = participantService.getParticipationStatusForSessions(userId,
+                request.getSessionIds());
+        return ResponseEntity.ok(statusMap);
     }
 
     /**

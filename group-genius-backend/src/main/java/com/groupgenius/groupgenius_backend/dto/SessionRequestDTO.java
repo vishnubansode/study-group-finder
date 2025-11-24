@@ -3,8 +3,6 @@ package com.groupgenius.groupgenius_backend.dto;
 import lombok.Getter;
 import lombok.Setter;
 
-// startTime is kept as String to support offset-aware ISO datetimes from clients
-
 @Getter
 @Setter
 public class SessionRequestDTO {
@@ -12,11 +10,10 @@ public class SessionRequestDTO {
     private Long groupId;
     private String title;
     private String description;
-    private String startTime; // ISO datetime string, may include timezone offset
-    private String startTimeLocal; // optional local wall-clock representation (YYYY-MM-DDTHH:mm)
+    private String date; // YYYY-MM-DD
+    private String startTime; // HH:mm
+    private String endTime; // HH:mm
     private Integer durationDays;
-    private String endTime;
-    private String endTimeLocal;
     private Long createdById;
     private String meetingLink;
 

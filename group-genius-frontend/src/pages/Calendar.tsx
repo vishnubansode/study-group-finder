@@ -19,7 +19,7 @@ import {
 import SessionCreateDialog from '@/components/session/SessionCreateDialog';
 import SessionEditDialog from '@/components/session/SessionEditDialog';
 import { useAuth } from '@/contexts/AuthContext';
-import { sessionInvitationAPI } from '@/lib/api/sessionInvitationApi';
+import { sessionInvitationAPI, sessionParticipantAPI } from '@/lib/api/sessionInvitationApi';
 import { groupAPI } from '@/lib/api/groupApi';
 import { sessionAPI } from '@/lib/api/sessionApi';
 
@@ -151,7 +151,11 @@ export default function Calendar() {
 
   // Load sessions for groups the user belongs to
   const loadSessions = async () => {
-    if (!user) return;
+    if (!user) {
+      console.log('Calendar: No user, skipping loadSessions');
+      return;
+    }
+    console.log('Calendar: Starting loadSessions for user', user.id);
     setLoadingSessions(true);
     try {
       const token = localStorage.getItem('token');
@@ -159,9 +163,12 @@ export default function Calendar() {
       // Load sessions from groups the user is part of
       const groups = await groupAPI.searchGroups(token, { userId: user.id, size: 100, filterByMembership: true });
       const arr = Array.isArray(groups) ? groups : (groups?.content ?? []);
+      console.log('Calendar: Fetched groups', arr.length);
+      
       const groupIds = arr.map((g: any) => g.groupId ?? g.id);
       const pagePromises = groupIds.map((gid: number) => sessionAPI.getSessionsByGroup(gid, 0, 100));
       const pages = await Promise.all(pagePromises);
+      console.log('Calendar: Fetched session pages', pages);
       
       // Also load all sessions created by the user (including ended ones)
       const createdSessions = await sessionAPI.getSessionsByCreator(user.id);
@@ -192,6 +199,11 @@ export default function Calendar() {
         }
       });
 
+      console.log('Calendar: Total unique sessions found', allSessions.length);
+      if (allSessions.length > 0) {
+        console.log('Calendar: Sample mapped session', allSessions[0]);
+      }
+
       // Resolve participation state for current user and only show sessions where
       // the current user is a participant. Also load user's pending/declined invitations
       // so we can show 'Invited' or 'Rejoin' states in the UI for non-creators.
@@ -209,28 +221,26 @@ export default function Calendar() {
           declined.forEach((inv: any) => { invMap[inv.sessionId] = { id: inv.id, status: inv.status }; });
           setInvitationMap(invMap);
 
-          const checks = await Promise.all(allSessions.map(async (s) => {
-            try {
-              const isPart = await sessionAPI.isParticipant(s.id, user.id);
-              return { id: s.id, isPart };
-            } catch (err) {
-              return { id: s.id, isPart: false };
-            }
-          }));
+          const sessionIds = allSessions.map((s) => s.id);
+          const rawStatusMap = sessionIds.length
+            ? await sessionParticipantAPI.getParticipationStatus(user.id, sessionIds)
+            : {};
+          const participationStatus: Record<number, boolean> = Object.entries(rawStatusMap).reduce((acc, [key, value]) => {
+            acc[Number(key)] = Boolean(value);
+            return acc;
+          }, {} as Record<number, boolean>);
 
-          const visible = allSessions
-            .map(s => {
-              const inv = invMap[s.id] || null;
-              return {
-                ...s,
-                isParticipant: !!(checks.find(c => c.id === s.id)?.isPart),
-                invitationStatus: inv ? inv.status : 'NONE',
-                invitationId: inv ? inv.id : null,
-              };
-            })
-            // show only sessions where current user is a participant OR where they created the session OR where they have an invitation
-            .filter(s => s.isParticipant || s.createdById === user.id || s.invitationStatus !== 'NONE');
-
+          const visible = allSessions.map(s => {
+            const inv = invMap[s.id] || null;
+            return {
+              ...s,
+              isParticipant: participationStatus[s.id] ?? false,
+              invitationStatus: inv ? inv.status : 'NONE',
+              invitationId: inv ? inv.id : null,
+            };
+          });
+          
+          console.log('Calendar: Setting sessionsState with', visible.length, 'sessions');
           setSessionsState(visible);
         } catch (err) {
           console.warn('Error checking participant status or loading invitations', err);
@@ -289,33 +299,38 @@ export default function Calendar() {
     return () => clearInterval(interval);
   }, [user]);
 
+  const normalizeDateTimeInput = (value: string | null, dateHint?: string | null) => {
+    if (!value) return null;
+    const trimmed = value.trim();
+    if (!trimmed) return null;
+    if (trimmed.includes('T')) return trimmed;
+    if (dateHint) return `${dateHint}T${trimmed}`;
+    return trimmed;
+  };
+
+  const parseServerToLocalDate = (value: string | null, dateHint?: string | null) => {
+    const normalized = normalizeDateTimeInput(value, dateHint);
+    if (!normalized) return null;
+    const hasTZ = /[zZ]$|[+-]\d{2}:?\d{2}$/.test(normalized);
+    const candidate = hasTZ ? new Date(normalized) : new Date(normalized);
+    return Number.isNaN(candidate.getTime()) ? null : candidate;
+  };
+
+  const formatLocalDate = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  const formatSimpleTime = (value?: string | null) => value ? value.split(':').slice(0, 2).join(':') : '';
+
   const mapDtoToUi = (dto: any) => {
     // dto: SessionResponseDTO (now has startTime and durationDays)
     const start = dto.startTime || dto.start || null;
     const firstDayEnd = dto.endTime || dto.end || null;
     const duration = dto.durationDays == null ? dto.duration || 1 : dto.durationDays;
-    // Parse server start into a local Date reliably: if the server string includes a timezone (Z or +/-offset)
-    // use Date parsing; otherwise treat the string as local and build a Date from components to avoid implicit UTC conversions.
-    const parseServerToLocalDate = (s: string | null) => {
-      if (!s) return null;
-      const hasTZ = /[zZ]$|[+-]\d{2}:?\d{2}$/.test(s);
-      if (hasTZ) return new Date(s);
-      // expected format YYYY-MM-DDTHH:mm[:ss]
-      const parts = s.split('T');
-      if (parts.length < 2) return new Date(s);
-      const [y, m, d] = parts[0].split('-').map(Number);
-      const [hh, mm] = parts[1].split(':').map(Number);
-      return new Date(y, m - 1, d, hh || 0, mm || 0, 0);
-    };
-
-  const startDate = parseServerToLocalDate(start);
-  const firstDayEndDate = parseServerToLocalDate(firstDayEnd);
-  const computedEnd = firstDayEndDate ? new Date(firstDayEndDate.getTime() + (Math.max(duration - 1, 0) * 24 * 60 * 60 * 1000)) : null;
-  const endTimeDisplay = firstDayEndDate ? firstDayEndDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
-  const formatLocalDate = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-  const date = startDate ? formatLocalDate(startDate) : (dto.date ?? '');
-  const startTimeDisplay = startDate ? startDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
-  const time = startDate ? `${startTimeDisplay}${endTimeDisplay ? ' - ' + endTimeDisplay : ''}` : '';
+    const startDate = parseServerToLocalDate(start, dto.date);
+    const firstDayEndDate = parseServerToLocalDate(firstDayEnd, dto.date);
+    const computedEnd = firstDayEndDate ? new Date(firstDayEndDate.getTime() + (Math.max(duration - 1, 0) * 24 * 60 * 60 * 1000)) : null;
+    const endTimeDisplay = firstDayEndDate ? firstDayEndDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : formatSimpleTime(firstDayEnd);
+    const date = startDate ? formatLocalDate(startDate) : (dto.date ?? '');
+    const startTimeDisplay = startDate ? startDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : formatSimpleTime(start);
+    const time = startTimeDisplay ? `${startTimeDisplay}${endTimeDisplay ? ' - ' + endTimeDisplay : ''}` : (startTimeDisplay || endTimeDisplay);
     return {
       id: dto.id,
       title: dto.title,
@@ -324,8 +339,8 @@ export default function Calendar() {
       startDateObj: startDate,
       durationDays: duration,
       time,
-      startTime: start,
-      endTime: dto.endTime,
+      startTime: startDate ? startDate.toISOString() : null,
+      endTime: firstDayEndDate ? firstDayEndDate.toISOString() : null,
       description: dto.description,
       meetingLink: dto.meetingLink,
       groupId: dto.groupId,

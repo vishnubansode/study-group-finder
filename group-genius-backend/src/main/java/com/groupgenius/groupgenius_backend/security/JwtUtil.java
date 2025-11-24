@@ -1,6 +1,7 @@
 package com.groupgenius.groupgenius_backend.security;
 
 import io.jsonwebtoken.*;
+import io.jsonwebtoken.JwtParser;
 import io.jsonwebtoken.security.Keys;
 import org.springframework.stereotype.Component;
 
@@ -10,7 +11,7 @@ import java.util.Date;
 @Component
 public class JwtUtil {
 
-    //  Should ideally come from application.properties
+    // Should ideally come from application.properties
     private final String jwtSecret = "GroupGeniusSecretKeyForJWTWhichShouldBeLongEnough123!";
     private final long jwtExpirationMs = 24 * 60 * 60 * 1000; // 24 hours
 
@@ -18,7 +19,7 @@ public class JwtUtil {
         return Keys.hmacShaKeyFor(jwtSecret.getBytes());
     }
 
-    //  Generate token
+    // Generate token
     public String generateToken(String email) {
         return Jwts.builder()
                 .setSubject(email) // subject = username/email
@@ -28,12 +29,16 @@ public class JwtUtil {
                 .compact();
     }
 
-    //  Extract email (username) from token
+    // Extract email (username) from token
     public String extractUsername(String token) {
         return parseClaims(token).getSubject();
     }
 
-    //  Validate token
+    public String extractUsernameAllowExpired(String token) {
+        return parseClaimsAllowExpired(token).getSubject();
+    }
+
+    // Validate token
     public boolean validateToken(String token) {
         try {
             parseClaims(token);
@@ -44,7 +49,7 @@ public class JwtUtil {
             System.out.println("JWT unsupported: " + e.getMessage());
         } catch (MalformedJwtException e) {
             System.out.println("Invalid JWT: " + e.getMessage());
-        } catch (SignatureException e) {
+        } catch (io.jsonwebtoken.security.SignatureException e) {
             System.out.println("Invalid JWT signature: " + e.getMessage());
         } catch (IllegalArgumentException e) {
             System.out.println("JWT claims string is empty: " + e.getMessage());
@@ -52,12 +57,36 @@ public class JwtUtil {
         return false;
     }
 
-    //  Internal: Parse token
+    // Internal: Parse token
     private Claims parseClaims(String token) {
-        return Jwts.parserBuilder()
+        return parseClaimsInternal(token, false);
+    }
+
+    private Claims parseClaimsAllowExpired(String token) {
+        return parseClaimsInternal(token, true);
+    }
+
+    private Claims parseClaimsInternal(String token, boolean allowExpired) {
+        JwtParser parser = Jwts.parserBuilder()
                 .setSigningKey(getSigningKey())
-                .build()
-                .parseClaimsJws(token)
-                .getBody();
+                .build();
+
+        try {
+            return parser.parseClaimsJws(token).getBody();
+        } catch (ExpiredJwtException e) {
+            if (allowExpired) {
+                return e.getClaims();
+            }
+            throw e;
+        }
+    }
+
+    public boolean isTokenExpired(String token) {
+        try {
+            parseClaims(token);
+            return false;
+        } catch (ExpiredJwtException e) {
+            return true;
+        }
     }
 }

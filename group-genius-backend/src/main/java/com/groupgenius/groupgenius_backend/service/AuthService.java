@@ -8,6 +8,7 @@ import com.groupgenius.groupgenius_backend.mapper.UserMapper;
 import com.groupgenius.groupgenius_backend.repository.CourseRepository;
 import com.groupgenius.groupgenius_backend.repository.UserRepository;
 import com.groupgenius.groupgenius_backend.security.JwtUtil;
+import io.jsonwebtoken.JwtException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -39,21 +40,21 @@ public class AuthService {
             profileImageUrl = fileStorageService.storeFile(profileImage);
         }
 
-    // Map DTO to Entity manually to avoid type mismatches
-    User user = User.builder()
-        .firstName(userDto.getFirstName())
-        .lastName(userDto.getLastName())
-        .email(userDto.getEmail())
-        .password(passwordEncoder.encode(userDto.getPassword()))
-        .secondarySchool(userDto.getSecondarySchool())
-        .graduationYear(userDto.getGraduationYear())
-        .university(userDto.getUniversity())
-        .major(userDto.getMajor())
-        .currentYear(userDto.getCurrentYear())
-        .bio(userDto.getBio())
-        .profileImageUrl(profileImageUrl)
-        .courses(new HashSet<>())
-        .build();
+        // Map DTO to Entity manually to avoid type mismatches
+        User user = User.builder()
+                .firstName(userDto.getFirstName())
+                .lastName(userDto.getLastName())
+                .email(userDto.getEmail())
+                .password(passwordEncoder.encode(userDto.getPassword()))
+                .secondarySchool(userDto.getSecondarySchool())
+                .graduationYear(userDto.getGraduationYear())
+                .university(userDto.getUniversity())
+                .major(userDto.getMajor())
+                .currentYear(userDto.getCurrentYear())
+                .bio(userDto.getBio())
+                .profileImageUrl(profileImageUrl)
+                .courses(new HashSet<>())
+                .build();
 
         if (userDto.getSelectedCourseIds() != null) {
             for (Long courseId : userDto.getSelectedCourseIds()) {
@@ -62,17 +63,17 @@ public class AuthService {
             }
         }
 
-    userRepository.save(user);
+        userRepository.save(user);
 
-    // Send welcome email asynchronously
-    emailService.sendWelcomeEmail(user.getEmail(), user.getFirstName());
+        // Send welcome email asynchronously
+        emailService.sendWelcomeEmail(user.getEmail(), user.getFirstName());
 
-    String token = jwtUtil.generateToken(user.getEmail());
-    return LoginResponse.builder()
-        .token(token)
-        .tokenType("Bearer")
-        .user(UserMapper.toResponse(user))
-        .build();
+        String token = jwtUtil.generateToken(user.getEmail());
+        return LoginResponse.builder()
+                .token(token)
+                .tokenType("Bearer")
+                .user(UserMapper.toResponse(user))
+                .build();
     }
 
     public LoginResponse login(LoginRequest request) {
@@ -87,6 +88,35 @@ public class AuthService {
 
         return LoginResponse.builder()
                 .token(token)
+                .tokenType("Bearer")
+                .user(UserMapper.toResponse(user))
+                .build();
+    }
+
+    public LoginResponse refreshToken(String token) {
+        if (token == null || token.isBlank()) {
+            throw new IllegalArgumentException("Authorization token is required");
+        }
+
+        boolean expired;
+        try {
+            expired = jwtUtil.isTokenExpired(token);
+        } catch (JwtException | IllegalArgumentException ex) {
+            throw new IllegalArgumentException("Invalid token");
+        }
+
+        if (!expired && !jwtUtil.validateToken(token)) {
+            throw new IllegalArgumentException("Invalid token");
+        }
+
+        String email = jwtUtil.extractUsernameAllowExpired(token);
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new IllegalArgumentException("User not found"));
+
+        String newToken = jwtUtil.generateToken(user.getEmail());
+
+        return LoginResponse.builder()
+                .token(newToken)
                 .tokenType("Bearer")
                 .user(UserMapper.toResponse(user))
                 .build();
@@ -126,8 +156,9 @@ public class AuthService {
         emailService.sendNotificationEmail(
                 user.getEmail(),
                 "Password Changed Successfully",
-                String.format("Hi %s,\n\nYour password has been successfully changed. If you didn't make this change, please contact support immediately.\n\nBest regards,\nGroupGenius Team", user.getFirstName())
-        );
+                String.format(
+                        "Hi %s,\n\nYour password has been successfully changed. If you didn't make this change, please contact support immediately.\n\nBest regards,\nGroupGenius Team",
+                        user.getFirstName()));
 
         return email;
     }

@@ -10,6 +10,7 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -29,8 +30,7 @@ public class AuthController {
     @PostMapping(value = "/register", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<LoginResponse> register(
             @RequestPart("user") UserDto userDto,
-            @RequestPart(value = "profileImage", required = false) MultipartFile profileImage
-    ) throws IOException {
+            @RequestPart(value = "profileImage", required = false) MultipartFile profileImage) throws IOException {
 
         return ResponseEntity.ok(authService.register(userDto, profileImage));
     }
@@ -39,6 +39,26 @@ public class AuthController {
     public ResponseEntity<LoginResponse> login(@Valid @RequestBody LoginRequest loginRequest) {
         LoginResponse response = authService.login(loginRequest);
         return ResponseEntity.ok(response);
+    }
+
+    @PostMapping("/refresh-token")
+    public ResponseEntity<?> refreshToken(@RequestHeader(value = "Authorization", required = false) String authHeader) {
+        try {
+            if (!StringUtils.hasText(authHeader) || !authHeader.startsWith("Bearer ")) {
+                return ResponseEntity.badRequest()
+                        .body(Map.of("error", "Authorization header with Bearer token is required"));
+            }
+
+            String token = authHeader.substring(7);
+            LoginResponse response = authService.refreshToken(token);
+            return ResponseEntity.ok(response);
+        } catch (RuntimeException e) {
+            return ResponseEntity.status(401)
+                    .body(Map.of("error", e.getMessage()));
+        } catch (Exception e) {
+            return ResponseEntity.status(500)
+                    .body(Map.of("error", "Unable to refresh token right now"));
+        }
     }
 
     @PostMapping("/forgot-password")
@@ -51,7 +71,7 @@ public class AuthController {
             }
 
             passwordResetService.initiatePasswordReset(email.trim());
-            
+
             Map<String, String> response = new HashMap<>();
             response.put("message", "Password reset link sent to your email");
             response.put("email", email.trim());
@@ -82,7 +102,7 @@ public class AuthController {
             }
 
             passwordResetService.resetPassword(token, newPassword);
-            
+
             Map<String, String> response = new HashMap<>();
             response.put("message", "Password reset successfully");
             return ResponseEntity.ok(response);
@@ -95,7 +115,7 @@ public class AuthController {
     @GetMapping("/debug/reset-tokens")
     public ResponseEntity<Map<String, Object>> getResetTokens() {
         List<PasswordResetToken> tokens = passwordResetService.getAllTokens();
-        
+
         Map<String, Object> debug = new HashMap<>();
         debug.put("totalTokens", tokens.size());
         debug.put("tokens", tokens.stream().map(token -> {
@@ -107,15 +127,14 @@ public class AuthController {
             tokenInfo.put("resetLink", "http://localhost:3000/reset-password?token=" + token.getToken());
             return tokenInfo;
         }).toList());
-        
+
         return ResponseEntity.ok(debug);
     }
 
     @PostMapping("/change-password")
     public ResponseEntity<Map<String, String>> changePassword(
             @RequestHeader("Authorization") String authHeader,
-            @RequestBody Map<String, String> request
-    ) {
+            @RequestBody Map<String, String> request) {
         try {
             String currentPassword = request.get("currentPassword");
             String newPassword = request.get("newPassword");
@@ -128,12 +147,12 @@ public class AuthController {
             // Extract email from JWT token
             String token = authHeader.replace("Bearer ", "");
             String email = authService.changePassword(token, currentPassword, newPassword);
-            
+
             Map<String, String> response = new HashMap<>();
             response.put("message", "Password changed successfully");
             response.put("email", email);
             return ResponseEntity.ok(response);
-            
+
         } catch (RuntimeException e) {
             if (e.getMessage().contains("Current password is incorrect")) {
                 return ResponseEntity.status(401)

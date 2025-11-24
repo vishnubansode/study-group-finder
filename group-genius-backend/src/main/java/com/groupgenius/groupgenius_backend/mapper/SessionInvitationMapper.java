@@ -9,19 +9,26 @@ public final class SessionInvitationMapper {
     }
 
     public static SessionInvitationResponse toDTO(SessionInvitation invitation) {
+        // Combine date + time to create LocalDateTime for the response
+        var session = invitation.getSession();
+        var sessionStartDateTime = session.getSessionDate() != null && session.getStartTime() != null
+                ? session.getSessionDate().atTime(session.getStartTime())
+                : null;
+        var sessionEndDateTime = session.getComputedEndTime(); // This already returns LocalDateTime
+
         return SessionInvitationResponse.builder()
                 .id(invitation.getId())
-                .sessionId(invitation.getSession().getId())
-                .sessionTitle(invitation.getSession().getTitle())
-                .sessionDescription(invitation.getSession().getDescription())
-                .sessionStartTime(invitation.getSession().getStartTime())
-                .sessionEndTime(invitation.getSession().getComputedEndTime())
-                .groupId(invitation.getSession().getGroup().getId())
-                .groupName(invitation.getSession().getGroup().getGroupName())
-                .sessionDurationDays(invitation.getSession().getDurationDays())
-                .invitedBy(invitation.getSession().getCreatedBy().getId())
-                .invitedByName(invitation.getSession().getCreatedBy().getFirstName() + " " +
-                        invitation.getSession().getCreatedBy().getLastName())
+                .sessionId(session.getId())
+                .sessionTitle(session.getTitle())
+                .sessionDescription(session.getDescription())
+                .sessionStartTime(sessionStartDateTime)
+                .sessionEndTime(sessionEndDateTime)
+                .groupId(session.getGroup().getId())
+                .groupName(session.getGroup().getGroupName())
+                .sessionDurationDays(session.getDurationDays())
+                .invitedBy(session.getCreatedBy().getId())
+                .invitedByName(session.getCreatedBy().getFirstName() + " " +
+                        session.getCreatedBy().getLastName())
                 .userId(invitation.getUser().getId())
                 .status(invitation.getStatus().name())
                 .invitedAt(invitation.getInvitedAt())

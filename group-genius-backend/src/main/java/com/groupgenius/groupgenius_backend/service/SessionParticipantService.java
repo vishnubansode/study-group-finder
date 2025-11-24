@@ -14,7 +14,11 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -59,6 +63,21 @@ public class SessionParticipantService {
 
         return participantRepository.findBySession(session).stream()
                 .anyMatch(p -> p.getUser().getId().equals(userId));
+    }
+
+    @Transactional(readOnly = true)
+    public Map<Long, Boolean> getParticipationStatusForSessions(Long userId, List<Long> sessionIds) {
+        if (sessionIds == null || sessionIds.isEmpty()) {
+            return Collections.emptyMap();
+        }
+        com.groupgenius.groupgenius_backend.entity.User user = userRepository.findById(userId)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found with ID: " + userId));
+        List<Long> participatingIds = participantRepository.findSessionIdsByUserIdAndSessionIds(user.getId(),
+                sessionIds);
+        Set<Long> participatingSet = new HashSet<>(participatingIds);
+        return sessionIds.stream().distinct().collect(Collectors.toMap(
+                id -> id,
+                participatingSet::contains));
     }
 
     /**

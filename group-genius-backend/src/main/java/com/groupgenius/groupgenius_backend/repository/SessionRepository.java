@@ -18,7 +18,7 @@ public interface SessionRepository extends JpaRepository<Session, Long>, JpaSpec
         // Find overlapping sessions for the same group
         // Overlap: existing_start < new_end AND existing_end > new_start
         // existing_end = DATE_ADD(s.start_time, INTERVAL s.duration_days DAY)
-        @Query(value = "SELECT * FROM sessions s WHERE s.group_id = :groupId AND (s.start_time < :endTime AND DATE_ADD(s.end_time, INTERVAL (s.duration_days - 1) DAY) > :startTime)", nativeQuery = true)
+        @Query(value = "SELECT * FROM sessions s WHERE s.group_id = :groupId AND (TIMESTAMP(s.session_date, s.start_time) < :endTime AND DATE_ADD(TIMESTAMP(s.session_date, s.end_time), INTERVAL (s.duration_days - 1) DAY) > :startTime)", nativeQuery = true)
         List<Session> findOverlappingSessions(@Param("groupId") Long groupId,
                         @Param("startTime") LocalDateTime startTime,
                         @Param("endTime") LocalDateTime endTime);
@@ -41,7 +41,7 @@ public interface SessionRepository extends JpaRepository<Session, Long>, JpaSpec
         // Find active sessions for a group (paged)
         Page<Session> findByGroupAndArchivedFalse(Group group, Pageable pageable);
 
-        @Query("SELECT s FROM Session s WHERE s.archived = false AND s.startTime BETWEEN :start AND :end")
+        @Query(value = "SELECT * FROM sessions s WHERE s.archived = false AND TIMESTAMP(s.session_date, s.start_time) BETWEEN :start AND :end", nativeQuery = true)
         List<Session> findActiveSessionsBetween(@Param("start") LocalDateTime start,
                         @Param("end") LocalDateTime end);
 }

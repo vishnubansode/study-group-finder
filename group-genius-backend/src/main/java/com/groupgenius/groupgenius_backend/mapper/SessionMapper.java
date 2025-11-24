@@ -14,13 +14,13 @@ public class SessionMapper {
                 .groupId(session.getGroup().getId())
                 .title(session.getTitle())
                 .description(session.getDescription())
+                .date(session.getSessionDate())
                 .startTime(session.getStartTime())
                 .endTime(session.getEndTime())
                 .durationDays(session.getDurationDays())
                 .meetingLink(session.getMeetingLink())
                 .createdById(session.getCreatedBy().getId())
                 .createdByName(session.getCreatedBy().getFirstName())
-                .createdAt(session.getCreatedAt())
                 .build();
     }
 }

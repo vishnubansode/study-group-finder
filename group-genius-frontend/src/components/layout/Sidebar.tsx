@@ -47,6 +47,12 @@ interface StickyNote {
   rotation: number;
 }
 
+const parseSessionDate = (value?: string | null) => {
+  if (!value) return null;
+  const parsed = new Date(value);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+};
+
 export function Sidebar() {
   const { user } = useAuth();
   const [nextSession, setNextSession] = useState<Session | null>(null);
@@ -62,16 +68,19 @@ export function Sidebar() {
   const mapDtoToUi = useCallback((dto: SessionResponseDTO, groupName?: string): Session => {
     const start = dto.startTime || dto.start || null;
     const end = dto.endTime || dto.end || null;
-    const startDate = start ? new Date(start) : null;
+    const startDate = parseSessionDate(start);
+    const endDate = parseSessionDate(end);
     const date = startDate ? startDate.toISOString().split('T')[0] : (dto.date ?? '');
-    const time = startDate ? `${startDate.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}${end ? ' - ' + (new Date(end)).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}) : ''}` : '';
+    const time = startDate
+      ? `${startDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}${endDate ? ' - ' + endDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}`
+      : '';
     return {
       id: dto.id,
       title: dto.title,
       date,
       time,
-      startTime: start,
-      endTime: end,
+      startTime: startDate ? startDate.toISOString() : null,
+      endTime: endDate ? end : null,
       groupId: dto.groupId,
       groupName: groupName || 'Study Group'
     };

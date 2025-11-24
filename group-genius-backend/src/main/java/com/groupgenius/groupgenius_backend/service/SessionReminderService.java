@@ -56,15 +56,16 @@ public class SessionReminderService {
         }
 
         for (Session session : sessions) {
-            if (session.getStartTime() == null) {
+            LocalDateTime sessionStart = session.getComputedStartTime();
+            if (sessionStart == null) {
                 continue;
             }
             processReminder(session, ReminderType.DAY_OF,
-                    session.getStartTime().toLocalDate().atStartOfDay(), now);
+                    sessionStart.toLocalDate().atStartOfDay(), now);
             processReminder(session, ReminderType.TWO_HOURS_BEFORE,
-                    session.getStartTime().minusHours(2), now);
+                    sessionStart.minusHours(2), now);
             processReminder(session, ReminderType.ONE_HOUR_BEFORE,
-                    session.getStartTime().minusHours(1), now);
+                    sessionStart.minusHours(1), now);
         }
     }
 
@@ -78,7 +79,8 @@ public class SessionReminderService {
             return;
         }
 
-        if (reminderType != ReminderType.DAY_OF && now.isAfter(session.getStartTime())) {
+        LocalDateTime sessionStart = session.getComputedStartTime();
+        if (reminderType != ReminderType.DAY_OF && sessionStart != null && now.isAfter(sessionStart)) {
             return;
         }
 
@@ -154,7 +156,10 @@ public class SessionReminderService {
     }
 
     private String buildReminderMessage(Session session, ReminderType reminderType) {
-        LocalDateTime startTime = session.getStartTime();
+        LocalDateTime startTime = session.getComputedStartTime();
+        if (startTime == null) {
+            return "Session reminder: " + session.getTitle();
+        }
         String formattedTime = startTime.format(TIME_DISPLAY_FORMATTER);
         LocalDate sessionDate = startTime.toLocalDate();
 

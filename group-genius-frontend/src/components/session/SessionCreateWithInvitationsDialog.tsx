@@ -97,34 +97,22 @@ export default function SessionCreateWithInvitationsDialog({
     try {
       setLoading(true);
 
-      // Combine date and time into ISO format and include duration in days
-      const startLocal = `${startDate}T${startTime}`;
-      const endLocal = `${startDate}T${endTime}`;
-      const startMoment = new Date(startLocal);
-      const endMoment = new Date(endLocal);
-      if (endMoment <= startMoment) {
-        alert('End time must be later than the start time and on the same day.');
+      // Validate times are on same day and end is after start
+      const startDateTime = new Date(`${startDate}T${startTime}`);
+      const endDateTime = new Date(`${startDate}T${endTime}`);
+      
+      if (endDateTime <= startDateTime) {
+        alert('End time must be later than the start time.');
         return;
       }
-      const formatWithOffset = (localDatetime: string) => {
-        if (!localDatetime) return localDatetime;
-        const base = localDatetime.length === 16 ? `${localDatetime}:00` : localDatetime;
-        const offsetMinutes = -new Date().getTimezoneOffset();
-        const sign = offsetMinutes >= 0 ? '+' : '-';
-        const abs = Math.abs(offsetMinutes);
-        const hh = String(Math.floor(abs / 60)).padStart(2, '0');
-        const mm = String(abs % 60).padStart(2, '0');
-        return `${base}${sign}${hh}:${mm}`;
-      };
 
       const request: SessionCreateWithInvitationsRequest = {
         groupId,
         title,
         description,
-        startTime: formatWithOffset(startLocal),
-        startTimeLocal: startLocal,
-        endTime: formatWithOffset(endLocal),
-        endTimeLocal: endLocal,
+        date: startDate, // YYYY-MM-DD
+        startTime, // HH:mm
+        endTime, // HH:mm
         durationDays: durationDays,
         meetingLink: meetingLink || undefined,
         invitedUserIds: selectedUserIds,
@@ -138,7 +126,7 @@ export default function SessionCreateWithInvitationsDialog({
       setStartDate('');
       setStartTime('');
       setEndTime('');
-  setDurationDays(1);
+      setDurationDays(1);
       setMeetingLink('');
       setSelectedUserIds([]);
       

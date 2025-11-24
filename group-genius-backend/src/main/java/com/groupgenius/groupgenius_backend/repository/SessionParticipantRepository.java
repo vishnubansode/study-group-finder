@@ -25,4 +25,8 @@ public interface SessionParticipantRepository extends JpaRepository<SessionParti
 
     @Query("SELECT sp FROM SessionParticipant sp WHERE sp.session.group.id = :groupId AND sp.user.id = :userId")
     List<SessionParticipant> findByGroupIdAndUserId(@Param("groupId") Long groupId, @Param("userId") Long userId);
+
+    @Query("SELECT sp.session.id FROM SessionParticipant sp WHERE sp.user.id = :userId AND sp.session.id IN :sessionIds")
+    List<Long> findSessionIdsByUserIdAndSessionIds(@Param("userId") Long userId,
+            @Param("sessionIds") List<Long> sessionIds);
 }
