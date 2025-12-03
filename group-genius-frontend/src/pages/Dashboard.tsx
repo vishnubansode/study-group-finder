@@ -7,30 +7,54 @@ import {
   Users, 
   Calendar, 
   BookOpen, 
-  Award, 
   Plus, 
-  Clock, 
   TrendingUp, 
   MessageCircle,
   Target,
   UserPlus,
   ArrowRight,
+  ArrowUpRight,
+  ArrowDownRight,
   GraduationCap,
-  Sparkles,
   Edit,
-  Bell,
-  CheckCircle2,
-  X,
   Zap,
-  Lightbulb,
   Star,
-  Video,
-  FileText
+  BookmarkCheck,
+  Sparkles,
+  Layers,
+  BarChart3
 } from 'lucide-react';
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Link, useParams, Navigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import ChatContainer from '@/components/Chat/ChatContainer';
+import { userCourseApi } from '@/services/courseService';
+import type { Course, CoursePeer, UserDashboardResponse } from '@/types/course';
+
+type DashboardCourse = Course & { currentEnrollment?: number };
+type StatDetail = {
+  label: string;
+  value: string;
+  hint?: string;
+  icon?: React.ReactNode;
+};
+
+type StatCardConfig = {
+  icon: React.ReactNode;
+  title: string;
+  value: string;
+  change: string;
+  trend: 'up' | 'down' | 'neutral';
+  details?: StatDetail[];
+  chip?: { label: string; value: string };
+  insight?: string;
+  accent?: {
+    gradient?: string;
+    iconBg?: string;
+    chipBg?: string;
+    ring?: string;
+  };
+};
 
 export default function Dashboard() {
   const { id } = useParams<{ id: string }>();
@@ -46,16 +70,145 @@ export default function Dashboard() {
     return <Navigate to={`/dashboard/${user.id}`} replace />;
   }
 
-  // Replace demo/mock arrays with real data fetches in future.
-  // For now use empty arrays/placeholders to avoid showing dummy data.
-  const [upcomingSessions, setUpcomingSessions] = useState<any[]>([]);
-  const [myCourses, setMyCourses] = useState<any[]>([]);
-  const [myGroups, setMyGroups] = useState<any[]>([]);
-  const [notifications, setNotifications] = useState<any[]>([]);
-  const [suggestedPeers, setSuggestedPeers] = useState<any[]>([]);
-  const [motivationalTips] = useState<any[]>([]);
-  const currentTip = motivationalTips.length ? motivationalTips[Math.floor(Date.now() / (24 * 60 * 60 * 1000)) % motivationalTips.length] : null;
-  const [selectedGroupId, setSelectedGroupId] = useState<number | null>(null);
+  const [dashboardData, setDashboardData] = useState<UserDashboardResponse | null>(null);
+  const [dashboardLoading, setDashboardLoading] = useState(false);
+  const [dashboardError, setDashboardError] = useState<string | null>(null);
+  const [expandedCourseId, setExpandedCourseId] = useState<number | null>(null);
+  const [expandedPeerId, setExpandedPeerId] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (!user?.id) return;
+    let isMounted = true;
+    setDashboardLoading(true);
+    setDashboardError(null);
+
+    userCourseApi.getUserDashboard(user.id)
+      .then((data) => {
+        if (!isMounted) return;
+        setDashboardData(data);
+      })
+      .catch((error) => {
+        if (!isMounted) return;
+        setDashboardError(error?.message || 'Unable to load dashboard data.');
+      })
+      .finally(() => {
+        if (!isMounted) return;
+        setDashboardLoading(false);
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [user?.id]);
+
+  const enrolledCourses: DashboardCourse[] = (dashboardData?.enrolledCourses ?? []) as DashboardCourse[];
+  const suggestedPeers: CoursePeer[] = (dashboardData?.suggestedPeers ?? []) as CoursePeer[];
+  const totalCourses = dashboardData?.totalCourses ?? 0;
+  const totalPeers = dashboardData?.totalPeers ?? 0;
+  const peersWithCommonCourses = suggestedPeers.filter(peer => (peer.commonCourses ?? 0) > 0).length;
+  const sharedCourseCount = suggestedPeers.reduce((sum, peer) => sum + (peer.commonCourses ?? 0), 0);
+  const totalEnrollment = enrolledCourses.reduce((sum, course) => sum + (course.currentEnrollment ?? 0), 0);
+  const averageClassSize = enrolledCourses.length ? Math.round(totalEnrollment / enrolledCourses.length) : 0;
+  const activeCourseCount = enrolledCourses.filter(course => course.isEnrolled).length;
+  const savedCourseCount = Math.max(totalCourses - activeCourseCount, 0);
+  const latestCourseCode = enrolledCourses[0]?.courseCode ?? '—';
+  const averagePeerOverlap = suggestedPeers.length ? sharedCourseCount / suggestedPeers.length : 0;
+  const formattedAveragePeerOverlap = averagePeerOverlap % 1 === 0 ? averagePeerOverlap.toString() : averagePeerOverlap.toFixed(1);
+  const topPeerMatch = suggestedPeers.reduce<CoursePeer | undefined>((currentTop, peer) => {
+    if (!currentTop) return peer;
+    return (peer.commonCourses ?? 0) > (currentTop.commonCourses ?? 0) ? peer : currentTop;
+  }, undefined);
+  const engagedPeers = suggestedPeers.filter(peer => (peer.commonCourses ?? 0) >= 2).length;
+  const classSizes = enrolledCourses.map((course) => course.currentEnrollment ?? 0);
+  const largestClassSize = classSizes.length ? Math.max(...classSizes) : 0;
+  const smallestClassSize = classSizes.length ? Math.min(...classSizes) : 0;
+  const classSpread = classSizes.length ? Math.max(largestClassSize - smallestClassSize, 0) : 0;
+  const courseColorPalette = ['bg-primary', 'bg-secondary', 'bg-accent', 'bg-orange-500', 'bg-emerald-500'];
+  const getCourseColor = (index: number) => courseColorPalette[index % courseColorPalette.length];
+  const defaultChatGroupId = 1;
+  const topPeerMatchName = topPeerMatch ? `${topPeerMatch.firstName} ${topPeerMatch.lastName ?? ''}`.trim() : 'Pending';
+  const statCards: StatCardConfig[] = [
+    {
+      icon: <BookOpen className="w-5 h-5" />,
+      title: 'Enrolled Courses',
+      value: totalCourses.toString(),
+      change: dashboardLoading ? 'Syncing courses...' : activeCourseCount ? `${activeCourseCount} courses active now` : 'Enroll to get started',
+      trend: activeCourseCount ? 'up' : 'neutral',
+      chip: totalCourses ? { label: 'Active ratio', value: `${activeCourseCount}/${totalCourses}` } : undefined,
+      insight: totalCourses ? 'Keep momentum by spreading study blocks through the week.' : 'Add your first class to unlock personalized insights.',
+      accent: {
+        gradient: 'from-sky-500/15 via-sky-500/5 to-transparent',
+        iconBg: 'bg-sky-500/15 text-sky-600',
+        chipBg: 'bg-sky-500/10 text-sky-700',
+        ring: 'ring-1 ring-sky-500/20',
+      },
+      details: [
+        { label: 'Active now', value: activeCourseCount.toString(), hint: 'Courses currently running', icon: <Zap className="w-3 h-3" /> },
+        { label: 'Saved for later', value: savedCourseCount.toString(), hint: 'Pinned to revisit soon', icon: <BookmarkCheck className="w-3 h-3" /> },
+        { label: 'Latest course', value: latestCourseCode, hint: 'Most recent enrollment', icon: <BookOpen className="w-3 h-3" /> },
+      ],
+    },
+    {
+      icon: <Users className="w-5 h-5" />,
+      title: 'Suggested Peers',
+      value: totalPeers.toString(),
+      change: dashboardLoading ? 'Matching peers...' : peersWithCommonCourses ? `${peersWithCommonCourses} ready to collaborate` : 'Enroll to unlock matches',
+      trend: peersWithCommonCourses ? 'up' : 'neutral',
+      chip: suggestedPeers.length ? { label: 'High-overlap', value: engagedPeers.toString() } : undefined,
+      insight: peersWithCommonCourses ? `Top match: ${topPeerMatchName}` : 'Once you share courses, we surface best-fit peers.',
+      accent: {
+        gradient: 'from-violet-500/15 via-violet-500/5 to-transparent',
+        iconBg: 'bg-violet-500/15 text-violet-600',
+        chipBg: 'bg-violet-500/10 text-violet-700',
+        ring: 'ring-1 ring-violet-500/20',
+      },
+      details: [
+        { label: 'Matches ready', value: peersWithCommonCourses.toString(), hint: 'Share at least one class', icon: <Users className="w-3 h-3" /> },
+        { label: 'Avg overlap', value: `${formattedAveragePeerOverlap} courses`, hint: 'Per suggested peer', icon: <Layers className="w-3 h-3" /> },
+        { label: 'Top match', value: topPeerMatchName, hint: 'Most shared courses', icon: <Sparkles className="w-3 h-3" /> },
+      ],
+    },
+    {
+      icon: <TrendingUp className="w-5 h-5" />,
+      title: 'Average Class Size',
+      value: averageClassSize.toString(),
+      change: enrolledCourses.length ? 'Across your current schedule' : 'Join a course to see data',
+      trend: enrolledCourses.length ? 'up' : 'neutral',
+      chip: enrolledCourses.length ? { label: 'Sections tracked', value: enrolledCourses.length.toString() } : undefined,
+      insight: classSizes.length ? `Largest group has ${largestClassSize} learners; spread of ${classSpread}.` : 'Class insights appear after enrolling.',
+      accent: {
+        gradient: 'from-emerald-500/15 via-emerald-500/5 to-transparent',
+        iconBg: 'bg-emerald-500/15 text-emerald-600',
+        chipBg: 'bg-emerald-500/10 text-emerald-700',
+        ring: 'ring-1 ring-emerald-500/20',
+      },
+      details: [
+        { label: 'Largest class', value: classSizes.length ? `${largestClassSize} students` : '—', hint: 'Peak enrollment', icon: <TrendingUp className="w-3 h-3" /> },
+        { label: 'Smallest class', value: classSizes.length ? `${smallestClassSize} students` : '—', hint: 'Most intimate', icon: <Target className="w-3 h-3" /> },
+        { label: 'Spread', value: classSizes.length ? `${classSpread} learners` : '—', hint: 'Range between classes', icon: <BarChart3 className="w-3 h-3" /> },
+      ],
+    },
+    {
+      icon: <Target className="w-5 h-5" />,
+      title: 'Shared Courses',
+      value: sharedCourseCount.toString(),
+      change: suggestedPeers.length ? 'Total overlaps with peers' : 'No overlaps yet',
+      trend: sharedCourseCount ? 'up' : 'neutral',
+      chip: suggestedPeers.length ? { label: 'Peers', value: suggestedPeers.length.toString() } : undefined,
+      insight: sharedCourseCount ? 'Leverage overlaps to spin up focused study pods.' : 'Shared course data appears after connecting with peers.',
+      accent: {
+        gradient: 'from-amber-500/15 via-amber-500/5 to-transparent',
+        iconBg: 'bg-amber-500/15 text-amber-600',
+        chipBg: 'bg-amber-500/10 text-amber-700',
+        ring: 'ring-1 ring-amber-500/20',
+      },
+      details: [
+        { label: 'Engaged peers', value: peersWithCommonCourses.toString(), hint: 'Share at least one class', icon: <Users className="w-3 h-3" /> },
+        { label: 'High-overlap peers', value: engagedPeers.toString(), hint: '2+ shared courses', icon: <Target className="w-3 h-3" /> },
+        { label: 'Avg per peer', value: formattedAveragePeerOverlap, hint: 'Shared courses each', icon: <BarChart3 className="w-3 h-3" /> },
+      ],
+    },
+  ];
   
   return (
     <div className="min-h-screen bg-background">
@@ -89,37 +242,20 @@ export default function Dashboard() {
         </div>
       </div>
 
+          {dashboardError && (
+            <div className="max-w-7xl mx-auto px-6 mt-4">
+              <div className="rounded-lg border border-destructive/30 bg-destructive/10 text-destructive px-4 py-3 text-sm">
+                {dashboardError}
+              </div>
+            </div>
+          )}
+
       <div className="max-w-7xl mx-auto px-6 py-8 pb-24 lg:pb-8">
         {/* Stats Overview */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-          <StatCard 
-            icon={<Users className="w-5 h-5" />} 
-            title="My Groups" 
-            value="5"
-            change="+2 this week"
-            trend="up"
-          />
-          <StatCard 
-            icon={<Calendar className="w-5 h-5" />} 
-            title="Sessions This Week" 
-            value="8"
-            change="3 completed"
-            trend="neutral"
-          />
-          <StatCard 
-            icon={<Clock className="w-5 h-5" />} 
-            title="Study Hours" 
-            value="24.5"
-            change="+5.2 from last week"
-            trend="up"
-          />
-          <StatCard 
-            icon={<Award className="w-5 h-5" />} 
-            title="Achievements" 
-            value="12"
-            change="2 new badges"
-            trend="up"
-          />
+          {statCards.map((card) => (
+            <StatCard key={card.title} {...card} />
+          ))}
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -147,15 +283,15 @@ export default function Dashboard() {
                     <div className="flex flex-wrap gap-2 justify-center sm:justify-start">
                       <Badge variant="outline" className="gap-1">
                         <BookOpen className="w-3 h-3" />
-                        4 Courses
+                        {dashboardLoading ? 'Syncing courses...' : `${totalCourses} Courses`}
                       </Badge>
                       <Badge variant="outline" className="gap-1">
                         <Users className="w-3 h-3" />
-                        5 Groups
+                        {dashboardLoading ? 'Finding peers...' : `${totalPeers} Peers`}
                       </Badge>
                       <Badge variant="outline" className="gap-1">
                         <Star className="w-3 h-3" />
-                        12 Achievements
+                        {sharedCourseCount} Shared Courses
                       </Badge>
                     </div>
                   </div>
@@ -169,59 +305,6 @@ export default function Dashboard() {
               </CardContent>
             </Card>
 
-            {/* Upcoming Sessions Card */}
-            <Card>
-              <CardHeader>
-                <div className="flex items-center justify-between">
-                  <div>
-                    <CardTitle className="flex items-center gap-2">
-                      <Calendar className="w-5 h-5 text-primary" />
-                      Upcoming Study Sessions
-                    </CardTitle>
-                    <CardDescription className="mt-1">Your scheduled sessions</CardDescription>
-                  </div>
-                  <Button variant="ghost" size="sm" asChild>
-                    <Link to="/calendar" className="gap-1">
-                      View All
-                      <ArrowRight className="w-4 h-4" />
-                    </Link>
-                  </Button>
-                </div>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                {upcomingSessions.map((session) => (
-                  <div key={session.id} className="flex items-center gap-3 p-4 rounded-lg border bg-card hover:bg-accent/5 transition-all hover:shadow-sm">
-                    <div className="flex flex-col items-center justify-center w-16 h-16 rounded-lg bg-primary/10 flex-shrink-0">
-                      <span className="text-xs font-semibold text-primary">{session.date}</span>
-                      <span className="text-xs text-muted-foreground">{session.time.split(',')[1]}</span>
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 mb-1">
-                        <h4 className="font-semibold text-sm truncate">{session.topic}</h4>
-                        {session.type === 'video' ? (
-                          <Badge variant="secondary" className="text-xs"><Video className="w-3 h-3 mr-1" />Online</Badge>
-                        ) : (
-                          <Badge variant="outline" className="text-xs">In-Person</Badge>
-                        )}
-                      </div>
-                      <p className="text-xs text-muted-foreground mb-2">{session.course} • {session.group}</p>
-                      <div className="flex items-center gap-2">
-                        <div className="flex -space-x-2">
-                          {[...Array(Math.min(session.attendees, 3))].map((_, i) => (
-                            <div key={i} className="w-6 h-6 rounded-full bg-gradient-to-br from-primary/80 to-secondary/80 border-2 border-background flex items-center justify-center text-xs text-white font-semibold">
-                              {String.fromCharCode(65 + i)}
-                            </div>
-                          ))}
-                        </div>
-                        <span className="text-xs text-muted-foreground">{session.attendees} attending</span>
-                      </div>
-                    </div>
-                    <Button size="sm" className="flex-shrink-0">Join</Button>
-                  </div>
-                ))}
-              </CardContent>
-            </Card>
-
             {/* My Courses Card */}
             <Card>
               <CardHeader>
@@ -229,9 +312,9 @@ export default function Dashboard() {
                   <div>
                     <CardTitle className="flex items-center gap-2">
                       <BookOpen className="w-5 h-5 text-primary" />
-                      My Courses
+                      Enrolled Courses
                     </CardTitle>
-                    <CardDescription>Your enrolled courses and progress</CardDescription>
+                    <CardDescription>Synced from your dashboard</CardDescription>
                   </div>
                   <Button variant="ghost" size="sm" asChild>
                     <Link to="/courses" className="gap-1">
@@ -242,64 +325,72 @@ export default function Dashboard() {
                 </div>
               </CardHeader>
               <CardContent className="space-y-3">
-                {myCourses.map((course) => (
-                  <div key={course.id} className="p-4 rounded-lg border hover:bg-accent/5 transition-colors group">
-                    <div className="flex items-start justify-between mb-3">
-                      <div className="flex items-center gap-3">
-                        <div className={`w-10 h-10 ${course.color} rounded-lg flex items-center justify-center flex-shrink-0`}>
-                          <BookOpen className="w-5 h-5 text-white" />
-                        </div>
-                        <div className="flex-1">
-                          <div className="flex items-center gap-2 mb-1">
-                            <Badge variant="outline" className="text-xs font-mono">{course.code}</Badge>
-                            <h4 className="font-semibold text-sm">{course.name}</h4>
-                          </div>
-                          <p className="text-xs text-muted-foreground">{course.professor}</p>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Button 
-                          variant="ghost" 
-                          size="sm" 
-                          className="h-8 px-2 opacity-0 group-hover:opacity-100 transition-opacity"
-                          asChild
-                        >
-                          <Link to={`/courses?course=${course.code}`}>
-                            <Users className="w-4 h-4" />
-                          </Link>
-                        </Button>
-                        <Button 
-                          variant="ghost" 
-                          size="sm" 
-                          className="h-8 w-8 p-0 text-muted-foreground hover:text-destructive opacity-0 group-hover:opacity-100 transition-opacity"
-                        >
-                          <X className="w-4 h-4" />
-                        </Button>
-                      </div>
-                    </div>
-                    <div className="space-y-2">
-                      <div className="flex items-center justify-between text-xs">
-                        <span className="text-muted-foreground">Course Progress</span>
-                        <span className="font-semibold">{course.progress}%</span>
-                      </div>
-                      <div className="w-full h-2 bg-secondary/20 rounded-full overflow-hidden">
-                        <div 
-                          className={`h-full ${course.color} transition-all duration-500`}
-                          style={{ width: `${course.progress}%` }}
-                        />
-                      </div>
-                      <div className="flex items-center justify-between text-xs text-muted-foreground">
-                        <span>Next assignment due soon</span>
-                        <Link 
-                          to={`/courses?course=${course.code}`}
-                          className="text-primary hover:underline font-medium"
-                        >
-                          View details
-                        </Link>
-                      </div>
-                    </div>
+                {dashboardLoading && (
+                  <div className="text-sm text-muted-foreground">Loading courses...</div>
+                )}
+                {!dashboardLoading && enrolledCourses.length === 0 && (
+                  <div className="text-sm text-muted-foreground">
+                    You haven't enrolled in any courses yet. Visit the catalog to get started.
                   </div>
-                ))}
+                )}
+                {enrolledCourses.map((course, index) => {
+                  const isExpanded = expandedCourseId === course.id;
+                  return (
+                    <button
+                      key={course.id}
+                      type="button"
+                      onClick={() => setExpandedCourseId(isExpanded ? null : course.id)}
+                      className={`w-full text-left p-4 rounded-lg border transition-colors focus:outline-none focus:ring-2 focus:ring-primary/40 ${
+                        isExpanded ? 'bg-accent/10 border-primary/40 shadow-sm' : 'hover:bg-accent/5'
+                      }`}
+                      aria-expanded={isExpanded}
+                    >
+                      <div className="flex items-start gap-3">
+                        <div className={`w-10 h-10 ${getCourseColor(index)} rounded-lg flex items-center justify-center flex-shrink-0 text-white font-semibold`}>
+                          {course.courseCode?.slice(0, 2) || 'CC'}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 mb-1">
+                            <Badge variant="outline" className="text-xs font-mono">{course.courseCode}</Badge>
+                            <h4 className="font-semibold text-sm truncate">{course.courseName}</h4>
+                          </div>
+                          <p className={`text-xs text-muted-foreground mb-2 ${isExpanded ? '' : 'truncate'}`}>
+                            {course.description || 'No description available.'}
+                          </p>
+                          <div className="flex flex-wrap gap-4 text-xs text-muted-foreground">
+                            <span className="flex items-center gap-1">
+                              <Users className="w-3 h-3" />
+                              {course.currentEnrollment ?? 0} currently enrolled
+                            </span>
+                            <span className="flex items-center gap-1">
+                              <Calendar className="w-3 h-3" />
+                              {course.isEnrolled ? 'Enrolled' : 'Available'}
+                            </span>
+                          </div>
+                          {isExpanded && (
+                            <div className="mt-3 text-xs text-muted-foreground space-y-2">
+                              <div className="flex flex-wrap gap-4">
+                                <span>
+                                  Course ID: <span className="font-medium text-foreground">#{course.id}</span>
+                                </span>
+                                <span>
+                                  Enrollment trend: <span className="font-medium text-foreground">{course.currentEnrollment ?? 0} learners</span>
+                                </span>
+                              </div>
+                              <p>
+                                {course.description || 'No description provided for this course yet.'}
+                              </p>
+                              <div className="flex items-center gap-2 text-primary font-medium">
+                                <ArrowRight className="w-3 h-3" />
+                                Click again to collapse
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </button>
+                  );
+                })}
                 <div className="pt-3 border-t">
                   <Button variant="outline" className="w-full gap-2" asChild>
                     <Link to="/courses">
@@ -311,49 +402,7 @@ export default function Dashboard() {
               </CardContent>
             </Card>
 
-            {/* My Groups Card */}
-            <Card>
-              <CardHeader>
-                <div className="flex items-center justify-between">
-                  <div>
-                    <CardTitle className="flex items-center gap-2">
-                      <Users className="w-5 h-5 text-primary" />
-                      My Study Groups
-                    </CardTitle>
-                    <CardDescription>Groups you've joined</CardDescription>
-                  </div>
-                  <Button variant="ghost" size="sm" asChild>
-                    <Link to="/groups" className="gap-1">
-                      <Plus className="w-4 h-4" />
-                      Create Group
-                    </Link>
-                  </Button>
-                </div>
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  {myGroups.map((group) => (
-                    <div key={group.id} className="p-3 rounded-lg border hover:border-primary/50 transition-all hover:shadow-sm cursor-pointer">
-                      <div className="flex items-start gap-3">
-                        <div className="w-12 h-12 rounded-lg bg-gradient-to-br from-primary/20 to-secondary/20 flex items-center justify-center text-2xl flex-shrink-0">
-                          {group.avatar}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2 mb-1">
-                            <h4 className="font-semibold text-sm truncate">{group.name}</h4>
-                            {group.active && (
-                              <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
-                            )}
-                          </div>
-                          <p className="text-xs text-muted-foreground mb-2">{group.members} members</p>
-                          <p className="text-xs text-muted-foreground">Last active: {group.lastActivity}</p>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
+            {/* Removed placeholder groups card */}
           </div>
 
           {/* Sidebar - Right Column */}
@@ -399,73 +448,10 @@ export default function Dashboard() {
                 <CardDescription>Live chat for your primary group</CardDescription>
               </CardHeader>
               <CardContent className="p-0 h-[360px]">
-                {/* Use first group as default chat group for now */}
-                <ChatContainer groupId={myGroups.length ? myGroups[0].id : 1} username={user?.firstName || user?.email || 'Guest'} />
+                {/* Use fallback group until user selects one */}
+                <ChatContainer groupId={defaultChatGroupId} username={user?.firstName || user?.email || 'Guest'} />
               </CardContent>
             </Card>
-            {/* Notifications Card */}
-            <Card>
-              <CardHeader>
-                <div className="flex items-center justify-between">
-                  <CardTitle className="flex items-center gap-2 text-lg">
-                    <Bell className="w-5 h-5 text-primary" />
-                    Notifications
-                  </CardTitle>
-                  <Badge variant="secondary">{notifications.filter(n => n.unread).length}</Badge>
-                </div>
-              </CardHeader>
-              <CardContent className="space-y-2">
-                {notifications.map((notification) => (
-                  <div key={notification.id} className={`p-3 rounded-lg border transition-colors ${notification.unread ? 'bg-primary/5 border-primary/20' : 'hover:bg-accent/5'}`}>
-                    <p className="text-sm mb-1">{notification.message}</p>
-                    <p className="text-xs text-muted-foreground">{notification.time}</p>
-                    {notification.type === 'invite' && (
-                      <div className="flex gap-2 mt-2">
-                        <Button size="sm" variant="default" className="h-7 text-xs">Accept</Button>
-                        <Button size="sm" variant="outline" className="h-7 text-xs">Decline</Button>
-                      </div>
-                    )}
-                  </div>
-                ))}
-              </CardContent>
-            </Card>
-
-            {/* Progress/Engagement Card */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-lg">
-                  <TrendingUp className="w-5 h-5 text-primary" />
-                  This Week's Progress
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm text-muted-foreground">Groups Joined</span>
-                    <span className="font-bold text-lg">5</span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm text-muted-foreground">Sessions Attended</span>
-                    <span className="font-bold text-lg">8</span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm text-muted-foreground">Study Hours</span>
-                    <span className="font-bold text-lg">24.5</span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm text-muted-foreground">Messages Sent</span>
-                    <span className="font-bold text-lg">43</span>
-                  </div>
-                </div>
-                <div className="pt-3 border-t">
-                  <div className="flex items-center justify-center gap-2 text-sm text-green-600">
-                    <CheckCircle2 className="w-4 h-4" />
-                    <span className="font-semibold">Great week! Keep it up! 🎉</span>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
             {/* Suggested Peers Card */}
             <Card>
               <CardHeader>
@@ -476,38 +462,64 @@ export default function Dashboard() {
                 <CardDescription>Students with common courses</CardDescription>
               </CardHeader>
               <CardContent className="space-y-3">
-                {suggestedPeers.map((peer) => (
-                  <div key={peer.id} className="flex items-center gap-3 p-2 rounded-lg hover:bg-accent/5 transition-colors">
-                    <Avatar className="w-10 h-10">
-                      <AvatarImage src={peer.avatar || undefined} />
-                      <AvatarFallback className="text-xs bg-gradient-to-br from-primary/80 to-secondary/80 text-white">
-                        {peer.name.split(' ').map(n => n[0]).join('')}
-                      </AvatarFallback>
-                    </Avatar>
-                    <div className="flex-1 min-w-0">
-                      <h4 className="font-semibold text-sm">{peer.name}</h4>
-                      <p className="text-xs text-muted-foreground truncate">{peer.commonCourses}</p>
-                    </div>
-                    <Button size="sm" variant="outline" className="h-7 text-xs">Connect</Button>
-                  </div>
-                ))}
+                {dashboardLoading && (
+                  <div className="text-sm text-muted-foreground">Finding peers who share your courses...</div>
+                )}
+                {!dashboardLoading && suggestedPeers.length === 0 && (
+                  <div className="text-sm text-muted-foreground">No suggestions yet. Enroll in more courses to discover peers.</div>
+                )}
+                {suggestedPeers.map((peer) => {
+                  const isExpanded = expandedPeerId === peer.id;
+                  return (
+                    <button
+                      key={peer.id}
+                      type="button"
+                      onClick={() => setExpandedPeerId(isExpanded ? null : peer.id)}
+                      className={`w-full text-left p-3 rounded-lg border transition-colors focus:outline-none focus:ring-2 focus:ring-primary/40 ${
+                        isExpanded ? 'bg-accent/10 border-primary/40 shadow-sm' : 'hover:bg-accent/5'
+                      }`}
+                      aria-expanded={isExpanded}
+                    >
+                      <div className="flex items-center gap-3">
+                        <Avatar className="w-10 h-10">
+                          <AvatarImage src={peer.profileImageUrl || undefined} />
+                          <AvatarFallback className="text-xs bg-gradient-to-br from-primary/80 to-secondary/80 text-white">
+                            {[peer.firstName, peer.lastName].filter(Boolean).map((n) => n![0]).join('') || 'GG'}
+                          </AvatarFallback>
+                        </Avatar>
+                        <div className="flex-1 min-w-0">
+                          <h4 className="font-semibold text-sm truncate">{peer.firstName} {peer.lastName}</h4>
+                          <p className="text-xs text-muted-foreground truncate">{peer.email}</p>
+                          <p className="text-xs text-primary mt-1">{peer.commonCourses ?? 0} common courses</p>
+                          {isExpanded && (
+                            <div className="mt-2 text-xs text-muted-foreground space-y-1">
+                              {peer.university && <p><span className="font-medium text-foreground">University:</span> {peer.university}</p>}
+                              {peer.major && <p><span className="font-medium text-foreground">Major:</span> {peer.major}</p>}
+                              {peer.bio && <p className="leading-relaxed">{peer.bio}</p>}
+                              <p>
+                                Shared courses: <span className="font-medium text-foreground">{peer.commonCourses ?? 0}</span>
+                              </p>
+                            </div>
+                          )}
+                        </div>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="h-7 text-xs"
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            // future: trigger connect action
+                          }}
+                        >
+                          Connect
+                        </Button>
+                      </div>
+                    </button>
+                  );
+                })}
               </CardContent>
             </Card>
 
-            {/* Motivational/Tip Card */}
-            {currentTip ? (
-              <Card className={`bg-gradient-to-br ${currentTip.color} border-primary/20`}>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2 text-lg">
-                    {currentTip.icon}
-                    Daily Tip
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <p className="text-sm leading-relaxed">{currentTip.text}</p>
-                </CardContent>
-              </Card>
-            ) : null}
           </div>
         </div>
       </div>
@@ -520,30 +532,85 @@ function StatCard({
   title, 
   value, 
   change, 
-  trend 
-}: { 
-  icon: React.ReactNode; 
-  title: string; 
-  value: string; 
-  change: string; 
-  trend: 'up' | 'down' | 'neutral';
-}) {
+  trend, 
+  details,
+  chip,
+  insight,
+  accent
+}: StatCardConfig) {
+  const accentStyles = {
+    gradient: accent?.gradient ?? 'from-primary/10 via-primary/5 to-transparent',
+    iconBg: accent?.iconBg ?? 'bg-primary/10 text-primary',
+    chipBg: accent?.chipBg ?? 'bg-primary/10 text-primary',
+    ring: accent?.ring ?? 'ring-1 ring-border/60',
+  };
+
+  const trendStyles = {
+    up: { color: 'text-emerald-600', icon: <ArrowUpRight className="w-3 h-3" /> },
+    down: { color: 'text-rose-500', icon: <ArrowDownRight className="w-3 h-3" /> },
+    neutral: { color: 'text-muted-foreground', icon: <ArrowRight className="w-3 h-3" /> },
+  } as const;
+
+  const iconNode = React.isValidElement(icon)
+    ? React.cloneElement(icon, { className: 'w-5 h-5' })
+    : icon;
+
   return (
-    <Card className="hover:shadow-md transition-shadow">
-      <CardHeader className="flex flex-row items-center justify-between pb-2">
-        <CardTitle className="text-sm font-medium text-muted-foreground">{title}</CardTitle>
-        <div className="text-primary">{icon}</div>
+    <Card className={`relative overflow-hidden rounded-2xl border bg-card/90 backdrop-blur shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-lg ${accentStyles.ring}`}>
+      <div className={`absolute inset-0 bg-gradient-to-br ${accentStyles.gradient}`} aria-hidden />
+      <CardHeader className="relative flex flex-row items-start justify-between gap-3 pb-3">
+        <div>
+          <CardTitle className="text-sm font-semibold text-foreground/90">{title}</CardTitle>
+          <p className={`text-xs mt-1 flex items-center gap-1 font-medium ${trendStyles[trend].color}`}>
+            {trendStyles[trend].icon}
+            {change}
+          </p>
+        </div>
+        <div className={`w-10 h-10 rounded-2xl flex items-center justify-center ${accentStyles.iconBg}`}>
+          {iconNode}
+        </div>
       </CardHeader>
-      <CardContent>
-        <div className="text-2xl font-bold">{value}</div>
-        <p className={`text-xs mt-1 flex items-center gap-1 ${
-          trend === 'up' ? 'text-green-600' : 
-          trend === 'down' ? 'text-red-600' : 
-          'text-muted-foreground'
-        }`}>
-          {trend === 'up' && <TrendingUp className="w-3 h-3" />}
-          {change}
-        </p>
+      <CardContent className="relative space-y-4">
+        <div className="flex items-baseline gap-3 flex-wrap">
+          <p className="text-4xl font-semibold tracking-tight">{value}</p>
+          {chip ? (
+            <span className={`text-[11px] uppercase tracking-wide font-semibold px-3 py-1 rounded-full ${accentStyles.chipBg}`}>
+              {chip.label}: {chip.value}
+            </span>
+          ) : null}
+        </div>
+        {details?.length ? (
+          <dl className="space-y-2.5 text-sm">
+            {details.map((detail) => (
+              <div
+                key={`${title}-${detail.label}`}
+                className="flex items-center justify-between gap-3 rounded-xl border border-border/60 bg-background/70 px-3 py-2"
+              >
+                <div className="flex items-center gap-2">
+                  {detail.icon ? (
+                    <span className="w-7 h-7 rounded-full bg-card/70 flex items-center justify-center text-muted-foreground">
+                      {React.isValidElement(detail.icon)
+                        ? React.cloneElement(detail.icon, { className: 'w-3.5 h-3.5' })
+                        : detail.icon}
+                    </span>
+                  ) : null}
+                  <div className="leading-tight">
+                    <dt className="text-xs font-medium text-muted-foreground">{detail.label}</dt>
+                    {detail.hint ? (
+                      <span className="text-[11px] text-muted-foreground/80">{detail.hint}</span>
+                    ) : null}
+                  </div>
+                </div>
+                <dd className="text-sm font-semibold text-foreground">{detail.value}</dd>
+              </div>
+            ))}
+          </dl>
+        ) : null}
+        {insight ? (
+          <p className="text-xs text-muted-foreground/80 border-t border-dashed border-border/70 pt-2">
+            {insight}
+          </p>
+        ) : null}
       </CardContent>
     </Card>
   );

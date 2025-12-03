@@ -45,10 +45,21 @@ const getDateLabel = (timestamp) => {
 };
 
 const MessageList = ({ messages, username, userId, onEdit, onDelete, typingIndicator }) => {
+  const containerRef = useRef(null);
   const bottomRef = useRef(null);
 
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+    if (!containerRef.current) return;
+    requestAnimationFrame(() => {
+      try {
+        containerRef.current.scrollTo({
+          top: containerRef.current.scrollHeight,
+          behavior: "smooth",
+        });
+      } catch (err) {
+        containerRef.current.scrollTop = containerRef.current.scrollHeight;
+      }
+    });
   }, [messages, typingIndicator]);
 
   let lastDateLabel = null;
@@ -60,7 +71,7 @@ const MessageList = ({ messages, username, userId, onEdit, onDelete, typingIndic
   }, [messages]);
 
   return (
-    <div className="flex-1 overflow-y-auto p-4">
+    <div ref={containerRef} className="flex-1 overflow-y-auto p-4">
       {!hasMessages && (
         <div className="flex items-center justify-center h-full">
           <div className="text-center text-muted-foreground">

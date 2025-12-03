@@ -61,7 +61,6 @@ export const MessagingWidget: React.FC<MessagingWidgetProps> = ({
   
   const widgetRef = useRef<HTMLDivElement>(null);
   const floatingButtonRef = useRef<HTMLDivElement>(null);
-  const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const movedRef = useRef(false);
   const initialDragPos = useRef({ x: 0, y: 0 });
@@ -138,15 +137,6 @@ export const MessagingWidget: React.FC<MessagingWidgetProps> = ({
       localStorage.setItem('groupgenius_chat_sessions', JSON.stringify(chatSessions));
     }
   }, [chatSessions]);
-
-  // Scroll to bottom of messages
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  };
-
-  useEffect(() => {
-    scrollToBottom();
-  }, [messages]);
 
   // Focus input when opening
   useEffect(() => {
@@ -744,8 +734,6 @@ export const MessagingWidget: React.FC<MessagingWidgetProps> = ({
                           </div>
                         </div>
                       )}
-                      
-                      <div ref={messagesEndRef} />
                     </div>
                   </ScrollArea>
                 </div>
